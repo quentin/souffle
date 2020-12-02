@@ -265,7 +265,8 @@ int main(int argc, char** argv) {
                         "\ttype-analysis"},
                 {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
                 {"help", 'h', "", "", false, "Display this help message."},
-                {"legacy", '\6', "", "", false, "Enable legacy support."}};
+                {"legacy", '\6', "", "", false, "Enable legacy support."},
+                {"preprocessor", '\7', "CMD", "", false, "preprocessor to use instead of mcpp"}};
         Global::config().processArgs(argc, argv, header.str(), footer.str(), options);
 
         // ------ command line arguments -------------
@@ -389,13 +390,25 @@ int main(int argc, char** argv) {
     }
 
     /* Create the pipe to establish a communication between cpp and souffle */
-    std::string cmd = which("mcpp");
 
-    if (!isExecutable(cmd)) {
-        throw std::runtime_error("failed to locate mcpp pre-processor");
+    std::string cmd;
+
+    if (Global::config().has("preprocessor")) {
+        cmd = Global::config().get("preprocessor");
+    } else {
+        cmd = which("mcpp");
+        if (isExecutable(cmd)) {
+            cmd += " -e utf8 -W0 ";
+        } else {
+            cmd = which("gcc");
+            if (isExecutable(cmd)) {
+                cmd += " -x c -E ";
+            } else {
+                throw std::runtime_error("failed to locate mcpp or gcc pre-processors");
+            }
+        }
     }
 
-    cmd += " -e utf8 -W0 ";
     cmd += toString(join(Global::config().getMany("include-dir"), " ",
             [&](auto&& os, auto&& dir) { tfm::format(os, "'-I%s'", dir); }));
     if (Global::config().has("macro")) {
