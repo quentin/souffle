@@ -31,7 +31,6 @@ using FF_uint = uint32_t;
 using FF_float = float;
 #endif
 
-extern "C" {
 
 FF_int foo(FF_int n, const char* s) {
     return n + strlen(s);
@@ -135,4 +134,3 @@ souffle::RamDomain my_to_number_fun(
 souffle::RamDomain my_identity(souffle::SymbolTable*, souffle::RecordTable*, souffle::RamDomain arg) {
     return arg;
 }
-}  // end of extern "C"

@@ -1,10 +1,9 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
-
+#include <cmath>
 using namespace std;
 
-extern "C" {
 
 uint32_t log_wrapper(uint32_t n) {
     return std::log2(n);
@@ -17,5 +16,4 @@ uint32_t get_rightmost_unset_bit(uint32_t n) {
         }
     }
     return 0;
-}
 }

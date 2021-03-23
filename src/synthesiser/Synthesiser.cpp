@@ -2436,7 +2436,6 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         }
         withSharedLibrary = true;
     });
-    os << "extern \"C\" {\n";
     for (const auto& f : functors) {
         //        std::size_t arity = f.second.length() - 1;
         const std::string& name = f.first;
@@ -2470,7 +2469,6 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
                     join(map(argsTypes, cppTypeDecl), ","));
         }
     }
-    os << "}\n";
     os << "\n";
     os << "namespace souffle {\n";
     os << "static const RamDomain RAM_BIT_SHIFT_MASK = RAM_DOMAIN_SIZE - 1;\n";
