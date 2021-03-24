@@ -445,7 +445,7 @@ public:
             if (cur->numElements >= parenttype::node::maxKeys) {
                 // split this node
                 idx -= cur->rebalance_or_split(
-                        const_cast<typename parenttype::node**>(&this->root), this->root_lock, idx);
+                        const_cast<typename parenttype::node**>(&this->root), this->root_lock, static_cast<int>(idx));
 
                 // insert element in right fragment
                 if (((typename parenttype::size_type)idx) > cur->numElements) {
