@@ -1340,7 +1340,7 @@ public:
 
                 // split this node
                 auto old_root = root;
-                idx -= cur->rebalance_or_split(const_cast<node**>(&root), root_lock, idx, parents);
+                idx -= cur->rebalance_or_split(const_cast<node**>(&root), root_lock, static_cast<int>(idx), parents);
 
                 // release parent lock
                 for (auto it = parents.rbegin(); it != parents.rend(); ++it) {

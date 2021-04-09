@@ -48,6 +48,9 @@ constexpr std::size_t hardware_destructive_interference_size = 2 * sizeof(max_al
 #include <sched.h>
 // pthread_yield is deprecated and should be replaced by sched_yield
 #define pthread_yield sched_yield
+#elif defined _MSC_VER
+#include <thread>
+#define pthread_yield std::this_thread::yield
 #endif
 
 // support for a parallel region
@@ -221,10 +224,14 @@ public:
 namespace detail {
 
 /* Pause instruction to prevent excess processor bus usage */
+#if defined _MSC_VER
+#define cpu_relax() YieldProcessor()
+#else
 #ifdef __x86_64__
 #define cpu_relax() asm volatile("pause\n" : : : "memory")
 #else
 #define cpu_relax() asm volatile("" : : : "memory")
+#endif
 #endif
 
 /**

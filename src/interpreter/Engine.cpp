@@ -1395,7 +1395,14 @@ RamDomain Engine::evalParallelScan(
         for (const auto& info : viewInfo) {
             newCtxt.createView(*getRelationHandle(info[0]), info[1], info[2]);
         }
+#if defined _OPENMP && _OPENMP < 200805
+        auto count = std::distance(pStream.begin(), pStream.end());
+        auto b = pStream.begin();
+        pfor(int i = 0; i < count; i++) {
+            auto it = b + i;
+#else
         pfor(auto it = pStream.begin(); it < pStream.end(); it++) {
+#endif
             for (const auto& tuple : *it) {
                 newCtxt[cur.getTupleId()] = tuple.data();
                 if (!execute(shadow.getNestedOperation(), newCtxt)) {
@@ -1448,7 +1455,14 @@ RamDomain Engine::evalParallelIndexScan(
         for (const auto& info : viewInfo) {
             newCtxt.createView(*getRelationHandle(info[0]), info[1], info[2]);
         }
+#if defined _OPENMP && _OPENMP < 200805
+        auto count = std::distance(pStream.begin(), pStream.end());
+        auto b = pStream.begin();
+        pfor(int i = 0; i < count; i++) {
+            auto it = b + i;
+#else
         pfor(auto it = pStream.begin(); it < pStream.end(); it++) {
+#endif
             for (const auto& tuple : *it) {
                 newCtxt[cur.getTupleId()] = tuple.data();
                 if (!execute(shadow.getNestedOperation(), newCtxt)) {
@@ -1486,7 +1500,14 @@ RamDomain Engine::evalParallelIfExists(
         for (const auto& info : viewInfo) {
             newCtxt.createView(*getRelationHandle(info[0]), info[1], info[2]);
         }
+#if defined _OPENMP && _OPENMP < 200805
+        auto count = std::distance(pStream.begin(), pStream.end());
+        auto b = pStream.begin();
+        pfor(int i = 0; i < count; i++) {
+            auto it = b + i;
+#else
         pfor(auto it = pStream.begin(); it < pStream.end(); it++) {
+#endif
             for (const auto& tuple : *it) {
                 newCtxt[cur.getTupleId()] = tuple.data();
                 if (execute(shadow.getCondition(), newCtxt)) {
@@ -1543,7 +1564,14 @@ RamDomain Engine::evalParallelIndexIfExists(const Rel& rel, const ram::ParallelI
         for (const auto& info : viewInfo) {
             newCtxt.createView(*getRelationHandle(info[0]), info[1], info[2]);
         }
+#if defined _OPENMP && _OPENMP < 200805
+        auto count = std::distance(pStream.begin(), pStream.end());
+        auto b = pStream.begin();
+        pfor(int i = 0; i < count; i++) {
+            auto it = b + i;
+#else
         pfor(auto it = pStream.begin(); it < pStream.end(); it++) {
+#endif
             for (const auto& tuple : *it) {
                 newCtxt[cur.getTupleId()] = tuple.data();
                 if (execute(shadow.getCondition(), newCtxt)) {
