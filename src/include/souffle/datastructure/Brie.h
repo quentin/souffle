@@ -2887,9 +2887,9 @@ public:
         if (this->empty()) return res;
 
         // use top-level elements for partitioning
-        int step = std::max(store.size() / chunks, std::size_t(1));
+        size_t step = std::max(store.size() / chunks, std::size_t(1));
 
-        int c = 1;
+        size_t c = 1;
         auto priv = begin();
         for (auto it = store.begin(); it != store.end(); ++it, c++) {
             if (c % step != 0 || c == 1) {

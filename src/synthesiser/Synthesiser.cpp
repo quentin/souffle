@@ -2700,7 +2700,7 @@ void runFunction(std::string  inputDirectoryArg,
     // set default threads (in embedded mode)
     // if this is not set, and omp is used, the default omp setting of number of cores is used.
 #if defined(_OPENMP)
-    if (0 < getNumThreads()) { omp_set_num_threads(getNumThreads()); }
+    if (0 < getNumThreads()) { omp_set_num_threads(static_cast<int>(getNumThreads())); }
 #endif
 
     signalHandler->set();

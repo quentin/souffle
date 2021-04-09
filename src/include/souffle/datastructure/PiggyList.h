@@ -9,18 +9,14 @@
 #include <iterator>
 
 #ifdef _WIN32
+#include <intrin.h>
 /**
  * Some versions of MSVC do not provide a builtin for counting leading zeroes
  * like gcc, so we have to implement it ourselves.
  */
 #if defined(_MSC_VER)
-unsigned long __inline __builtin_clzll(unsigned long long value) {
-    unsigned long msb = 0;
-
-    if (_BitScanReverse64(&msb, value))
-        return 63 - msb;
-    else
-        return 64;
+int __inline __builtin_clzll(unsigned long long value) {
+    return static_cast<int>(__lzcnt64(value));
 }
 #endif  // _MSC_VER
 #endif  // _WIN32

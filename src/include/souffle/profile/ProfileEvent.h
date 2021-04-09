@@ -81,7 +81,7 @@ public:
     }
 
     /** create quantity event */
-    void makeQuantityEvent(const std::string& txt, std::size_t number, int iteration) {
+    void makeQuantityEvent(const std::string& txt, std::size_t number, std::size_t iteration) {
         profile::EventProcessorSingleton::instance().process(database, txt.c_str(), number, iteration);
     }
 

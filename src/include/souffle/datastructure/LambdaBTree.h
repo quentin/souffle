@@ -346,7 +346,7 @@ public:
             assert(cur->numElements < parenttype::node::maxKeys && "Split required!");
 
             // move keys
-            for (int j = cur->numElements; j > idx; --j) {
+            for (int j = static_cast<int>(cur->numElements); j > idx; --j) {
                 cur->keys[j] = cur->keys[j - 1];
             }
 
@@ -458,7 +458,7 @@ public:
             assert(cur->numElements < parenttype::node::maxKeys && "Split required!");
 
             // move keys
-            for (int j = cur->numElements; j > idx; --j) {
+            for (size_t j = cur->numElements; j > static_cast<size_t>(idx); --j) {
                 cur->keys[j] = cur->keys[j - 1];
             }
 
