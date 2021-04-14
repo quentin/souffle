@@ -384,9 +384,58 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_END_COMMENT(out);
         }
 
-        void visit_(type_identity<Query>, const Query& query, std::ostream& out) override {
-            PRINT_BEGIN_COMMENT(out);
+        std::map<Own<UserDefinedOperator>, std::pair<int,int>> temporaries;
+        bool tmp_mode = false;
+        void genTemporaries(int lvl, std::ostream& out) {
+            tmp_mode = true;
+            for (auto const& [v, level] : temporaries) {
+                if (lvl == level.first) {
+                    out << "const auto tmp_";
+                    if (level.first < 0) {
+                        out << "neg" << (-level.first);
+                    } else {
+                        out  << level.first;
+                    }
+                    out << "_" << level.second << " = make_on_demand([=]() -> RamDomain {return ";
+                    dispatch(*v, out);
+                    out << ";});\n";
+                }
+            }
+            tmp_mode = false;
+        }
 
+        void visit_(type_identity<Query>, const Query& query, std::ostream& out) override {
+            temporaries.clear();
+            int curr = 0;
+            visit(query, [&](const UserDefinedOperator& op) {
+                for (auto const& [v, level] : temporaries) {
+                    if (op == *v) {
+                        return;
+                    }
+                }
+                bool contains_functor = false;
+
+                std::vector<Expression*> args = op.getArguments();
+                for (Expression* arg : args) {
+                    visit(*arg, [&](const UserDefinedOperator&) {
+                        contains_functor = true;
+                    });
+                }
+                if (!contains_functor) {
+                    int max_id = -1;
+                    for (auto arg : args) {
+                        visit(*arg, [&](const TupleElement& elem) {
+                            max_id = std::max(max_id, elem.getTupleId());
+                        });
+                    }
+                    temporaries[souffle::clone(op)] = std::make_pair(max_id, curr++);
+                }
+            });
+
+            PRINT_BEGIN_COMMENT(out);
+            out << "{\n"; // start scope for temporaries of level -1
+
+            genTemporaries(-1, out);
             // split terms of conditions of outer filter operation
             // into terms that require a context and terms that
             // do not require a context
@@ -472,6 +521,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << "}\n";
             }
 
+            out << "}\n"; // end scope for temporaries of level -1
             PRINT_END_COMMENT(out);
         }
 
@@ -684,6 +734,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "try{\n";
             out << "for(const auto& env0 : *it) {\n";
 
+            genTemporaries(0, out);
             visit_(type_identity<TupleOperation>(), pscan, out);
 
             out << "}\n";
@@ -705,6 +756,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "for(const auto& env" << id << " : "
                 << "*" << relName << ") {\n";
 
+            genTemporaries(id, out);
             visit_(type_identity<TupleOperation>(), scan, out);
 
             out << "}\n";
@@ -723,6 +775,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             out << "for(const auto& env" << identifier << " : "
                 << "*" << relName << ") {\n";
+            genTemporaries(identifier, out);
             out << "if( ";
 
             dispatch(ifexists.getCondition(), out);
@@ -767,6 +820,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                    )cpp";
             out << "try{\n";
             out << "for(const auto& env0 : *it) {\n";
+            genTemporaries(0, out);
             out << "if( ";
 
             dispatch(pifexists.getCondition(), out);
@@ -803,6 +857,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 << "lowerUpperRange_" << keys << "(" << rangeBounds.first.str() << ","
                 << rangeBounds.second.str() << "," << ctxName << ");\n";
             out << "for(const auto& env" << identifier << " : range) {\n";
+            genTemporaries(identifier, out);
 
             visit_(type_identity<TupleOperation>(), iscan, out);
 
@@ -848,6 +903,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                    )cpp";
             out << "try{\n";
             out << "for(const auto& env0 : *it) {\n";
+            genTemporaries(0, out);
 
             visit_(type_identity<TupleOperation>(), piscan, out);
 
@@ -877,6 +933,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 << "lowerUpperRange_" << keys << "(" << rangeBounds.first.str() << ","
                 << rangeBounds.second.str() << "," << ctxName << ");\n";
             out << "for(const auto& env" << identifier << " : range) {\n";
+            genTemporaries(identifier, out);
             out << "if( ";
 
             dispatch(iifexists.getCondition(), out);
@@ -928,6 +985,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                    )cpp";
             out << "try{";
             out << "for(const auto& env0 : *it) {\n";
+            genTemporaries(0, out);
             out << "if( ";
 
             dispatch(piifexists.getCondition(), out);
@@ -964,6 +1022,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 << "env" << unpack.getTupleId() << " = "
                 << "recordTable.unpack(ref," << arity << ");"
                 << "\n";
+            genTemporaries(unpack.getTupleId(), out);
 
             out << "{\n";
 
@@ -1002,6 +1061,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // shortcut: use relation size
                 out << "env" << identifier << "[0] = " << relName << "->"
                     << "size();\n";
+                genTemporaries(identifier, out);
                 out << "{\n";  // to match PARALLEL_END closing bracket
                 out << preamble.str();
                 visit_(type_identity<TupleOperation>(), aggregate, out);
@@ -1102,6 +1162,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // iterate over tuples in each part
                 out << "for (const auto& env" << identifier << ": *it) {\n";
             }
+            genTemporaries(identifier, out);
 
             // produce condition inside the loop if necessary
             out << "if( ";
@@ -1167,6 +1228,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             // write result into environment tuple
             out << "env" << identifier << "[0] = ramBitCast(res0);\n";
+            genTemporaries(identifier, out);
 
             // check whether there exists a min/max first before next loop
             out << "if (shouldRunNested) {\n";
@@ -1213,6 +1275,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // shortcut: use relation size
                 out << "env" << identifier << "[0] = " << relName << "->"
                     << "size();\n";
+                genTemporaries(identifier, out);
                 visit_(type_identity<TupleOperation>(), aggregate, out);
                 PRINT_END_COMMENT(out);
                 return;
@@ -1275,6 +1338,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // aggregate result
                 out << "for(const auto& env" << identifier << " : range) {\n";
             }
+            genTemporaries(identifier, out);
 
             // produce condition inside the loop
             out << "if( ";
@@ -1334,6 +1398,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             // write result into environment tuple
             out << "env" << identifier << "[0] = ramBitCast(res0);\n";
+            genTemporaries(identifier, out);
 
             // check whether there exists a min/max first before next loop
             out << "if (shouldRunNested) {\n";
@@ -1366,6 +1431,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     << "size();\n";
                 out << "PARALLEL_START\n";
                 out << preamble.str();
+                genTemporaries(identifier, out);
                 visit_(type_identity<TupleOperation>(), aggregate, out);
                 PRINT_END_COMMENT(out);
                 return;
@@ -1455,6 +1521,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "for (auto it = part.begin(); it < part.end(); ++it) {\n";
             // iterate over tuples in each part
             out << "for (const auto& env" << identifier << ": *it) {\n";
+            genTemporaries(identifier, out);
 
             // produce condition inside the loop
             out << "if( ";
@@ -1513,6 +1580,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             // write result into environment tuple
             out << "env" << identifier << "[0] = ramBitCast(res0);\n";
+            genTemporaries(identifier, out);
 
             // check whether there exists a min/max first before next loop
             out << "if (shouldRunNested) {\n";
@@ -1537,6 +1605,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // shortcut: use relation size
                 out << "env" << identifier << "[0] = " << relName << "->"
                     << "size();\n";
+                genTemporaries(identifier, out);
                 visit_(type_identity<TupleOperation>(), aggregate, out);
                 PRINT_END_COMMENT(out);
                 return;
@@ -1588,6 +1657,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             // check whether there is an index to use
             out << "for(const auto& env" << identifier << " : "
                 << "*" << relName << ") {\n";
+            genTemporaries(identifier, out);
 
             // produce condition inside the loop
             out << "if( ";
@@ -1642,6 +1712,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             // write result into environment tuple
             out << "env" << identifier << "[0] = ramBitCast(res0);\n";
+            genTemporaries(identifier, out);
 
             // check whether there exists a min/max first before next loop
             out << "if (shouldRunNested) {\n";
@@ -2256,6 +2327,20 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
         void visit_(type_identity<UserDefinedOperator>, const UserDefinedOperator& op,
                 std::ostream& out) override {
+            if (!tmp_mode) {
+                for (auto const& [v, level] : temporaries) {
+                    if (op == *v) {
+                        out << "*tmp_";
+                        if (level.first < 0) {
+                            out << "neg" << (-level.first);
+                        } else {
+                            out << level.first;
+                        }
+                        out << "_" << level.second;
+                        return;
+                    }
+                }
+            }
             const std::string& name = op.getName();
 
             auto args = op.getArguments();
@@ -2448,6 +2533,7 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         os << "#include <mutex>\n";
         os << "#include \"souffle/provenance/Explain.h\"\n";
     }
+    os << "#include<future>\n";
 
     if (Global::config().has("live-profile")) {
         os << "#include <thread>\n";
@@ -2657,6 +2743,56 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
                     foundIn(loadRelations), foundIn(storeRelations));
         }
     }
+    os << "private:\n";
+os << R"_(template<typename T>
+struct OnDemand {
+
+    OnDemand() = delete;
+
+    OnDemand(std::function<T()> Builder)
+        : Builder(Builder)
+        , Value() {
+    }
+
+    OnDemand(const OnDemand& Other)
+        : Builder(Other.Builder)
+        , Value(Other.Value) {
+    }
+
+    OnDemand(OnDemand&& Other)
+        : Builder(Other.Builder)
+        , Value(Other.Value) {
+    }
+
+    OnDemand& operator=(const OnDemand& Other) {
+        Builder = Other.Builder;
+        Value = Other.Value;
+        return *this;
+    }
+
+    OnDemand& operator=(OnDemand&& Other) {
+        Builder = Other.Builder;
+        Value = Other.Value;
+        return *this;
+    }
+
+    const T& operator*() const {
+        if (!Value) {
+            Value = Builder();
+        }
+        return *Value;
+    }
+private:
+    std::function<T()> Builder;
+    mutable std::optional<T> Value;
+};
+
+template <typename F, typename T = std::invoke_result_t<F>>
+OnDemand<T> make_on_demand(F &&Fun) {
+    return OnDemand<T>(Fun);
+}
+)_";
+
     os << "public:\n";
 
     // -- constructor --
