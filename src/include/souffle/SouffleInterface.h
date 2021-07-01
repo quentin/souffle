@@ -831,6 +831,11 @@ public:
     }
 
     /**
+     * Pass a pointer to an object implementing the user-defined functors
+     */
+    virtual void setFunctors(void*) {};
+
+    /**
      * Get Relation by its name from relationMap, if relation not found, return a nullptr.
      *
      * @param name The name of the target relation (const std::string)

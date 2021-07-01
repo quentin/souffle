@@ -2345,6 +2345,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             auto args = op.getArguments();
             if (op.isStateful()) {
+                if (Global::config().has("functors-in-class")) {
+                    out << "functors->";
+                }
                 out << name << "(&symTable, &recordTable";
                 for (auto& arg : args) {
                     out << ",";
@@ -2506,7 +2509,7 @@ private:
     std::shared_ptr<std::ostream> current_stream;
 };
 
-void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& withSharedLibrary) {
+void Synthesiser::generateCode(std::ostream& sos, std::ostream& header_os, const std::string& id, bool& withSharedLibrary) {
     // ---------------------------------------------------------------
     //                      Auto-Index Generation
     // ---------------------------------------------------------------
@@ -2519,6 +2522,8 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
     DelayableOutputStream os;
 
     withSharedLibrary = false;
+
+    bool functors_in_class = Global::config().has("functors-in-class");
 
     std::string classname = "Sf_" + id;
 
@@ -2535,6 +2540,10 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
     }
     os << "#include<future>\n";
 
+    if (Global::config().has("profile")) {
+        os << "#include \"souffle/profile/Logger.h\"\n";
+    }
+
     if (Global::config().has("live-profile")) {
         os << "#include <thread>\n";
         os << "#include \"souffle/profile/Tui.h\"\n";
@@ -2550,6 +2559,10 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
     }
 
     os << "\n";
+    if (functors_in_class) {
+        os << "#include \"" << id << ".hpp" << "\"\n";
+    }
+
     // produce external definitions for user-defined functors
     std::map<std::string, std::tuple<TypeAttribute, std::vector<TypeAttribute>, bool>> functors;
     visit(prog, [&](const UserDefinedOperator& op) {
@@ -2558,6 +2571,16 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         }
         withSharedLibrary = true;
     });
+
+    if (functors_in_class) {
+        header_os << "#pragma once\n";
+        header_os << "\n#include \"souffle/CompiledSouffle.h\"\n";
+        header_os << "class " << id << "_functors {\n";
+        header_os << "protected:\n";
+        header_os << "virtual ~"<< id << "_functors(){}\n";
+        header_os << "public:\n";
+    }
+
     for (const auto& f : functors) {
         //        std::size_t arity = f.second.length() - 1;
         const std::string& name = f.first;
@@ -2580,18 +2603,29 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
             UNREACHABLE_BAD_CASE_ANALYSIS
         };
 
+    	if (functors_in_class) {
+            header_os << "virtual ";
+	    }
         if (stateful) {
-            os << "souffle::RamDomain " << name << "(souffle::SymbolTable *, souffle::RecordTable *";
+            header_os << "souffle::RamDomain " << name << "(souffle::SymbolTable *, souffle::RecordTable *";
             for (std::size_t i = 0; i < argsTypes.size(); i++) {
-                os << ",souffle::RamDomain";
+                header_os << ",souffle::RamDomain";
             }
-            os << ");\n";
+            header_os << ")";
         } else {
-            tfm::format(os, "%s %s(%s);\n", cppTypeDecl(returnType), name,
+            tfm::format(header_os, "%s %s(%s)", cppTypeDecl(returnType), name,
                     join(map(argsTypes, cppTypeDecl), ","));
         }
+        if (functors_in_class) {
+            header_os << " = 0";
+        }
+	    header_os << ";\n";
     }
-    os << "\n";
+    if (functors_in_class) {
+        header_os << "};\n";
+    }
+    header_os << "\n";
+
     os << "namespace souffle {\n";
     os << "static const RamDomain RAM_BIT_SHIFT_MASK = RAM_DOMAIN_SIZE - 1;\n";
 
@@ -2636,11 +2670,20 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
     os << "   } return result;\n";
     os << "}\n";
 
+    if (Global::config().has("functors-in-class")) {
+        os << id << "_functors * functors;\n";
+    }
     if (Global::config().has("profile")) {
         os << "std::string profiling_fname;\n";
     }
 
     os << "public:\n";
+
+    if (Global::config().has("functors-in-class")) {
+	os << "void setFunctors(void* func_impl) override {\n";
+	os << "    functors = static_cast<" + id + "_functors*>(func_impl);\n";
+        os << "}\n";
+    }
 
     // declare symbol table
     os << "// -- initialize symbol table --\n";
@@ -2685,6 +2728,10 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         return initCons;
     };
 
+
+    if (Global::config().has("functors-in-class")) {
+        initConsSep() << "functors(static_cast<" + id + "_functors *>(func_impl))";
+    }
     // `pf` must be a ctor param (see below)
     if (Global::config().has("profile")) {
         initConsSep() << "profiling_fname(std::move(pf))";
@@ -2797,8 +2844,10 @@ OnDemand<T> make_on_demand(F &&Fun) {
 
     // -- constructor --
 
-    os << classname;
-    os << (Global::config().has("profile") ? "(std::string pf=\"profile.log\")" : "()");
+    os << classname << "(";
+    os << (Global::config().has("functors-in-class") ? "void* func_impl=nullptr" : "");
+    os << ((Global::config().has("profile") && Global::config().has("functors-in-class")) ? "," : "");
+    os << (Global::config().has("profile") ? "std::string pf=\"profile.log\")" : ")");
     os << initCons.str() << '\n';
     os << "{\n";
     if (Global::config().has("profile")) {
@@ -2806,6 +2855,7 @@ OnDemand<T> make_on_demand(F &&Fun) {
     }
     os << registerRel.str();
     os << "}\n";
+
     // -- destructor --
 
     os << "~" << classname << "() {\n";

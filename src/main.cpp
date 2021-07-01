@@ -266,6 +266,7 @@ int main(int argc, char** argv) {
                 {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
                 {"help", 'h', "", "", false, "Display this help message."},
                 {"legacy", '\6', "", "", false, "Enable legacy support."},
+                {"functors-in-class", '\1', "", "", false, "Implement user-defined functors within a class object"},
                 {"preprocessor", '\7', "CMD", "", false, "preprocessor to use instead of mcpp"}};
         Global::config().processArgs(argc, argv, header.str(), footer.str(), options);
 
@@ -733,10 +734,16 @@ int main(int argc, char** argv) {
             auto synthesisStart = std::chrono::high_resolution_clock::now();
             const bool emitToStdOut = Global::config().has("generate", "-");
             if (emitToStdOut)
-                synthesiser->generateCode(std::cout, baseIdentifier, withSharedLibrary);
+                synthesiser->generateCode(std::cout, std::cout, baseIdentifier, withSharedLibrary);
             else {
                 std::ofstream os{sourceFilename};
-                synthesiser->generateCode(os, baseIdentifier, withSharedLibrary);
+                if (Global::config().has("functors-in-class")) {
+                    std::string headerFilename = baseFilename + ".hpp";
+                    std::ofstream os_header{headerFilename};
+                    synthesiser->generateCode(os, os_header, baseIdentifier, withSharedLibrary);
+                } else {
+                    synthesiser->generateCode(os, os, baseIdentifier, withSharedLibrary);
+                }
             }
             if (Global::config().has("verbose")) {
                 auto synthesisEnd = std::chrono::high_resolution_clock::now();

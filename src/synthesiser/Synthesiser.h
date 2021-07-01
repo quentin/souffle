@@ -131,6 +131,6 @@ public:
     }
 
     /** Generate code */
-    void generateCode(std::ostream& os, const std::string& id, bool& withSharedLibrary);
+    void generateCode(std::ostream& os, std::ostream& header_os, const std::string& id, bool& withSharedLibrary);
 };
 }  // namespace souffle::synthesiser

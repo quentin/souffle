@@ -272,6 +272,9 @@ public:
     /** Dump outputs: not implemented */
     void dumpOutputs() override {}
 
+    /** not implemented */
+    void setFunctors(void*) override {};
+
     /** Run subroutine */
     void executeSubroutine(
             std::string name, const std::vector<RamDomain>& args, std::vector<RamDomain>& ret) override {
