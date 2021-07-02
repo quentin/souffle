@@ -81,6 +81,8 @@ public:
 
     void apply(const NodeMapper& map) override;
 
+    void print(std::ostream& os, bool printLoc) const;
+
 protected:
     void print(std::ostream& os) const override;
 

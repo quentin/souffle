@@ -155,6 +155,18 @@ Node::NodeVec Program::getChildren() const {
     return res;
 }
 
+void Program::print(std::ostream& os, bool printLoc) const {
+    if (!printLoc) {
+        print(os);
+        return;
+    }
+    auto cls = makePtrRange(clauses);
+    for (auto cl : cls) {
+        cl->print(os, true);
+        os << "\n\n";
+    }
+}
+
 void Program::print(std::ostream& os) const {
     auto show = [&](auto&& xs, char const* sep = "\n") {
         if (!xs.empty()) os << join(xs, sep) << "\n";

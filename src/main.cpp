@@ -16,6 +16,7 @@
 
 #include "Global.h"
 #include "ast/Node.h"
+#include "ast/Clause.h"
 #include "ast/Program.h"
 #include "ast/TranslationUnit.h"
 #include "ast/analysis/PrecedenceGraph.h"
@@ -267,6 +268,8 @@ int main(int argc, char** argv) {
                 {"help", 'h', "", "", false, "Display this help message."},
                 {"legacy", '\6', "", "", false, "Enable legacy support."},
                 {"functors-in-class", '\1', "", "", false, "Implement user-defined functors within a class object"},
+                {"transformed-datalog", 'd', "FILE", "", false, "save transformed datalog to <FILE>."},
+                {"transformed-ram", 'r', "FILE", "", false, "save transformed RAM to <FILE>."},
                 {"preprocessor", '\7', "CMD", "", false, "preprocessor to use instead of mcpp"}};
         Global::config().processArgs(argc, argv, header.str(), footer.str(), options);
 
@@ -583,6 +586,18 @@ int main(int argc, char** argv) {
     if (hasShowOpt("transformed-ast", "transformed-datalog")) {
         std::cout << astTranslationUnit->getProgram() << std::endl;
     }
+    if (Global::config().has("transformed-datalog")) {
+        std::ofstream os{Global::config().get("transformed-datalog")};
+    	astTranslationUnit->getProgram().print(os, true);
+    }
+
+    if (Global::config().has("show")) {
+        // Output the transformed datalog and return
+        if (Global::config().get("show") == "transformed-datalog") {
+            std::cout << astTranslationUnit->getProgram() << std::endl;
+            return 0;
+        }
+    }
 
     // Output the precedence graph in graphviz dot format
     if (hasShowOpt("precedence-graph")) {
@@ -674,6 +689,11 @@ int main(int argc, char** argv) {
             !execute_mode && !compile_mode && !generate_mode && !Global::config().has("swig");
     const bool must_execute = execute_mode;
     const bool must_compile = must_execute || compile_mode;
+
+    if (Global::config().has("transformed-ram")) {
+        std::ofstream os{Global::config().get("transformed-ram")};
+    	os << ramTranslationUnit->getProgram() << std::endl;
+    }
 
     try {
         if (must_interpret) {

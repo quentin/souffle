@@ -68,6 +68,13 @@ Node::NodeVec Clause::getChildren() const {
     return res;
 }
 
+void Clause::print(std::ostream& os, bool printLoc) const {
+    print(os);
+    if (printLoc) {
+        os << "\n.loc " << getSrcLoc() << "\n";
+    }
+}
+
 void Clause::print(std::ostream& os) const {
     if (head != nullptr) {
         os << *head;
