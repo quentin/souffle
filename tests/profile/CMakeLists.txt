@@ -118,5 +118,7 @@ function(SOUFFLE_POSITIVE_PROF_TEST TEST_NAME)
     souffle_run_prof_test_helper(TEST_NAME ${TEST_NAME} ${ARGN})
 endfunction()
 
+if (NOT MSVC)
 souffle_positive_prof_test(lrg_attr_id)
 souffle_positive_prof_test(recursive)
+endif ()
