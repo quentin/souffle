@@ -11,8 +11,10 @@ target_compile_features(functors
                         PUBLIC cxx_std_17)
 set_target_properties(functors PROPERTIES CXX_EXTENSIONS OFF)
 
+if (NOT MSVC)
 target_compile_options(functors
                        PUBLIC "-Wall;-Wextra;-Werror;-fwrapv")
+endif()
 
 if (SOUFFLE_DOMAIN_64BIT)
     target_compile_definitions(functors

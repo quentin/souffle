@@ -12,8 +12,10 @@ target_compile_features(gcfunctors
 set_target_properties(gcfunctors PROPERTIES CXX_EXTENSIONS OFF)
 set_target_properties(gcfunctors PROPERTIES OUTPUT_NAME "functors")
 
+if (NOT MSVC)
 target_compile_options(gcfunctors
                        PUBLIC "-Wall;-Wextra;-Werror;-fwrapv")
+endif()
 
 if (SOUFFLE_DOMAIN_64BIT)
     target_compile_definitions(functors
