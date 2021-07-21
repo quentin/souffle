@@ -78,7 +78,7 @@ constexpr int __builtin_ctzll_constexpr(unsigned long long value) {
 int __builtin_ctzll(unsigned long long value) {
     unsigned long trailing_zeroes = 0;
 
-    if (_BitScanForward64(&trailing_zero, value)) {
+    if (_BitScanForward64(&trailing_zeroes, value)) {
         return static_cast<int>(trailing_zeroes);
     } else {
         return 64;  // return 64 like GCC would when value == 0
