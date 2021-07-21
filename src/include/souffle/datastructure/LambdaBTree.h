@@ -314,7 +314,7 @@ public:
                 // split this node
                 auto old_root = this->root;
                 idx -= cur->rebalance_or_split(
-                        const_cast<typename parenttype::node**>(&this->root), this->root_lock, idx, parents);
+                        const_cast<typename parenttype::node**>(&this->root), this->root_lock, static_cast<int>(idx), parents);
 
                 // release parent lock
                 for (auto it = parents.rbegin(); it != parents.rend(); ++it) {
@@ -346,7 +346,7 @@ public:
             assert(cur->numElements < parenttype::node::maxKeys && "Split required!");
 
             // move keys
-            for (int j = cur->numElements; j > idx; --j) {
+            for (int j = static_cast<int>(cur->numElements); j > idx; --j) {
                 cur->keys[j] = cur->keys[j - 1];
             }
 
@@ -445,7 +445,7 @@ public:
             if (cur->numElements >= parenttype::node::maxKeys) {
                 // split this node
                 idx -= cur->rebalance_or_split(
-                        const_cast<typename parenttype::node**>(&this->root), this->root_lock, idx);
+                        const_cast<typename parenttype::node**>(&this->root), this->root_lock, static_cast<int>(idx));
 
                 // insert element in right fragment
                 if (((typename parenttype::size_type)idx) > cur->numElements) {

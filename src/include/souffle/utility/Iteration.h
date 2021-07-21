@@ -26,7 +26,18 @@
 namespace souffle {
 
 namespace detail {
-
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4172)
+#elif defined(__GNUC__) && (__GNUC__ >= 7)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-local-addr"
+#elif defined(__has_warning)
+#pragma clang diagnostic push
+#if __has_warning("-Wreturn-stack-address")
+#pragma clang diagnostic ignored "-Wreturn-stack-address"
+#endif
+#endif
 // This is a helper in the cases when the lambda is stateless
 template <typename F>
 F makeFun() {
@@ -37,6 +48,13 @@ F makeFun() {
     typename std::aligned_storage<sizeof(F)>::type fakeLam;
     return reinterpret_cast<F const&>(fakeLam);
 }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#elif defined(__GNUC__) && (__GNUC__ >= 7)
+#pragma GCC diagnostic pop
+#elif defined(__has_warning)
+#pragma clang diagnostic pop
+#endif
 }  // namespace detail
 
 // -------------------------------------------------------------

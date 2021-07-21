@@ -821,7 +821,7 @@ protected:
                         }
                     }
 
-                    pos = (i > other->numElements) ? 0 : i;
+                    pos = (i > static_cast<unsigned>(other->numElements)) ? 0 : static_cast<unsigned>(i);
                     other->insert_inner(root, root_lock, pos, predecessor, key, newNode, locked_nodes);
 #else
                     other->insert_inner(root, root_lock, pos, predecessor, key, newNode);
@@ -1537,7 +1537,7 @@ public:
 
                 // split this node
                 auto old_root = root;
-                idx -= cur->rebalance_or_split(const_cast<node**>(&root), root_lock, idx, parents);
+                idx -= cur->rebalance_or_split(const_cast<node**>(&root), root_lock, static_cast<int>(idx), parents);
 
                 // release parent lock
                 for (auto it = parents.rbegin(); it != parents.rend(); ++it) {
@@ -1569,7 +1569,7 @@ public:
             assert(cur->numElements < node::maxKeys && "Split required!");
 
             // move keys
-            for (int j = cur->numElements; j > idx; --j) {
+            for (int j = static_cast<int>(cur->numElements); j > static_cast<int>(idx); --j) {
                 cur->keys[j] = cur->keys[j - 1];
             }
 

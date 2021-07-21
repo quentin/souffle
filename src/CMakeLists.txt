@@ -7,6 +7,7 @@
 set(SOUFFLE_SOURCES
     FunctorOps.cpp
     Global.cpp
+    GetOptLong.cpp
     ast/Aggregator.cpp
     ast/AlgebraicDataType.cpp
     ast/Atom.cpp
@@ -199,6 +200,22 @@ if(SOUFFLE_CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_link_libraries(libsouffle PUBLIC coverage_config)
 endif(SOUFFLE_CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 
+if (MSVC)
+    add_definitions (/bigobj)
+
+    add_definitions(/wd6326 /wd5105)
+
+    if (NOT (MSVC_VERSION LESS 1910))
+      add_definitions (/permissive-)
+    endif()
+
+    add_definitions(/Zc:preprocessor)
+
+    add_definitions(/openmp)
+
+    target_compile_definitions(libsouffle PUBLIC USE_CUSTOM_GETOPTLONG)
+endif (MSVC)
+
 # FIXME: Better to have a library list
 if (OPENMP_FOUND)
     target_link_libraries(libsouffle
@@ -221,6 +238,11 @@ endif()
 if (SOUFFLE_DOMAIN_64BIT)
     target_compile_definitions(libsouffle
                                PUBLIC RAM_DOMAIN_SIZE=64)
+endif()
+
+if (SOUFFLE_CUSTOM_GETOPTLONG)
+    target_compile_definitions(libsouffle
+                               PUBLIC USE_CUSTOM_GETOPTLONG)
 endif()
 
 if (SOUFFLE_USE_CURSES)
@@ -257,7 +279,7 @@ install(TARGETS souffle DESTINATION bin)
 # Souffle's profiler binary
 # --------------------------------------------------
 
-
+if (NOT MSVC)
 add_executable(souffleprof
                souffle_prof.cpp)
 target_include_directories(souffleprof PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -266,6 +288,7 @@ install(TARGETS souffleprof DESTINATION bin)
 # Set C++ standard to C++17
 target_compile_features(souffleprof
                         PUBLIC cxx_std_17)
+endif()
 
 # --------------------------------------------------
 # Substitutions for souffle-compile

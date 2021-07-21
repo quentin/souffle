@@ -22,7 +22,10 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #include <sys/stat.h>
 

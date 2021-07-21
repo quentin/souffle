@@ -29,6 +29,7 @@
 #include <utility>
 
 #ifdef _WIN32
+#define NOGDI
 #include <fcntl.h>
 #include <io.h>
 #include <stdlib.h>
@@ -61,13 +62,13 @@ constexpr unsigned long __builtin_ctz(unsigned long value) {
     return trailing_zeroes;
 }
 
-inline unsigned long __builtin_ctzll(unsigned long long value) {
+inline int __builtin_ctzll(unsigned long long value) {
     unsigned long trailing_zero = 0;
 
     if (_BitScanForward64(&trailing_zero, value)) {
-        return trailing_zero;
+        return static_cast<int>(trailing_zero);
     } else {
-        return 64;
+        return 64;  // return 64 like GCC would when value == 0
     }
 }
 #endif  // _MSC_VER

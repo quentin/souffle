@@ -669,7 +669,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "auto part = " << relName << "->partition();\n";
             out << "PARALLEL_START\n";
             out << preamble.str();
-            out << "pfor(auto it = part.begin(); it<part.end();++it){\n";
+            out << R"cpp(
+                   #if defined _OPENMP && _OPENMP < 200805
+                           auto count = std::distance(part.begin(), part.end());
+                           auto base = part.begin();
+                           pfor(int index  = 0; index < count; index++) {
+                               auto it = base + index;
+                   #else
+                           pfor(auto it = part.begin(); it < part.end(); it++) {
+                   #endif
+                   )cpp";
             out << "try{\n";
             out << "for(const auto& env0 : *it) {\n";
 
@@ -744,7 +753,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "auto part = " << relName << "->partition();\n";
             out << "PARALLEL_START\n";
             out << preamble.str();
-            out << "pfor(auto it = part.begin(); it<part.end();++it){\n";
+            out << R"cpp(
+                   #if defined _OPENMP && _OPENMP < 200805
+                           auto count = std::distance(part.begin(), part.end());
+                           auto base = part.begin();
+                           pfor(int index  = 0; index < count; index++) {
+                               auto it = base + index;
+                   #else
+                           pfor(auto it = part.begin(); it < part.end(); it++) {
+                   #endif
+                   )cpp";
             out << "try{\n";
             out << "for(const auto& env0 : *it) {\n";
             out << "if( ";
@@ -816,7 +834,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "auto part = range.partition();\n";
             out << "PARALLEL_START\n";
             out << preamble.str();
-            out << "pfor(auto it = part.begin(); it<part.end(); ++it) { \n";
+            out << R"cpp(
+                   #if defined _OPENMP && _OPENMP < 200805
+                           auto count = std::distance(part.begin(), part.end());
+                           auto base = part.begin();
+                           pfor(int index  = 0; index < count; index++) {
+                               auto it = base + index;
+                   #else
+                           pfor(auto it = part.begin(); it < part.end(); it++) {
+                   #endif
+                   )cpp";
             out << "try{\n";
             out << "for(const auto& env0 : *it) {\n";
 
@@ -887,7 +914,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "auto part = range.partition();\n";
             out << "PARALLEL_START\n";
             out << preamble.str();
-            out << "pfor(auto it = part.begin(); it<part.end(); ++it) { \n";
+            out << R"cpp(
+                   #if defined _OPENMP && _OPENMP < 200805
+                           auto count = std::distance(part.begin(), part.end());
+                           auto base = part.begin();
+                           pfor(int index  = 0; index < count; index++) {
+                               auto it = base + index;
+                   #else
+                           pfor(auto it = part.begin(); it < part.end(); it++) {
+                   #endif
+                   )cpp";
             out << "try{";
             out << "for(const auto& env0 : *it) {\n";
             out << "if( ";
@@ -2574,7 +2610,7 @@ void runFunction(std::string  inputDirectoryArg   = "",
     // set default threads (in embedded mode)
     // if this is not set, and omp is used, the default omp setting of number of cores is used.
 #if defined(_OPENMP)
-    if (0 < getNumThreads()) { omp_set_num_threads(getNumThreads()); }
+    if (0 < getNumThreads()) { omp_set_num_threads(static_cast<int>(getNumThreads())); }
 #endif
 
     signalHandler->set();

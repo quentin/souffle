@@ -5,8 +5,10 @@
 # - <souffle root>/licenses/SOUFFLE-UPL.txt
 
 # Make sure that the functor library is built
+if (NOT MSVC)
 add_subdirectory(functors)
 add_subdirectory(graph_coloring)
+endif ()
 
 # swig test which will run python, java or both
 function(SOUFFLE_POSITIVE_FUNCTOR_TEST TEST_NAME)
@@ -107,8 +109,10 @@ function(SOUFFLE_POSITIVE_CPP_TEST TEST_NAME)
     souffle_run_cpp_test_helper(TEST_NAME ${TEST_NAME} ${ARGN})
 endfunction()
 
+if (NOT MSVC)
 souffle_positive_functor_test(functors CATEGORY interface)
 souffle_positive_functor_test(graph_coloring CATEGORY interface)
+endif ()
 souffle_positive_cpp_test(contain_insert)
 souffle_positive_cpp_test(get_symboltabletype)
 souffle_positive_cpp_test(insert_for)
