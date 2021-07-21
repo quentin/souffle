@@ -215,6 +215,8 @@ if (MSVC)
 
     add_definitions(/openmp)
 
+    add_definitions(/EHsc)
+
     target_compile_definitions(libsouffle PUBLIC USE_CUSTOM_GETOPTLONG)
 endif (MSVC)
 
