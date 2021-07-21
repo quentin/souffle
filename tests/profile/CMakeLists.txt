@@ -118,5 +118,8 @@ function(SOUFFLE_POSITIVE_PROF_TEST TEST_NAME)
     souffle_run_prof_test_helper(TEST_NAME ${TEST_NAME} ${ARGN})
 endfunction()
 
+# MW disabled for 3p build
+if (UNIX AND NOT APPLE)
 souffle_positive_prof_test(lrg_attr_id)
 souffle_positive_prof_test(recursive)
+endif ()

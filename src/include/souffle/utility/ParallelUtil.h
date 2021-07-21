@@ -53,12 +53,21 @@ constexpr std::size_t hardware_destructive_interference_size = 2 * sizeof(max_al
 #define pthread_yield std::this_thread::yield
 #endif
 
+#ifdef _MSC_VER
+// support for a parallel region
+#define PARALLEL_START __pragma(omp parallel) {
+#define PARALLEL_END }
+
+// support for parallel loops
+#define pfor __pragma(omp for schedule(dynamic)) for
+#else
 // support for a parallel region
 #define PARALLEL_START _Pragma("omp parallel") {
 #define PARALLEL_END }
 
 // support for parallel loops
 #define pfor _Pragma("omp for schedule(dynamic)") for
+#endif
 
 // spawn and sync are processed sequentially (overhead to expensive)
 #define task_spawn

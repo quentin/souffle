@@ -15,8 +15,8 @@
  ***********************************************************************/
 
 #include "Global.h"
-#include "ast/Node.h"
 #include "ast/Clause.h"
+#include "ast/Node.h"
 #include "ast/Program.h"
 #include "ast/TranslationUnit.h"
 #include "ast/analysis/PrecedenceGraph.h"
@@ -91,8 +91,10 @@
 #include "reports/DebugReport.h"
 #include "reports/ErrorReport.h"
 #include "souffle/RamTypes.h"
+#ifndef _MSC_VER
 #include "souffle/profile/Tui.h"
 #include "souffle/provenance/Explain.h"
+#endif
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/FileUtil.h"
 #include "souffle/utility/MiscUtil.h"
@@ -267,7 +269,8 @@ int main(int argc, char** argv) {
                 {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
                 {"help", 'h', "", "", false, "Display this help message."},
                 {"legacy", '\6', "", "", false, "Enable legacy support."},
-                {"functors-in-class", '\1', "", "", false, "Implement user-defined functors within a class object"},
+                {"functors-in-class", '\1', "", "", false,
+                        "Implement user-defined functors within a class object"},
                 {"transformed-datalog", 'd', "FILE", "", false, "save transformed datalog to <FILE>."},
                 {"transformed-ram", 'r', "FILE", "", false, "save transformed RAM to <FILE>."},
                 {"preprocessor", '\7', "CMD", "", false, "preprocessor to use instead of mcpp"}};
@@ -588,7 +591,7 @@ int main(int argc, char** argv) {
     }
     if (Global::config().has("transformed-datalog")) {
         std::ofstream os{Global::config().get("transformed-datalog")};
-    	astTranslationUnit->getProgram().print(os, true);
+        astTranslationUnit->getProgram().print(os, true);
     }
 
     if (Global::config().has("show")) {
@@ -692,7 +695,7 @@ int main(int argc, char** argv) {
 
     if (Global::config().has("transformed-ram")) {
         std::ofstream os{Global::config().get("transformed-ram")};
-    	os << ramTranslationUnit->getProgram() << std::endl;
+        os << ramTranslationUnit->getProgram() << std::endl;
     }
 
     try {
@@ -702,7 +705,11 @@ int main(int argc, char** argv) {
             std::thread profiler;
             // Start up profiler if needed
             if (Global::config().has("live-profile")) {
+#ifdef _MSC_VER
+                throw("No live-profile on Windows\n.");
+#else
                 profiler = std::thread([]() { profile::Tui().runProf(); });
+#endif
             }
 
             // configure and execute interpreter
@@ -713,6 +720,9 @@ int main(int argc, char** argv) {
                 profiler.join();
             }
             if (Global::config().has("provenance")) {
+#ifdef _MSC_VER
+                throw("No explain/explore provenance on Windows\n.");
+#else
                 // only run explain interface if interpreted
                 interpreter::ProgInterface interface(*interpreter);
                 if (Global::config().get("provenance") == "explain") {
@@ -720,6 +730,7 @@ int main(int argc, char** argv) {
                 } else if (Global::config().get("provenance") == "explore") {
                     explain(interface, true);
                 }
+#endif
             }
         } else {
             // ------- compiler -------------

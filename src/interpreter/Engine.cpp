@@ -111,7 +111,17 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#ifdef _MSC_VER
+#define dlopen(libname, flags) LoadLibrary((libname))
+#define dlsym(lib, fn) GetProcAddress(static_cast<HMODULE>(lib), (fn))
+#else
 #include <dlfcn.h>
+#endif
+
+// Dynamic-size arrays are not compatible with all compilers, so make it unique pointers of array type
+#define dynarray(type, name, size) std::unique_ptr<type[]> name = std::make_unique<type[]>(size)
+
 #include <ffi.h>
 
 namespace souffle::interpreter {
@@ -120,7 +130,11 @@ namespace souffle::interpreter {
 #ifdef __APPLE__
 #define dynamicLibSuffix ".dylib";
 #else
+#ifdef _MSC_VER
+#define dynamicLibSuffix ".dll";
+#else
 #define dynamicLibSuffix ".so";
+#endif
 #endif
 
 // Aliases for foreign function interface.
@@ -239,12 +253,12 @@ const std::vector<void*>& Engine::loadDLL() {
         auto paths = Global::config().getMany("library-dir");
         // Set up our paths to have a library appended
         for (std::string& path : paths) {
-            if (path.back() != '/') {
-                path += '/';
+            if (path.back() != pathSeparator) {
+                path += pathSeparator;
             }
         }
 
-        if (library.find('/') != std::string::npos) {
+        if (library.find(pathSeparator) != std::string::npos) {
             paths.clear();
         }
 
@@ -668,9 +682,9 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             if (cur.isStateful()) {
                 // prepare dynamic call environment
                 ffi_cif cif;
-                ffi_type* args[arity + 2];
-                void* values[arity + 2];
-                RamDomain intVal[arity];
+                dynarray(ffi_type*, args, arity + 2);
+                dynarray(void*, values, arity + 2);
+                dynarray(RamDomain, intVal, arity);
                 ffi_arg rc;
 
                 /* Initialize arguments for ffi-call */
@@ -689,24 +703,24 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                 auto codomain = &FFI_RamSigned;
 
                 // Call the external function.
-                const auto prepStatus = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arity + 2, codomain, args);
+                const auto prepStatus = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arity + 2, codomain, args.get());
                 if (prepStatus != FFI_OK) {
                     fatal("Failed to prepare CIF for user-defined operator `%s`; error code = %d", name,
                             prepStatus);
                 }
-                ffi_call(&cif, userFunctor, &rc, values);
+                ffi_call(&cif, userFunctor, &rc, values.get());
                 return static_cast<RamDomain>(rc);
             } else {
                 const std::vector<TypeAttribute>& types = cur.getArgsTypes();
 
                 // prepare dynamic call environment
                 ffi_cif cif;
-                ffi_type* args[arity];
-                void* values[arity];
-                RamDomain intVal[arity];
-                RamUnsigned uintVal[arity];
-                RamFloat floatVal[arity];
-                const char* strVal[arity];
+                dynarray(ffi_type*, args, arity);
+                dynarray(void*, values, arity);
+                dynarray(RamDomain, intVal, arity);
+                dynarray(RamUnsigned, uintVal, arity);
+                dynarray(RamFloat, floatVal, arity);
+                dynarray(const char*, strVal, arity);
 
                 /* Initialize arguments for ffi-call */
                 for (std::size_t i = 0; i < arity; i++) {
@@ -749,7 +763,7 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                 }
 
                 // Call the external function.
-                const auto prepStatus = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arity, codomain, args);
+                const auto prepStatus = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arity, codomain, args.get());
                 if (prepStatus != FFI_OK) {
                     fatal("Failed to prepare CIF for user-defined operator `%s`; error code = %d", name,
                             prepStatus);
@@ -759,11 +773,11 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                 // Float return type needs special treatment, see https://stackoverflow.com/q/61577543
                 if (cur.getReturnType() == TypeAttribute::Float) {
                     RamFloat rvalue;
-                    ffi_call(&cif, userFunctor, &rvalue, values);
+                    ffi_call(&cif, userFunctor, &rvalue, values.get());
                     return ramBitCast(rvalue);
                 } else {
                     ffi_arg rvalue;
-                    ffi_call(&cif, userFunctor, &rvalue, values);
+                    ffi_call(&cif, userFunctor, &rvalue, values.get());
 
                     switch (cur.getReturnType()) {
                         case TypeAttribute::Signed: return static_cast<RamDomain>(rvalue);
@@ -783,11 +797,11 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
         CASE(PackRecord)
             auto values = cur.getArguments();
             std::size_t arity = values.size();
-            RamDomain data[arity];
+            dynarray(RamDomain, data, arity);
             for (std::size_t i = 0; i < arity; ++i) {
                 data[i] = execute(shadow.getChild(i), ctxt);
             }
-            return getRecordTable().pack(data, arity);
+            return getRecordTable().pack(data.get(), arity);
         ESAC(PackRecord)
 
         CASE(SubroutineArgument)
