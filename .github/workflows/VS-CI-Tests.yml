@@ -1,0 +1,92 @@
+name: VS-CI-Tests
+
+on:
+  push:
+    branches:
+      - msvc
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+jobs:
+  Msys2:
+    if: ${{ false }}  # disable for now
+    runs-on: windows-latest
+    name: CMake build on Windows
+    steps:
+    - uses: msys2/setup-msys2@v2
+      with:
+        update: true
+        install: >-
+          base-devel
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-libffi
+          mingw-w64-x86_64-zlib
+          mingw-w64-x86_64-sqlite3
+          flex
+          bison
+          pkg-config
+
+    - name: '🧰 Checkout'
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: CMake configure
+      run: cmake -S . -B build -G "Visual Studio 16 2019" -DSOUFFLE_DOMAIN_64BIT=ON -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DSOUFFLE_USE_CURSES=OFF -DCMAKE_FIND_DEBUG_MODE=TRUE -DCMAKE_PREFIX_PATH=D:/a/_temp/msys/usr
+    - name: CMake build
+      run: cmake --build build -j6
+      
+  Choco:
+    if: ${{ false }}  # disable for now
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: |
+        choco install --no-progress winflexbison3
+        choco install --no-progress sqlite
+        choco install --no-progress git
+        choco install --no-progress cmake
+    - name: Check in Path
+      run: win_flex --version
+    - name: Generate CMake Project
+      run: |
+        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        refreshenv
+        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 -DCMAKE_CXX_FLAGS=/bigobj -DSOUFFLE_DOMAIN_64BIT=ON -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DSOUFFLE_USE_CURSES=OFF -DSOUFFLE_USE_ZLIB=OFF -DCMAKE_FIND_DEBUG_MODE=TRUE -DCMAKE_PREFIX_PATH="C:\ProgramData\chocolatey"
+        cmake --build build --config Release
+
+  vcpkg-Chocolatey:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Install binary dependencies
+      run: |
+        choco install --no-progress winflexbison3
+        choco install --no-progress sqlite
+        choco install -no-progress cmake --version=3.20.5
+    - name: Check CMake
+      run: cmake --version
+    - name: Install library dependencies
+      uses: lukka/run-vcpkg@v7
+      with:
+        vcpkgGitCommitId: '3a28333d605f92f8659f3af1137324b2d9886101'
+        vcpkgTriplet: x64-windows
+        vcpkgArguments: 'sqlite3 zlib libffi --overlay-triplets=custom-triplets'  # add --debug to see details of installation # :x64-windows-static
+    - name: Create build directory
+      working-directory: ${{github.workspace}}
+      run: mkdir build
+    - name: Configure
+      working-directory: ${{github.workspace}}
+      run: |
+        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        refreshenv
+        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 "-DCMAKE_TOOLCHAIN_FILE=${{env.VCPKG_ROOT}}/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release" -DCMAKE_CXX_FLAGS=/bigobj -DSOUFFLE_DOMAIN_64BIT=ON -DLIBFFI_ROOT="D:/a/souffle/souffle/vcpkg/packages/libffi_x64-windows" -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DCMAKE_FIND_LIBRARY_SUFFIXES=".lib;.dll" -DSOUFFLE_USE_CURSES=OFF -DSOUFFLE_USE_ZLIB=ON -DCMAKE_FIND_DEBUG_MODE=FALSE
+    - name: Build
+      working-directory: ${{github.workspace}}
+      run: cmake --build build --config Release
+      

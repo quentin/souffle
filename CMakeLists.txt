@@ -190,9 +190,10 @@ if (SOUFFLE_USE_SQLITE)
 endif()
 
 # --------------------------------------------------
-# libffi
+# lib
+
 # --------------------------------------------------
-find_package(LibFFI REQUIRED)
+find_package(libffi CONFIG REQUIRED)
 
 # --------------------------------------------------
 # pthreads
