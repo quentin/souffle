@@ -66,20 +66,20 @@ constexpr unsigned long __builtin_ctz(unsigned long value) {
 
 // return the number of trailing zeroes in value, or 64 if value is zero.
 constexpr int __builtin_ctzll_constexpr(unsigned long long value) {
-    unsigned long trailing_zero = 0;
+    int trailing_zeroes = 0;
 
     if (value == 0) return 64;
     while ((value = value >> 1) ^ 1) {
-        ++trailing_zeroes
+        ++trailing_zeroes;
     }
     return trailing_zeroes;
 }
 
 int __builtin_ctzll(unsigned long long value) {
-    unsigned long trailing_zero = 0;
+    unsigned long trailing_zeroes = 0;
 
     if (_BitScanForward64(&trailing_zero, value)) {
-        return static_cast<int>(trailing_zero);
+        return static_cast<int>(trailing_zeroes);
     } else {
         return 64;  // return 64 like GCC would when value == 0
     }
