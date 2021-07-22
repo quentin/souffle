@@ -56,5 +56,5 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest --output-on-failure --config Release --progress -j4
+      run: ctest --output-on-failure --build-config Release --progress -j4
 
