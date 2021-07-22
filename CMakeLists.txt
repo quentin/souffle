@@ -197,7 +197,10 @@ endif()
 # --------------------------------------------------
 # libffi
 # --------------------------------------------------
-find_package(libffi CONFIG REQUIRED)
+find_package(libffi CONFIG QUIET)
+if (NOT libffi_FOUND)
+  find_package(LibFFI REQUIRED)
+endif()
 
 # --------------------------------------------------
 # pthreads

@@ -14,82 +14,41 @@ env:
   CHOCO_CACHE_DIR: "${{ github.workspace }}/choco-cache"
 
 jobs:
-  Msys2:
-    if: ${{ false }}  # disable for now
-    runs-on: windows-latest
-    name: CMake build on Windows
-    steps:
-    - uses: msys2/setup-msys2@v2
-      with:
-        update: true
-        install: >-
-          base-devel
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-libffi
-          mingw-w64-x86_64-zlib
-          mingw-w64-x86_64-sqlite3
-          flex
-          bison
-          pkg-config
 
-    - name: '🧰 Checkout'
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: CMake configure
-      run: cmake -S . -B build -G "Visual Studio 16 2019" -DSOUFFLE_DOMAIN_64BIT=ON -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DSOUFFLE_USE_CURSES=OFF -DCMAKE_FIND_DEBUG_MODE=TRUE -DCMAKE_PREFIX_PATH=D:/a/_temp/msys/usr
-    - name: CMake build
-      run: cmake --build build -j6
-      
-  Choco:
-    if: ${{ false }}  # disable for now
+  Windows-CMake-MSVC:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install Dependencies
-      run: |
-        choco install --no-progress winflexbison3
-        choco install --no-progress sqlite
-        choco install --no-progress git
-        choco install --no-progress cmake
-    - name: Check in Path
-      run: win_flex --version
-    - name: Generate CMake Project
-      run: |
-        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
-        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
-        refreshenv
-        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 -DCMAKE_CXX_FLAGS=/bigobj -DSOUFFLE_DOMAIN_64BIT=ON -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DSOUFFLE_USE_CURSES=OFF -DSOUFFLE_USE_ZLIB=OFF -DCMAKE_FIND_DEBUG_MODE=TRUE -DCMAKE_PREFIX_PATH="C:\ProgramData\chocolatey"
-        cmake --build build --config Release
 
-  vcpkg-Chocolatey:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Cache
+    - name: Dependencies Cache
       uses: actions/cache@v2
       env:
         cache-name: cache-chocolatey
       with:
+        # cache Chocolatey packages to speed-up the deployment.
         path: |
           ${{ env.CHOCO_CACHE_DIR }}
         key: windows-${{ hashFiles('choco-packages.config') }}
-    - name: Install binary dependencies
+
+    # Use Chocolatey to install binary dependencies.
+    - name: Binary Dependencies (Chocolatey)
       run: |
         choco config set cacheLocation ${{ env.CHOCO_CACHE_DIR }}
         choco install choco-packages.config --no-progress
-    - name: Check CMake
-      run: cmake --version
-    - name: Install library dependencies
+
+    # Use vcpkg to install devel library dependencies.
+    - name: Library Dependencies (vcpkg)
       uses: lukka/run-vcpkg@v7
       with:
         vcpkgGitCommitId: '3a28333d605f92f8659f3af1137324b2d9886101'
         vcpkgTriplet: x64-windows
         vcpkgArguments: 'sqlite3 zlib libffi'
-    - name: Create build directory
+
+    - name: Create Build Directory
       working-directory: ${{github.workspace}}
       run: mkdir build
-    - name: Configure
+
+    - name: Configure Build
       working-directory: ${{github.workspace}}
       run: |
         $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
@@ -99,4 +58,8 @@ jobs:
     - name: Build
       working-directory: ${{github.workspace}}
       run: cmake --build build --config Release
-      
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      run: ctest --output-on-failure --progress -j4
+
