@@ -27,6 +27,8 @@
 #include <string>
 #ifndef _MSC_VER
 #include <unistd.h>
+#else
+#define STDERR_FILENO 2
 #endif
 
 namespace souffle {
