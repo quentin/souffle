@@ -55,6 +55,7 @@ jobs:
       run: cmake --build build --config Release -j4
 
     - name: Test
+      if: ${{ false }} # disabled
       working-directory: ${{github.workspace}}/build
       run: ctest --output-on-failure --build-config Release --progress -j4
 
