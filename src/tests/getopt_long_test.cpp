@@ -84,7 +84,7 @@ TEST(GetOptLong, SimplePermutation) {
     EXPECT_EQ(std::string(argv[optind + 3]), std::string("arg4"));
 }
 
-#if 0 // disabled because not passing yet
+#if 0  // disabled because not passing yet
 TEST(GetOptLong, ComplexPermutation) {
     optind = 1;
     opterr = 0;
