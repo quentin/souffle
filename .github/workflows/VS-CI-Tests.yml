@@ -67,13 +67,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Cache
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-chocolatey
-        with:
-          path: |
-            ${{ env.CHOCO_CACHE_DIR }}
-          key: windows-${{ hashFiles('choco-packages.config') }}
+      uses: actions/cache@v2
+      env:
+        cache-name: cache-chocolatey
+      with:
+        path: |
+          ${{ env.CHOCO_CACHE_DIR }}
+        key: windows-${{ hashFiles('choco-packages.config') }}
     - name: Install binary dependencies
       run: |
         choco config set cacheLocation ${{ env.CHOCO_CACHE_DIR }}
