@@ -2,8 +2,6 @@ name: CI-Tests
 on:
   pull_request:
     types: [opened, synchronize]
-    branches:
-      - master
   workflow_dispatch:
 
 jobs:

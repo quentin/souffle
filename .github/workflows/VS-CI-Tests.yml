@@ -1,13 +1,8 @@
 name: VS-CI-Tests
 
 on:
-  push:
-    branches:
-      - msvc
   pull_request:
     types: [opened, synchronize]
-    branches:
-      - msvc
   workflow_dispatch:
 
 env:
@@ -57,9 +52,9 @@ jobs:
         cmake -S . -B build -G "Visual Studio 16 2019" -A x64 "-DCMAKE_TOOLCHAIN_FILE=${{env.VCPKG_ROOT}}/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release" -DCMAKE_CXX_FLAGS=/bigobj -DSOUFFLE_DOMAIN_64BIT=ON -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DCMAKE_FIND_LIBRARY_SUFFIXES=".lib;.dll" -DSOUFFLE_USE_CURSES=OFF -DSOUFFLE_USE_ZLIB=ON -DCMAKE_FIND_DEBUG_MODE=FALSE
     - name: Build
       working-directory: ${{github.workspace}}
-      run: cmake --build build --config Release
+      run: cmake --build build --config Release -j4
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest --output-on-failure --progress -j4
+      run: ctest --output-on-failure --config Release --progress -j4
 

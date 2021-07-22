@@ -1,8 +1,9 @@
 
 #include "tests/test.h"
 
-#include "GetOptLong.cpp"
+#define USE_CUSTOM_GETOPTLONG
 #include "GetOptLong.h"
+#include "GetOptLong.cpp"
 
 namespace souffle::test {
 
