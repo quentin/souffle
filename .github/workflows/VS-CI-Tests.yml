@@ -6,6 +6,8 @@ on:
       - msvc
   pull_request:
     types: [opened, synchronize]
+    branches:
+      - msvc
   workflow_dispatch:
 
 jobs:
