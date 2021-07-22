@@ -55,7 +55,7 @@
 
 #if defined(_MSC_VER)
 // return the number of trailing zeroes in value, or 32 if value is zero.
-constexpr unsigned long __builtin_ctz(unsigned long value) {
+inline constexpr unsigned long __builtin_ctz(unsigned long value) {
     unsigned long trailing_zeroes = 0;
     if (value == 0) return 32;
     while ((value = value >> 1) ^ 1) {
@@ -65,7 +65,7 @@ constexpr unsigned long __builtin_ctz(unsigned long value) {
 }
 
 // return the number of trailing zeroes in value, or 64 if value is zero.
-constexpr int __builtin_ctzll_constexpr(unsigned long long value) {
+inline constexpr int __builtin_ctzll_constexpr(unsigned long long value) {
     int trailing_zeroes = 0;
 
     if (value == 0) return 64;
@@ -75,7 +75,7 @@ constexpr int __builtin_ctzll_constexpr(unsigned long long value) {
     return trailing_zeroes;
 }
 
-int __builtin_ctzll(unsigned long long value) {
+inline int __builtin_ctzll(unsigned long long value) {
     unsigned long trailing_zeroes = 0;
 
     if (_BitScanForward64(&trailing_zeroes, value)) {

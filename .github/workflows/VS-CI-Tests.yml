@@ -10,6 +10,9 @@ on:
       - msvc
   workflow_dispatch:
 
+env:
+  CHOCO_CACHE_DIR: "${{ github.workspace }}/choco-cache"
+
 jobs:
   Msys2:
     if: ${{ false }}  # disable for now
@@ -63,13 +66,18 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-      with:
-        submodules: 'recursive'
+    - name: Cache
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-chocolatey
+        with:
+          path: |
+            ${{ env.CHOCO_CACHE_DIR }}
+          key: windows-${{ hashFiles('choco-packages.config') }}
     - name: Install binary dependencies
       run: |
-        choco install --no-progress winflexbison3
-        choco install --no-progress sqlite
-        choco install -no-progress cmake --version=3.20.5
+        choco config set cacheLocation ${{ env.CHOCO_CACHE_DIR }}
+        choco install choco-packages.config --no-progress
     - name: Check CMake
       run: cmake --version
     - name: Install library dependencies
@@ -77,7 +85,7 @@ jobs:
       with:
         vcpkgGitCommitId: '3a28333d605f92f8659f3af1137324b2d9886101'
         vcpkgTriplet: x64-windows
-        vcpkgArguments: 'sqlite3 zlib libffi --overlay-triplets=custom-triplets'  # add --debug to see details of installation # :x64-windows-static
+        vcpkgArguments: 'sqlite3 zlib libffi'
     - name: Create build directory
       working-directory: ${{github.workspace}}
       run: mkdir build
@@ -87,7 +95,7 @@ jobs:
         $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
         Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
         refreshenv
-        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 "-DCMAKE_TOOLCHAIN_FILE=${{env.VCPKG_ROOT}}/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release" -DCMAKE_CXX_FLAGS=/bigobj -DSOUFFLE_DOMAIN_64BIT=ON -DLIBFFI_ROOT="D:/a/souffle/souffle/vcpkg/packages/libffi_x64-windows" -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DCMAKE_FIND_LIBRARY_SUFFIXES=".lib;.dll" -DSOUFFLE_USE_CURSES=OFF -DSOUFFLE_USE_ZLIB=ON -DCMAKE_FIND_DEBUG_MODE=FALSE
+        cmake -S . -B build -G "Visual Studio 16 2019" -A x64 "-DCMAKE_TOOLCHAIN_FILE=${{env.VCPKG_ROOT}}/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_BUILD_TYPE=Release" -DCMAKE_CXX_FLAGS=/bigobj -DSOUFFLE_DOMAIN_64BIT=ON -DCMAKE_FIND_LIBRARY_PREFIXES=";lib" -DCMAKE_FIND_LIBRARY_SUFFIXES=".lib;.dll" -DSOUFFLE_USE_CURSES=OFF -DSOUFFLE_USE_ZLIB=ON -DCMAKE_FIND_DEBUG_MODE=FALSE
     - name: Build
       working-directory: ${{github.workspace}}
       run: cmake --build build --config Release
