@@ -17,6 +17,11 @@
 %require "3.0.2"
 
 %defines
+// MathWorks: replaced api.parser.class with parser_class_name
+// for compatibility reasons with the version of Bison3 in the 3p: v3.0.2
+//replace with %define api.parser.class {parser} after Bison3 is upgraded
+%define parser_class_name {parser}
+
 %define api.token.constructor
 %define api.value.type variant
 %define parse.assert
