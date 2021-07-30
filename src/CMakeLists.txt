@@ -319,6 +319,7 @@ function(AUTOMAKE_COMPATIBLE_SUBST F_IN F_OUT)
 
     if (SOUFFLE_USE_SQLITE)
         string(APPEND LIBS " ${SQLite3_LIBRARY}")
+        string(APPEND CPPFLAGS " -I${SQLite3_INCLUDE_DIRS}")
     endif()
 
     if (SOUFFLE_USE_ZLIB)

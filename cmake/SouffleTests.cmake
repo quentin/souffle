@@ -145,7 +145,11 @@ function(SOUFFLE_RUN_TEST_HELPER)
     endif()
 
     if (PARAM_FUNCTORS)
-        set(EXTRA_FLAGS "${EXTRA_FLAGS} '-L${CMAKE_CURRENT_BINARY_DIR}/${PARAM_TEST_NAME}'")
+        set(EXTRA_FLAGS "${EXTRA_FLAGS} '-L${CMAKE_CURRENT_BINARY_DIR}/${PARAM_TEST_NAME}' -lfunctors")
+    endif()
+
+    if (SOUFFLE_USE_SQLITE)
+        set(EXTRA_FLAGS "${EXTRA_FLAGS} -L${SQLite3_ROOT}/lib -lsqlite3")
     endif()
 
     if (NOT PARAM_FACTS_DIR_NAME)
