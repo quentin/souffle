@@ -8,12 +8,13 @@
 
 /************************************************************************
  *
- * @file main.cpp
+ * @file MainDriver.cpp
  *
  * Main driver for Souffle
  *
  ***********************************************************************/
 
+#include "MainDriver.h"
 #include "Global.h"
 #include "ast/Clause.h"
 #include "ast/Node.h"
@@ -206,100 +207,106 @@ void compileToBinary(const std::string& command, std::string_view sourceFilename
         throw std::invalid_argument(tfm::format("failed to compile C++ source <%s>", sourceFilename));
 }
 
-int main(int argc, char** argv) {
-    /* Time taking for overall runtime */
-    auto souffle_start = std::chrono::high_resolution_clock::now();
-
+bool processArgs(int argc, char** argv) {
     std::string versionFooter;
 
     /* have all to do with command line arguments in its own scope, as these are accessible through the global
      * configuration only */
-    try {
-        std::stringstream header;
-        header << "============================================================================" << std::endl;
-        header << "souffle -- A datalog engine." << std::endl;
-        header << "Usage: souffle [OPTION] FILE." << std::endl;
-        header << "----------------------------------------------------------------------------" << std::endl;
-        header << "Options:" << std::endl;
+    std::stringstream header;
+    header << "============================================================================" << std::endl;
+    header << "souffle -- A datalog engine." << std::endl;
+    header << "Usage: souffle [OPTION] FILE." << std::endl;
+    header << "----------------------------------------------------------------------------" << std::endl;
+    header << "Options:" << std::endl;
 
-        std::stringstream footer;
-        footer << "----------------------------------------------------------------------------" << std::endl;
-        footer << "Version: " << PACKAGE_VERSION << "" << std::endl;
-        footer << "----------------------------------------------------------------------------" << std::endl;
-        footer << "Copyright (c) 2016-22 The Souffle Developers." << std::endl;
-        footer << "Copyright (c) 2013-16 Oracle and/or its affiliates." << std::endl;
-        footer << "All rights reserved." << std::endl;
-        footer << "============================================================================" << std::endl;
+    std::stringstream footer;
+    footer << "----------------------------------------------------------------------------" << std::endl;
+    footer << "Version: " << PACKAGE_VERSION << "" << std::endl;
+    footer << "----------------------------------------------------------------------------" << std::endl;
+    footer << "Copyright (c) 2016-22 The Souffle Developers." << std::endl;
+    footer << "Copyright (c) 2013-16 Oracle and/or its affiliates." << std::endl;
+    footer << "All rights reserved." << std::endl;
+    footer << "============================================================================" << std::endl;
 
         versionFooter = footer.str();
 
-        // command line options, the environment will be filled with the arguments passed to them, or
-        // the empty string if they take none
-        // main option, the datalog program itself, has an empty key
-        std::vector<MainOption> options{{"", 0, "", "", false, ""},
+    // command line options, the environment will be filled with the arguments passed to them, or
+    // the empty string if they take none
+    // main option, the datalog program itself, has an empty key
+    std::vector<MainOption> options{{"", 0, "", "", false, ""},
                 {"auto-schedule", 'a', "FILE", "", false,
                         "Use profile auto-schedule <FILE> for auto-scheduling."},
-                {"fact-dir", 'F', "DIR", ".", false, "Specify directory for fact files."},
-                {"include-dir", 'I', "DIR", ".", true, "Specify directory for include files."},
-                {"output-dir", 'D', "DIR", ".", false,
-                        "Specify directory for output files. If <DIR> is `-` then stdout is used."},
-                {"jobs", 'j', "N", "1", false,
-                        "Run interpreter/compiler in parallel using N threads, N=auto for system "
-                        "default."},
-                {"compile", 'c', "", "", false,
-                        "Generate C++ source code, compile to a binary executable, then run this "
-                        "executable."},
-                {"generate", 'g', "FILE", "", false,
-                        "Generate C++ source code for the given Datalog program and write it to "
-                        "<FILE>. If <FILE> is `-` then stdout is used."},
-                {"inline-exclude", '\x7', "RELATIONS", "", false,
-                        "Prevent the given relations from being inlined. Overrides any `inline` qualifiers."},
-                {"swig", 's', "LANG", "", false,
-                        "Generate SWIG interface for given language. The values <LANG> accepts is java and "
-                        "python. "},
-                {"library-dir", 'L', "DIR", "", true, "Specify directory for library files."},
-                {"libraries", 'l', "FILE", "", true, "Specify libraries."},
-                {"no-warn", 'w', "", "", false, "Disable warnings."},
-                {"magic-transform", 'm', "RELATIONS", "", false,
-                        "Enable magic set transformation changes on the given relations, use '*' "
-                        "for all."},
-                {"magic-transform-exclude", '\x8', "RELATIONS", "", false,
-                        "Disable magic set transformation changes on the given relations. Overrides "
-                        "`magic-transform`. Implies `inline-exclude` for the given relations."},
-                {"macro", 'M', "MACROS", "", false, "Set macro definitions for the pre-processor"},
-                {"disable-transformers", 'z', "TRANSFORMERS", "", false,
-                        "Disable the given AST transformers."},
-                {"dl-program", 'o', "FILE", "", false,
-                        "Generate C++ source code, written to <FILE>, and compile this to a "
-                        "binary executable (without executing it)."},
+            {"fact-dir", 'F', "DIR", ".", false, "Specify directory for fact files."},
+            {"include-dir", 'I', "DIR", ".", true, "Specify directory for include files."},
+            {"output-dir", 'D', "DIR", ".", false,
+                    "Specify directory for output files. If <DIR> is `-` then stdout is used."},
+            {"jobs", 'j', "N", "1", false,
+                    "Run interpreter/compiler in parallel using N threads, N=auto for system "
+                    "default."},
+            {"compile", 'c', "", "", false,
+                    "Generate C++ source code, compile to a binary executable, then run this "
+                    "executable."},
+            {"generate", 'g', "FILE", "", false,
+                    "Generate C++ source code for the given Datalog program and write it to "
+                    "<FILE>. If <FILE> is `-` then stdout is used."},
+            {"inline-exclude", '\x7', "RELATIONS", "", false,
+                    "Prevent the given relations from being inlined. Overrides any `inline` qualifiers."},
+            {"swig", 's', "LANG", "", false,
+                    "Generate SWIG interface for given language. The values <LANG> accepts is java and "
+                    "python. "},
+            {"library-dir", 'L', "DIR", "", true, "Specify directory for library files."},
+            {"libraries", 'l', "FILE", "", true, "Specify libraries."},
+            {"no-warn", 'w', "", "", false, "Disable warnings."},
+            {"magic-transform", 'm', "RELATIONS", "", false,
+                    "Enable magic set transformation changes on the given relations, use '*' "
+                    "for all."},
+            {"magic-transform-exclude", '\x8', "RELATIONS", "", false,
+                    "Disable magic set transformation changes on the given relations. Overrides "
+                    "`magic-transform`. Implies `inline-exclude` for the given relations."},
+            {"macro", 'M', "MACROS", "", false, "Set macro definitions for the pre-processor"},
+            {"disable-transformers", 'z', "TRANSFORMERS", "", false, "Disable the given AST transformers."},
+            {"dl-program", 'o', "FILE", "", false,
+                    "Generate C++ source code, written to <FILE>, and compile this to a "
+                    "binary executable (without executing it)."},
                 {"index-stats", '\x9', "", "", false, "Enable collection of index statistics"},
-                {"live-profile", '\1', "", "", false, "Enable live profiling."},
-                {"profile", 'p', "FILE", "", false, "Enable profiling, and write profile data to <FILE>."},
-                {"profile-frequency", '\2', "", "", false, "Enable the frequency counter in the profiler."},
-                {"debug-report", 'r', "FILE", "", false, "Write HTML debug report to <FILE>."},
-                {"pragma", 'P', "OPTIONS", "", true, "Set pragma options."},
-                {"provenance", 't', "[ none | explain | explore ]", "", false,
-                        "Enable provenance instrumentation and interaction."},
-                {"verbose", 'v', "", "", false, "Verbose output."},
-                {"version", '\3', "", "", false, "Version."},
-                {"show", '\4', "[ <see-list> ]", "", true,
-                        "Print selected program information.\n"
-                        "Modes:\n"
-                        "\tinitial-ast\n"
-                        "\tinitial-ram\n"
-                        "\tparse-errors\n"
-                        "\tprecedence-graph\n"
-                        "\tprecedence-graph-text\n"
-                        "\tscc-graph\n"
-                        "\tscc-graph-text\n"
-                        "\ttransformed-ast\n"
-                        "\ttransformed-ram\n"
-                        "\ttype-analysis"},
-                {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
-                {"help", 'h', "", "", false, "Display this help message."},
+            {"live-profile", '\1', "", "", false, "Enable live profiling."},
+            {"profile", 'p', "FILE", "", false, "Enable profiling, and write profile data to <FILE>."},
+            {"profile-use", 'u', "FILE", "", false,
+                    "Use profile log-file <FILE> for profile-guided optimization."},
+            {"profile-frequency", '\2', "", "", false, "Enable the frequency counter in the profiler."},
+            {"debug-report", 'r', "FILE", "", false, "Write HTML debug report to <FILE>."},
+            {"pragma", 'P', "OPTIONS", "", true, "Set pragma options."},
+            {"provenance", 't', "[ none | explain | explore ]", "", false,
+                    "Enable provenance instrumentation and interaction."},
+            {"verbose", 'v', "", "", false, "Verbose output."}, {"version", '\3', "", "", false, "Version."},
+            {"show", '\4', "[ <see-list> ]", "", true,
+                    "Print selected program information.\n"
+                    "Modes:\n"
+                    "\tinitial-ast\n"
+                    "\tinitial-ram\n"
+                    "\tparse-errors\n"
+                    "\tprecedence-graph\n"
+                    "\tprecedence-graph-text\n"
+                    "\tscc-graph\n"
+                    "\tscc-graph-text\n"
+                    "\ttransformed-ast\n"
+                    "\ttransformed-ram\n"
+                    "\ttype-analysis"},
+            {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
+            {"help", 'h', "", "", false, "Display this help message."},
                 {"legacy", '\6', "", "", false, "Enable legacy support."},
                 {"preprocessor", '\7', "CMD", "", false, "C preprocessor to use."}};
         Global::config().processArgs(argc, argv, header.str(), versionFooter, options);
+
+    return true;
+}
+
+int main(int argc, char** argv) {
+    /* Time taking for overall runtime */
+    auto souffle_start = std::chrono::high_resolution_clock::now();
+
+    try {
+        processArgs(argc, argv);
 
         // ------ command line arguments -------------
 
@@ -424,7 +431,17 @@ int main(int argc, char** argv) {
         throw std::runtime_error("failed to determine souffle executable path");
     }
 
-    /* Create the pipe to establish a communication between cpp and souffle */
+    FILE* in;
+    const bool using_preprocessor = !Global::config().has("no-preprocess");
+
+    if (!using_preprocessor) {
+        in = fopen(Global::config().get("").c_str(), "r");
+        if (in == nullptr) {
+            perror(nullptr);
+            throw std::runtime_error("failed to open input file");
+        }
+    } else {
+        /* Create the pipe to establish a communication between cpp and souffle */
 
     std::string cmd;
 
@@ -448,11 +465,11 @@ int main(int argc, char** argv) {
     cmd += " " + toString(join(Global::config().getMany("include-dir"), " ",
                          [&](auto&& os, auto&& dir) { tfm::format(os, "-I \"%s\"", dir); }));
 
-    if (Global::config().has("macro")) {
-        cmd += " " + Global::config().get("macro");
-    }
-    // Add RamDomain size as a macro
-    cmd += " -DRAM_DOMAIN_SIZE=" + std::to_string(RAM_DOMAIN_SIZE);
+        if (Global::config().has("macro")) {
+            cmd += " " + Global::config().get("macro");
+        }
+        // Add RamDomain size as a macro
+        cmd += " -DRAM_DOMAIN_SIZE=" + std::to_string(RAM_DOMAIN_SIZE);
     cmd += " \"" + Global::config().get("") + "\"";
 #if defined(_MSC_VER)
     // cl.exe prints the input file name on the standard error stream,
@@ -460,7 +477,6 @@ int main(int argc, char** argv) {
     // because Souffle test-suite is sensible to error outputs.
     cmd += " 2> nul";
 #endif
-    FILE* in = popen(cmd.c_str(), "r");
 
     /* Time taking for parsing */
     auto parser_start = std::chrono::high_resolution_clock::now();
@@ -473,15 +489,19 @@ int main(int argc, char** argv) {
     Own<ast::TranslationUnit> astTranslationUnit =
             ParserDriver::parseTranslationUnit("<stdin>", in, errReport, debugReport);
 
-    // close input pipe
-    int preprocessor_status = pclose(in);
-    if (preprocessor_status == -1) {
-        perror(nullptr);
-        throw std::runtime_error("failed to close pre-processor pipe");
+    if (using_preprocessor) {
+        // close input pipe
+        int preprocessor_status = pclose(in);
+        if (preprocessor_status == -1) {
+            perror(nullptr);
+            throw std::runtime_error("failed to close pre-processor pipe");
     } else if (preprocessor_status != 0) {
         std::cerr << "Pre-processors command failed with code " << preprocessor_status << ": '" << cmd
                   << "'\n";
         throw std::runtime_error("Pre-processor command failed");
+        }
+    } else {
+        fclose(in);
     }
 
     /* Report run-time of the parser if verbose flag is set */
@@ -851,7 +871,3 @@ int main(int argc, char** argv) {
 }
 
 }  // end of namespace souffle
-
-int main(int argc, char** argv) {
-    return souffle::main(argc, argv);
-}

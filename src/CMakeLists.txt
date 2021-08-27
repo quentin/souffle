@@ -8,6 +8,7 @@
 set(SOUFFLE_SOURCES
     FunctorOps.cpp
     Global.cpp
+    MainDriver.cpp
     ast/Aggregator.cpp
     ast/AlgebraicDataType.cpp
     ast/AliasType.cpp
@@ -306,7 +307,7 @@ set_target_properties(libsouffle PROPERTIES OUTPUT_NAME "souffle")
 # Souffle binary
 # --------------------------------------------------
 add_executable(souffle
-               main.cpp)
+               souffle.cpp)
 target_link_libraries(souffle libsouffle)
 install(TARGETS souffle DESTINATION bin)
 
