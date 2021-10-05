@@ -30,6 +30,8 @@
 #include "ast/SubsumptiveClause.h"
 #include "ast/UnnamedVariable.h"
 #include "ast/analysis/Functor.h"
+#include "ast/transform/ReorderLiterals.h"
+#include "ast/utility/SipsMetric.h"
 #include "ast/utility/Utils.h"
 #include "ast/utility/Visitor.h"
 #include "ast2ram/utility/Location.h"
@@ -73,7 +75,7 @@ bool ClauseTranslator::isRecursive() const {
     return !sccAtoms.empty();
 }
 
-std::string ClauseTranslator::getClauseString(const ast::Clause& clause) const {
+Own<ast::Clause> ClauseTranslator::getRenamedClause(const ast::Clause& clause) const {
     auto renamedClone = clone(clause);
 
     // Update the head atom
@@ -90,8 +92,11 @@ std::string ClauseTranslator::getClauseString(const ast::Clause& clause) const {
                 "atom sequence in clone should match");
         cloneAtom->setQualifiedName(getClauseAtomName(clause, originalAtom));
     }
+    return renamedClone;
+}
 
-    return toString(*renamedClone);
+std::string ClauseTranslator::getClauseString(const ast::Clause& clause) const {
+    return toString(*getRenamedClause(clause));
 }
 
 Own<ram::Statement> ClauseTranslator::translateRecursiveClause(
@@ -696,6 +701,19 @@ std::vector<ast::Atom*> ClauseTranslator::getAtomOrdering(const ast::Clause& cla
     auto atoms = ast::getBodyLiterals<ast::Atom>(clause);
 
     const auto& plan = clause.getExecutionPlan();
+    if (!clause.isLeq() && (plan == nullptr || !contains(plan->getOrders(), version))) {
+        const ast::SipsMetric* sips;
+        if(plan != nullptr && plan->hasSips()) {
+            sips = context.getSipsMetric(plan->getSips());
+        } else {
+            sips = context.getSipsMetric();
+        }
+        // need to rename atoms with the appropriate @delta_ prefixes for this version
+        auto renamedClone = getRenamedClause(clause);
+        std::vector<unsigned int> newOrder = sips->getReordering(&*renamedClone);
+        return reorderAtoms(atoms, newOrder);
+    }
+
     if (plan == nullptr) {
         return atoms;
     }

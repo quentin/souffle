@@ -48,11 +48,14 @@ void ExecutionPlan::print(std::ostream& out) const {
         out << join(plans, ", ",
                 [](std::ostream& os, const auto& arg) { os << arg.first << ":" << *arg.second; });
     }
+    if (sips.has_value()) {
+        //out << " .sips " << sips.value() << std::endl;
+    }
 }
 
 bool ExecutionPlan::equal(const Node& node) const {
     const auto& other = asAssert<ExecutionPlan>(node);
-    return equal_targets(plans, other.plans);
+    return equal_targets(plans, other.plans) && sips == other.sips;
 }
 
 ExecutionPlan* ExecutionPlan::cloning() const {
@@ -60,6 +63,7 @@ ExecutionPlan* ExecutionPlan::cloning() const {
     for (auto& plan : plans) {
         res->setOrderFor(plan.first, clone(plan.second));
     }
+    res->sips = sips;
     return res.release();
 }
 }  // namespace souffle::ast

@@ -49,6 +49,19 @@ public:
 
     NodeVec getChildren() const override;
 
+    void setSips(std::string s) {
+        sips = s;
+    }
+
+    const std::string getSips() const {
+        assert(sips.has_value());
+        return sips.value();
+    }
+
+    bool hasSips() const {
+        return sips.has_value();
+    }
+
 protected:
     void print(std::ostream& out) const override;
 
@@ -60,6 +73,8 @@ private:
 private:
     /** Mapping versions of clauses to execution orders */
     std::map<int, Own<ExecutionOrder>> plans;
+
+    std::optional<std::string> sips;
 };
 
 }  // namespace souffle::ast

@@ -70,6 +70,8 @@ std::unique_ptr<SipsMetric> SipsMetric::create(const std::string& heuristic, con
         return mk<MaxBoundSips>();
     else if (heuristic == "max-bound-delta")
         return mk<MaxBoundDeltaSips>();
+    else if (heuristic == "delta-max-bound")
+        return mk<DeltaMaxBoundSips>();
     else if (heuristic == "max-ratio")
         return mk<MaxRatioSips>();
     else if (heuristic == "least-free")
@@ -86,7 +88,8 @@ std::unique_ptr<SipsMetric> SipsMetric::create(const std::string& heuristic, con
     else if (heuristic == "delta-input")
         return mk<DeltaInputSips>(tu.getAnalysis<analysis::RelationDetailCacheAnalysis>(),
                 tu.getAnalysis<analysis::IOTypeAnalysis>());
-
+    std::cout << "sips heuristic " << heuristic << " does not exist" << std::endl;
+    assert(0);
     // default is all-bound
     return create("all-bound", tu);
 }
@@ -201,6 +204,39 @@ std::vector<double> MaxBoundDeltaSips::evaluateCosts(
         } else {
             // Between 1 and (2 + delta), decreasing with more num bound
             cost.push_back(delta + 1 + (1 / numBound));
+        }
+    }
+    assert(atoms.size() == cost.size() && "each atom should have exactly one cost");
+    return cost;
+}
+
+std::vector<double> DeltaMaxBoundSips::evaluateCosts(
+        const std::vector<Atom*> atoms, const BindingStore& bindingStore) const {
+    // Goal: prioritise (1) all-bound, then (2) max number of bound vars, then (3) left-most, but use deltas
+    // as a tiebreaker between these.
+    std::vector<double> cost;
+    for (const auto* atom : atoms) {
+        if (atom == nullptr) {
+            cost.push_back(std::numeric_limits<double>::max());
+            continue;
+        }
+
+        if (isDeltaRelation(atom->getQualifiedName())) {
+            cost.push_back(0);
+            continue;
+        }
+
+        int arity = atom->getArity();
+        int numBound = bindingStore.numBoundArguments(atom);
+        if (arity == numBound) {
+            // Always better than anything else
+            cost.push_back(0);
+        } else if (numBound == 0) {
+            // Always worse than any number of bound vars
+            cost.push_back(3);
+        } else {
+            // Between 1 and (2 + delta), decreasing with more num bound
+            cost.push_back(1 + (1 / numBound));
         }
     }
     assert(atoms.size() == cost.size() && "each atom should have exactly one cost");

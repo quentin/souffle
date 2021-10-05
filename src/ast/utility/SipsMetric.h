@@ -112,6 +112,16 @@ protected:
             const std::vector<Atom*> atoms, const BindingStore& bindingStore) const override;
 };
 
+/** Goal: prioritise (1) delta, (2) all-bound, then (3) max number of bound vars, then (4) left-most */
+class DeltaMaxBoundSips : public SipsMetric {
+public:
+    DeltaMaxBoundSips() = default;
+
+protected:
+    std::vector<double> evaluateCosts(
+            const std::vector<Atom*> atoms, const BindingStore& bindingStore) const override;
+};
+
 /** Goal: prioritise max ratio of bound args */
 class MaxRatioSips : public SipsMetric {
 public:

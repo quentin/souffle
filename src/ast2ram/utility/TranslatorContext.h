@@ -117,8 +117,13 @@ public:
     FunctorOp getOverloadedFunctorOp(const ast::IntrinsicFunctor& inf) const;
 
     /** Analyses */
+    const ast::SipsMetric* getSipsMetric(const std::string name) const {
+        assert(sipsMetrics.count(name));
+        return sipsMetrics.at(name).get();
+    }
+
     const ast::SipsMetric* getSipsMetric() const {
-        return sipsMetric.get();
+        return defaultSipsMetric.get();
     }
 
     /** Translation strategy */
@@ -145,7 +150,8 @@ private:
     const ast::analysis::SumTypeBranchesAnalysis* sumTypeBranches;
     const ast::analysis::PolymorphicObjectsAnalysis* polyAnalysis;
     std::map<const ast::Clause*, std::size_t> clauseNums;
-    Own<ast::SipsMetric> sipsMetric;
+    Own<ast::SipsMetric> defaultSipsMetric;
+    std::map<const std::string, Own<ast::SipsMetric>> sipsMetrics;
     Own<TranslationStrategy> translationStrategy;
 };
 

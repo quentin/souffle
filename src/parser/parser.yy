@@ -160,6 +160,7 @@
 %token TRUELIT                   "true literal constraint"
 %token FALSELIT                  "false literal constraint"
 %token PLAN                      "plan keyword"
+%token SIPS                      "sips keyword"
 %token CHOICEDOMAIN              "choice-domain"
 %token IF                        ":-"
 %token DECL                      "relation declaration"
@@ -1173,6 +1174,16 @@ query_plan_list
     {
       $$ = $curr_list;
       $$->setOrderFor(RamSignedFromString($NUMBER), $plan_order);
+    }
+  | query_plan_list[curr_list] COMMA SIPS COLON IDENT
+    {
+      $$ = $curr_list;
+      $$->setSips($IDENT);
+    }
+  | SIPS COLON STRING[val]
+    {
+      $$ = mk<ast::ExecutionPlan>();
+      $$->setSips($val);
     }
   ;
 

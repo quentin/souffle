@@ -72,13 +72,21 @@ TranslatorContext::TranslatorContext(const ast::TranslationUnit& tu) {
             clauseNums[clause] = count++;
         }
     }
+    for (const ast::Clause* clause : program->getClauses()) {
+        if(clause->getExecutionPlan() != nullptr && clause->getExecutionPlan()->hasSips()) {
+            std::string name = clause->getExecutionPlan()->getSips();
+            if (sipsMetrics.count(name) <= 0) {
+                sipsMetrics[name] = ast::SipsMetric::create(name, tu);
+            }
+        }
+    }
 
     // Set up SIPS metric
     std::string sipsChosen = "all-bound";
     if (Global::config().has("RamSIPS")) {
         sipsChosen = Global::config().get("RamSIPS");
     }
-    sipsMetric = ast::SipsMetric::create(sipsChosen, tu);
+    defaultSipsMetric = ast::SipsMetric::create(sipsChosen, tu);
 
     // Set up the correct strategy
     if (Global::config().has("provenance")) {
