@@ -54,6 +54,7 @@
 #include "ast/transform/ReplaceSingletonVariables.h"
 #include "ast/transform/ResolveAliases.h"
 #include "ast/transform/ResolveAnonymousRecordAliases.h"
+#include "ast/transform/ResolveRecordAccess.h"
 #include "ast/transform/SemanticChecker.h"
 #include "ast/transform/SimplifyAggregateTargetExpression.h"
 #include "ast/transform/UniqueAggregationVariables.h"
@@ -514,6 +515,7 @@ int main(int argc, char** argv) {
             mk<ast::transform::SimplifyAggregateTargetExpressionTransformer>(),
             mk<ast::transform::UniqueAggregationVariablesTransformer>(),
             mk<ast::transform::FixpointTransformer>(mk<ast::transform::PipelineTransformer>(
+                    mk<ast::transform::ResolveRecordAccess>(),
                     mk<ast::transform::ResolveAnonymousRecordAliasesTransformer>(),
                     mk<ast::transform::FoldAnonymousRecords>())),
             mk<ast::transform::SemanticChecker>(), mk<ast::transform::GroundWitnessesTransformer>(),
@@ -528,7 +530,9 @@ int main(int argc, char** argv) {
             mk<ast::transform::ResolveAliasesTransformer>(), mk<ast::transform::MinimiseProgramTransformer>(),
             mk<ast::transform::InlineUnmarkExcludedTransform>(),
             mk<ast::transform::InlineRelationsTransformer>(), mk<ast::transform::GroundedTermsChecker>(),
+            mk<ast::transform::ResolveRecordAccess>(),
             mk<ast::transform::ResolveAliasesTransformer>(),
+            mk<ast::transform::ResolveRecordAccess>(),
             mk<ast::transform::RemoveRedundantRelationsTransformer>(),
             mk<ast::transform::RemoveRelationCopiesTransformer>(),
             mk<ast::transform::RemoveEmptyRelationsTransformer>(),

@@ -101,6 +101,7 @@ set(SOUFFLE_SOURCES
     ast/transform/ReplaceSingletonVariables.cpp
     ast/transform/ResolveAliases.cpp
     ast/transform/ResolveAnonymousRecordAliases.cpp
+    ast/transform/ResolveRecordAccess.cpp
     ast/transform/SemanticChecker.cpp
     ast/transform/SimplifyAggregateTargetExpression.cpp
     ast/transform/Transformer.cpp
