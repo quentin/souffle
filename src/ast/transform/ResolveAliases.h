@@ -57,6 +57,7 @@ public:
      * @return a modified clone of the given clause
      */
     static Own<Clause> removeTrivialEquality(const Clause& clause);
+    static Own<Clause> simplifyEqualities(const Clause& clause);
 
     /**
      * Removes complex terms in atoms, replacing them with constrained variables.

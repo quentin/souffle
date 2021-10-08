@@ -391,6 +391,66 @@ Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& claus
     return res;
 }
 
+Own<Clause> ResolveAliasesTransformer::simplifyEqualities(const Clause& clause) {
+    auto res = clone(clause);
+
+    // tests whether something is a generator
+    bool hasGenerator = false;
+    visit(res, [&](const Aggregator&) { hasGenerator = true; });
+    visit(res, [&](const IntrinsicFunctor&inf) { hasGenerator |= analysis::FunctorAnalysis::isMultiResult(inf); });
+    if (hasGenerator) {
+        return res;
+    }
+
+    std::vector<BinaryConstraint*> constraints = getBodyLiterals<BinaryConstraint>(clause);
+    std::vector<BinaryConstraint*> eqconstraints =
+    filter(constraints, [&](BinaryConstraint* constraint) {
+        return isEqConstraint(constraint->getBaseOperator());
+    });
+    std::set<const BinaryConstraint*> to_replace;
+    for (BinaryConstraint* constraint : eqconstraints) {
+        if (to_replace.count(constraint)) continue;
+        std::vector<const Argument*> equal_args;
+        equal_args.push_back(constraint->getLHS());
+        equal_args.push_back(constraint->getRHS());
+        size_t last_size = 0;
+        while (last_size != equal_args.size()) {
+            last_size = equal_args.size();
+            for (BinaryConstraint* c : eqconstraints) {
+                if (c == constraint) continue;
+                if (any_of(equal_args, [&](const Argument* cur) { return *cur == *(c->getLHS()) || *cur == *(c->getRHS()); })) {
+                    to_replace.insert(c);
+                    to_replace.insert(constraint);
+                    if (!any_of(equal_args, [&](const Argument* cur) { return *cur == *(c->getLHS()); })) {
+                        equal_args.push_back(c->getLHS());
+                    }
+                    if (!any_of(equal_args, [&](const Argument* cur) { return *cur == *(c->getRHS()); })) {
+                        equal_args.push_back(c->getRHS());
+                    }
+                }
+            }
+        }
+        // the constraints in to_replace can now be simplified
+        std::sort(equal_args.begin(), equal_args.end(), [](const Argument* a1, const Argument * a2) {
+            if (isA<Variable>(a1) && !isA<Variable>(a2)) {
+                return true;
+            }
+            if (!isA<Variable>(a1) && isA<Variable>(a2)) {
+                return false;
+            }
+            return a1 < a2;
+        });
+        for (const Argument * arg0 : equal_args) {
+            for (const Argument * arg1 : equal_args) {
+                if (arg0 != arg1 && isA<Variable>(arg0) && isA<Variable>(arg1)) {
+                    res->addToBody(mk<BinaryConstraint>(BinaryConstraintOp::EQ, clone(arg0), clone(arg1)));
+                }
+            }
+        }
+    }
+    return res;
+}
+
 Own<Clause> ResolveAliasesTransformer::removeComplexTermsInAtoms(const Clause& clause) {
     Own<Clause> res(clone(clause));
 
@@ -520,7 +580,9 @@ bool ResolveAliasesTransformer::transform(TranslationUnit& translationUnit) {
 
         // -- Step 2 --
         // restore simple terms in atoms
-        Own<Clause> normalised = removeComplexTermsInAtoms(*cleaned);
+        Own<Clause> normalised2 = removeComplexTermsInAtoms(*cleaned);
+        Own<Clause> normalised3 = simplifyEqualities(*normalised2);
+        Own<Clause> normalised = resolveAliases(*normalised3);
 
         // swap if changed
         if (*normalised != *clause) {
