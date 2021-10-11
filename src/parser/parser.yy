@@ -285,6 +285,10 @@
 %type <Mov<VecOwn<ast::BranchType>>>    adt_branch_list
 %type <Mov<Own<ast::BranchType>>>       adt_branch
 
+/* JHenry: for specifying custom execution orders */
+%type <Mov<ast::QualifiedName>>                qualified_name_with_possible_delta
+%type <Mov<std::vector<ast::QualifiedName>>>          rel_list
+
 /* -- Operator precedence -- */
 %left L_OR
 %left L_XOR
@@ -1185,7 +1189,54 @@ query_plan_list
       $$ = mk<ast::ExecutionPlan>();
       $$->setSips($val);
     }
+  | LPAREN rel_list[val] RPAREN COLON plan_order
+    {
+      $$ = mk<ast::ExecutionPlan>();
+      std::string s = "";
+      for (auto v : $val) {
+        s = v.toString() + "," + s;
+      }
+      if (s.length() > 0) {
+          s.pop_back(); // remove trailing ','
+      }
+      $$->setCustomFor(s, Own<ast::ExecutionOrder>($plan_order));
+    }
+  | query_plan_list[curr_list] COMMA LPAREN rel_list[val] RPAREN COLON plan_order
+    {
+      $$ = $curr_list;
+      std::string s = "";
+      for (auto v : $val) {
+        s = v.toString() + "," + s;
+      }
+      if (s.length() > 0) {
+          s.pop_back(); // remove trailing ','
+      }
+      $$->setCustomFor(s, Own<ast::ExecutionOrder>($plan_order));
+    }
   ;
+
+rel_list
+  : qualified_name_with_possible_delta[rel]
+    {
+      $$.push_back($rel);
+    }
+  | qualified_name_with_possible_delta[rel] COMMA rel_list[v]
+    {
+      $$ = $v;
+      $$.push_back($rel);
+    }
+
+qualified_name_with_possible_delta
+  : qualified_name[rel]
+    {
+      $$ = $rel;
+    }
+  | AT IDENT[ident] DOT qualified_name[rel]
+    {
+
+      $$ = ("@" + $ident) + $rel;
+    }
+
 
 plan_order
   : LPAREN RPAREN

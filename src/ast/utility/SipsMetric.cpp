@@ -35,6 +35,28 @@ std::vector<unsigned int> SipsMetric::getReordering(const Clause* clause) const 
     auto atoms = getBodyLiterals<Atom>(*clause);
     std::vector<unsigned int> newOrder(atoms.size());
 
+    auto plan = clause->getExecutionPlan();
+    if (plan != nullptr) {
+        auto customs = plan->getCustoms();
+        if (customs.size() > 0) {
+            std::string s = "";
+            for (auto atom : atoms) {
+                s += atom->getQualifiedName().toString() + ",";
+            }
+            if (s.length() > 0) {
+                s.pop_back();
+            }
+            if (customs.count(s)) {
+                std::cout << "Applied custom ordering for " << s << std::endl;
+                auto order = customs[s]->getOrder();
+                std::vector<unsigned int> newOrder(order.size());
+                std::transform(order.begin(), order.end(), newOrder.begin(),
+                        [](unsigned int i) -> unsigned int { return i - 1; });
+                return newOrder;
+            }
+        }
+    }
+
     std::size_t numAdded = 0;
     while (numAdded < atoms.size()) {
         // grab the index of the next atom, based on the SIPS function
@@ -76,6 +98,8 @@ std::unique_ptr<SipsMetric> SipsMetric::create(const std::string& heuristic, con
         return mk<MaxRatioSips>();
     else if (heuristic == "least-free")
         return mk<LeastFreeSips>();
+    else if (heuristic == "delta-least-free")
+        return mk<DeltaLeastFreeSips>();
     else if (heuristic == "least-free-vars")
         return mk<LeastFreeVarsSips>();
     else if (heuristic == "profile-use")
@@ -284,6 +308,58 @@ std::vector<double> LeastFreeSips::evaluateCosts(
     }
     return cost;
 }
+
+std::vector<double> DeltaLeastFreeSips::evaluateCosts(
+        const std::vector<Atom*> atoms, const BindingStore& bindingStore) const {
+    // Goal: choose the atom with the least number of unbound arguments
+    std::vector<double> cost;
+    for (const auto* atom : atoms) {
+        if (atom == nullptr) {
+            cost.push_back(std::numeric_limits<double>::max());
+            continue;
+        }
+
+        if (isDeltaRelation(atom->getQualifiedName())) {
+            cost.push_back(0);
+            continue;
+        }
+
+        cost.push_back(1 + atom->getArity() - bindingStore.numBoundArguments(atom));
+    }
+    return cost;
+}
+
+std::vector<double> DeltaMaxRatioSips::evaluateCosts(
+        const std::vector<Atom*> atoms, const BindingStore& bindingStore) const {
+    // Goal: choose the atom with the least number of unbound arguments
+    std::vector<double> cost;
+    for (const auto* atom : atoms) {
+        if (atom == nullptr) {
+            cost.push_back(std::numeric_limits<double>::max());
+            continue;
+        }
+
+        if (isDeltaRelation(atom->getQualifiedName())) {
+            cost.push_back(1);
+            continue;
+        }
+
+        int arity = atom->getArity();
+        int numBound = bindingStore.numBoundArguments(atom);
+        if (arity == 0) {
+            // Always better than anything else
+            cost.push_back(0);
+        } else if (numBound == 0) {
+            // Always worse than anything else
+            cost.push_back(4.0);
+        } else {
+            // Between 0 and 1, decreasing as the ratio increases
+            cost.push_back(3.0 - ((double)numBound / (double)arity));
+        }
+    }
+    return cost;
+}
+
 
 std::vector<double> LeastFreeVarsSips::evaluateCosts(
         const std::vector<Atom*> atoms, const BindingStore& bindingStore) const {

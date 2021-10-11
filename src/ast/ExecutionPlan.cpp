@@ -31,6 +31,19 @@ std::map<int, const ExecutionOrder*> ExecutionPlan::getOrders() const {
     return result;
 }
 
+void ExecutionPlan::setCustomFor(std::string s, Own<ExecutionOrder> plan) {
+    assert(plan != nullptr);
+    customs[s] = std::move(plan);
+}
+
+std::map<std::string, const ExecutionOrder*> ExecutionPlan::getCustoms() const {
+    std::map<std::string, const ExecutionOrder*> result;
+    for (auto& custom : customs) {
+        result.insert(std::make_pair(custom.first, custom.second.get()));
+    }
+    return result;
+}
+
 void ExecutionPlan::apply(const NodeMapper& map) {
     for (auto& plan : plans) {
         plan.second = map(std::move(plan.second));
@@ -55,13 +68,16 @@ void ExecutionPlan::print(std::ostream& out) const {
 
 bool ExecutionPlan::equal(const Node& node) const {
     const auto& other = asAssert<ExecutionPlan>(node);
-    return equal_targets(plans, other.plans) && sips == other.sips;
+    return equal_targets(plans, other.plans) && equal_targets(customs, other.customs) && sips == other.sips;
 }
 
 ExecutionPlan* ExecutionPlan::cloning() const {
     auto res = mk<ExecutionPlan>(getSrcLoc());
     for (auto& plan : plans) {
         res->setOrderFor(plan.first, clone(plan.second));
+    }
+    for (auto& custom : customs) {
+        res->setCustomFor(custom.first, clone(custom.second));
     }
     res->sips = sips;
     return res.release();

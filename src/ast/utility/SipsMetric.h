@@ -46,7 +46,7 @@ public:
      * @param clause clause to reorder
      * @return the vector of new positions; v[i] = j iff atom j moves to pos i
      */
-    std::vector<unsigned int> getReordering(const Clause* clause) const;
+    virtual std::vector<unsigned int> getReordering(const Clause* clause) const;
 
     /** Create a SIPS metric based on a given heuristic. */
     static std::unique_ptr<SipsMetric> create(const std::string& heuristic, const TranslationUnit& tu);
@@ -136,6 +136,26 @@ protected:
 class LeastFreeSips : public SipsMetric {
 public:
     LeastFreeSips() = default;
+
+protected:
+    std::vector<double> evaluateCosts(
+            const std::vector<Atom*> atoms, const BindingStore& bindingStore) const override;
+};
+
+class DeltaLeastFreeSips : public SipsMetric {
+public:
+    DeltaLeastFreeSips() = default;
+
+protected:
+    std::vector<double> evaluateCosts(
+            const std::vector<Atom*> atoms, const BindingStore& bindingStore) const override;
+};
+
+class DeltaMaxRatioSips : public SipsMetric {
+public:
+    DeltaMaxRatioSips() = default;
+
+    std::vector<unsigned int> getReordering(const Clause* clause) const override;
 
 protected:
     std::vector<double> evaluateCosts(

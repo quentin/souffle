@@ -62,6 +62,10 @@ public:
         return sips.has_value();
     }
 
+    std::map<std::string, const ExecutionOrder*> getCustoms() const;
+
+    void setCustomFor(std::string, Own<ExecutionOrder> plan);
+
 protected:
     void print(std::ostream& out) const override;
 
@@ -75,6 +79,8 @@ private:
     std::map<int, Own<ExecutionOrder>> plans;
 
     std::optional<std::string> sips;
+
+    std::map<std::string, Own<ExecutionOrder>> customs;
 };
 
 }  // namespace souffle::ast
