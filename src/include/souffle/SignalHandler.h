@@ -26,6 +26,10 @@
 #include <mutex>
 #include <string>
 
+#ifdef PROFILING
+#include "souffle/profile/ProfileEvent.h"
+#endif
+
 #ifdef _WIN32
 #include <io.h>
 #define STDERR_FILENO 2 /* Standard error output.  */
@@ -189,6 +193,12 @@ private:
             write({error, " signal in rule:\n", msg, "\n"});
         else
             write({error, " signal.\n"});
+
+#ifdef PROFILING
+        write({error, "dumping profiling data...\n"});
+        ProfileEventSingleton::instance().stopTimer();
+        ProfileEventSingleton::instance().dump();
+#endif
 
         std::_Exit(EXIT_FAILURE);
     }
