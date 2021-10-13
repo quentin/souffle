@@ -396,7 +396,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     } else {
                         out  << level.first;
                     }
-                    out << "_" << level.second << " = make_on_demand([=]() -> RamDomain {return ";
+                    out << "_" << level.second << " = make_on_demand([&]() -> RamDomain {return ";
                     dispatch(*v, out);
                     out << ";});\n";
                 }
@@ -2538,7 +2538,6 @@ void Synthesiser::generateCode(std::ostream& sos, std::ostream& header_os, const
         os << "#include <mutex>\n";
         os << "#include \"souffle/provenance/Explain.h\"\n";
     }
-    os << "#include<future>\n";
 
     if (Global::config().has("profile")) {
         os << "#include \"souffle/profile/Logger.h\"\n";
@@ -2572,9 +2571,9 @@ void Synthesiser::generateCode(std::ostream& sos, std::ostream& header_os, const
         withSharedLibrary = true;
     });
 
+    header_os << "\n#include \"souffle/CompiledSouffle.h\"\n";
     if (functors_in_class) {
         header_os << "#pragma once\n";
-        header_os << "\n#include \"souffle/CompiledSouffle.h\"\n";
         header_os << "class " << id << "_functors {\n";
         header_os << "protected:\n";
         header_os << "virtual ~"<< id << "_functors(){}\n";
