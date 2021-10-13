@@ -26,9 +26,16 @@ function(SOUFFLE_RUN_CPP_TEST)
         ${ARGV}
     )
 
-
+    if (APPLE)
+        # Mathworks: required for the 3p build...
+    set(FOR_APPLE "-isysroot/Applications/Xcode12.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk")
+    add_test(NAME ${PARAM_QUALIFIED_TEST_NAME}_compile_cpp
+             COMMAND sh -c "set -e; '${CMAKE_CXX_COMPILER}' '${FOR_APPLE}' --std=c++17 -D__EMBEDDED_SOUFFLE__  '-I${CMAKE_SOURCE_DIR}/src/include' '${TEST_NAME}.cpp' '${PARAM_INPUT_DIR}/driver.cpp' -o '${TEST_NAME}'")
+    else()
     add_test(NAME ${PARAM_QUALIFIED_TEST_NAME}_compile_cpp
              COMMAND sh -c "set -e; '${CMAKE_CXX_COMPILER}' --std=c++17 -D__EMBEDDED_SOUFFLE__  '-I${CMAKE_SOURCE_DIR}/src/include' '${TEST_NAME}.cpp' '${PARAM_INPUT_DIR}/driver.cpp' -o '${TEST_NAME}'")
+    endif (APPLE)
+
     set_tests_properties(${PARAM_QUALIFIED_TEST_NAME}_compile_cpp PROPERTIES
                          WORKING_DIRECTORY "${PARAM_OUTPUT_DIR}"
                          LABELS "${PARAM_TEST_LABELS}"
