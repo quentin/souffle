@@ -200,6 +200,11 @@ set_target_properties(libsouffle PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_options(libsouffle
                        PUBLIC "-Wall;-Wextra;-Werror;-fwrapv")
 
+if (APPLE)
+    target_compile_options(libsouffle
+                       PUBLIC "-Wno-error=range-loop-analysis")
+endif (APPLE)
+
 target_link_libraries(libsouffle PRIVATE Threads::Threads)
 if (MSVC)
     add_definitions (/bigobj)
