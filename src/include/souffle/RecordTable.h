@@ -98,7 +98,7 @@ struct GenericRecordHash {
     std::size_t operator()(const T& Record) const {
         std::size_t Seed = 0;
         for (std::size_t I = 0; I < Arity; ++I) {
-            Seed ^= domainHash(Record[I]) + 0x9e3779b9 + (Seed << 6) + (Seed >> 2);
+            Seed ^= domainHash(Record[(int)I]) + 0x9e3779b9 + (Seed << 6) + (Seed >> 2);
         }
         return Seed;
     }

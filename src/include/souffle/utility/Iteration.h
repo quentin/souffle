@@ -29,6 +29,7 @@ namespace detail {
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4172)
+#pragma warning(disable : 4700)
 #elif defined(__GNUC__) && (__GNUC__ >= 7)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreturn-local-addr"

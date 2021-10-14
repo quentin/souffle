@@ -184,7 +184,7 @@ private:
                 // assign to variable to suppress ignored-return-value error.
                 // I don't think we care enough to handle this fringe failure mode.
                 // Worse case we don't get an error message.
-                [[maybe_unused]] auto _ = ::write(STDERR_FILENO, msg, ::strlen(msg));
+                [[maybe_unused]] auto _ = ::write(STDERR_FILENO, msg, (unsigned int)::strlen(msg));
             }
         };
 

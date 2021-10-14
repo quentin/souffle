@@ -3135,7 +3135,7 @@ void runFunction(std::string  inputDirectoryArg,
 
     // hidden hooks
     os << "SouffleProgram *newInstance_" << id << "(){return new " << classname << ";}\n";
-    os << "SymbolTable *getST_" << id << "(SouffleProgram *p){return &reinterpret_cast<" << classname
+    os << "SymbolTable *getST_" << id << "(SouffleProgram *p){return &static_cast<" << classname
        << "*>(p)->getSymbolTable();}\n";
 
     os << "\n#ifdef __EMBEDDED_SOUFFLE__\n";
