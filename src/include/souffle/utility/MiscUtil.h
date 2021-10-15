@@ -33,6 +33,9 @@
 #include <fcntl.h>
 #include <io.h>
 #include <stdlib.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 
 /**

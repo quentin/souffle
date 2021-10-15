@@ -17,6 +17,13 @@
 
 #pragma once
 
+#if defined _MSC_VER
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #include <atomic>
 #include <cassert>
 #include <cstddef>
