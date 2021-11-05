@@ -701,7 +701,7 @@ std::vector<ast::Atom*> ClauseTranslator::getAtomOrdering(const ast::Clause& cla
     auto atoms = ast::getBodyLiterals<ast::Atom>(clause);
 
     const auto& plan = clause.getExecutionPlan();
-    if (!clause.isLeq() && (plan == nullptr || !contains(plan->getOrders(), version))) {
+    if (isA<ast::SubsumptiveClause>(clause) && (plan == nullptr || !contains(plan->getOrders(), version))) {
         const ast::SipsMetric* sips;
         if(plan != nullptr && plan->hasSips()) {
             sips = context.getSipsMetric(plan->getSips());
