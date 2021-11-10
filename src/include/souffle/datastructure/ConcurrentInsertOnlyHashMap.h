@@ -145,7 +145,7 @@ public:
         }
         LoadFactor = 1.0;
         Buckets = std::make_unique<std::atomic<BucketList*>[]>(BucketCount);
-        MaxSizeBeforeGrow = (std::size_t)std::ceil(LoadFactor * BucketCount);
+        MaxSizeBeforeGrow = (std::size_t)std::ceil(LoadFactor * static_cast<double>(BucketCount));
     }
 
     ConcurrentInsertOnlyHashMap(const Hash& hash = Hash(), const KeyEqual& key_equal = KeyEqual(),
@@ -410,7 +410,7 @@ private:
             // Chose a prime number of buckets that ensures the desired load factor
             // given the current number of elements in the map.
             const std::size_t CurrentSize = Size;
-            const std::size_t NeededBucketCount = (std::size_t)std::ceil(CurrentSize / LoadFactor);
+            const auto NeededBucketCount = static_cast<std::size_t>(std::ceil(static_cast<double>(CurrentSize) / LoadFactor));
             std::size_t NewBucketCount = NeededBucketCount;
             for (std::size_t I = 0; I < details::ToPrime.size(); ++I) {
                 const uint64_t N = details::ToPrime[I].first;
@@ -446,7 +446,7 @@ private:
 
             Buckets = std::move(NewBuckets);
             BucketCount = NewBucketCount;
-            MaxSizeBeforeGrow = (std::size_t)(NewBucketCount * LoadFactor);
+            MaxSizeBeforeGrow = (std::size_t)(NewBucketCount * static_cast<std::size_t>(LoadFactor));
         }
 
         Lanes.beforeUnlockAllBut(H);

@@ -35,7 +35,7 @@ class Cell<std::chrono::microseconds> : public CellInterface {
 public:
     Cell(std::chrono::microseconds value) : value(value){};
     double getDoubleVal() const override {
-        return value.count() / 1000000.0;
+        return static_cast<double>(value.count()) / 1000000.0;
     }
     long getLongVal() const override {
         std::cerr << "getting long on time cell\n";

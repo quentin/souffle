@@ -260,9 +260,9 @@ public:
 
         auto beginTime = run->getStarttime();
         auto endTime = run->getEndtime();
-        ss << R"_({"top":[)_" << (endTime - beginTime).count() / 1000000.0 << "," << run->getTotalSize()
-           << "," << run->getTotalLoadtime().count() / 1000000.0 << ","
-           << run->getTotalSavetime().count() / 1000000.0 << "]";
+        ss << R"_({"top":[)_" << static_cast<double>((endTime - beginTime).count()) / 1000000.0 << "," << run->getTotalSize()
+           << "," << static_cast<double>(run->getTotalLoadtime().count()) / 1000000.0 << ","
+           << static_cast<double>(run->getTotalSavetime().count()) / 1000000.0 << "]";
         return ss;
     }
 
@@ -505,7 +505,7 @@ public:
         for (auto usage : usages) {
             comma(firstRow);
             ss << '[';
-            ss << (usage.time - beginTime).count() / 1000000.0 << ", ";
+            ss << static_cast<double>((usage.time - beginTime).count()) / 1000000.0 << ", ";
             ss << 100.0 * (usage.usertime - previousUsage.usertime) / (usage.time - previousUsage.time)
                << ", ";
             ss << 100.0 * (usage.systemtime - previousUsage.systemtime) / (usage.time - previousUsage.time)
@@ -838,6 +838,8 @@ public:
     }
 
     void usage(std::chrono::microseconds endTime, std::chrono::microseconds startTime, uint32_t height = 20) {
+        using rep_t = std::chrono::microseconds::rep;
+
         uint32_t width = getTermWidth() - 8;
 
         std::set<Usage> usages = getUsageStats(width);
@@ -850,7 +852,7 @@ public:
             return;
         }
 
-        double maxIntervalUsage = 0;
+        rep_t maxIntervalUsage = 0;
 
         // Extract our overall stats
         if (startTime.count() == 0) {
@@ -861,13 +863,13 @@ public:
         }
 
         if (usages.size() < width) {
-            width = usages.size();
+            width = static_cast<uint32_t>(usages.size());
         }
 
         // Find maximum so we can normalise the graph
         Usage previousUsage{{}, 0, {}, {}};
         for (auto& currentUsage : usages) {
-            double usageDiff = (currentUsage.systemtime - previousUsage.systemtime + currentUsage.usertime -
+            rep_t usageDiff = (currentUsage.systemtime - previousUsage.systemtime + currentUsage.usertime -
                                 previousUsage.usertime)
                                        .count();
             usageDiff /= (currentUsage.time - previousUsage.time).count();
@@ -878,7 +880,7 @@ public:
             previousUsage = currentUsage;
         }
 
-        double intervalUsagePercent = 100.0 * maxIntervalUsage;
+        rep_t intervalUsagePercent = 100 * maxIntervalUsage;
         std::printf("%11s\n", "cpu total");
         std::printf("%11s\n", Tools::formatTime(usages.rbegin()->usertime).c_str());
 
@@ -893,24 +895,24 @@ public:
         previousUsage = {{}, 0, {}, {}};
         uint32_t col = 0;
         for (const Usage& currentUsage : usages) {
-            uint64_t curHeight = 0;
-            uint64_t curSystemHeight = 0;
+            rep_t curHeight = 0;
+            rep_t curSystemHeight = 0;
             // Usage may be 0
             if (maxIntervalUsage != 0) {
                 curHeight = (currentUsage.systemtime - previousUsage.systemtime + currentUsage.usertime -
                              previousUsage.usertime)
                                     .count();
                 curHeight /= (currentUsage.time - previousUsage.time).count();
-                curHeight *= height / maxIntervalUsage;
+                curHeight *= static_cast<rep_t>(height) / maxIntervalUsage;
 
                 curSystemHeight = (currentUsage.systemtime - previousUsage.systemtime).count();
                 curSystemHeight /= (currentUsage.time - previousUsage.time).count();
-                curSystemHeight *= height / maxIntervalUsage;
+                curSystemHeight *= static_cast<rep_t>(height) / maxIntervalUsage;
             }
-            for (uint32_t row = 0; row < curHeight; ++row) {
+            for (uint32_t row = 0; row < static_cast<uint32_t>(curHeight); ++row) {
                 grid[row][col] = '*';
             }
-            for (uint32_t row = curHeight - curSystemHeight; row < curHeight; ++row) {
+            for (auto row = static_cast<uint32_t>(curHeight - curSystemHeight); row < static_cast<uint32_t>(curHeight); ++row) {
                 grid[row][col] = '+';
             }
             previousUsage = currentUsage;
@@ -1230,7 +1232,7 @@ public:
             std::printf("%8s%8s%8s%16s%6s\n", row[0]->toString(precision).c_str(),
                     row[1]->toString(precision).c_str(), row[2]->toString(precision).c_str(),
                     row[4]->toString(precision).c_str(), row[8]->toString(precision).c_str());
-            Table atom_table = out.getVersionAtoms(strRel, srcLocator, row[8]->getLongVal());
+            Table atom_table = out.getVersionAtoms(strRel, srcLocator, static_cast<int>(row[8]->getLongVal()));
             verAtoms(atom_table);
         }
 
@@ -1403,13 +1405,13 @@ public:
         std::reverse(list.begin(), list.end());
         int i = 0;
         for (auto& d : list) {
-            uint32_t len = 67.0 * d.count() / max.count();
+            auto len = static_cast<uint32_t>(67.0 * static_cast<double>(d.count()) / static_cast<double>(max.count()));
             std::string bar = "";
             for (uint32_t j = 0; j < len; j++) {
                 bar += "*";
             }
 
-            std::printf("%4d %10.8f | %s\n", i++, (d.count() / 1000000.0), bar.c_str());
+            std::printf("%4d %10.8f | %s\n", i++, (static_cast<double>(d.count()) / 1000000.0), bar.c_str());
         }
     }
 
@@ -1422,15 +1424,15 @@ public:
         }
         std::sort(list.begin(), list.end());
         std::reverse(list.begin(), list.end());
-        uint32_t i = 0;
+        std::size_t i = 0;
         for (auto& l : list) {
-            std::size_t len = max == 0 ? 0 : 64.0 * l / max;
+            std::size_t len = max == 0 ? 0 : 64 * l / max;
             std::string bar = "";
-            for (uint32_t j = 0; j < len; j++) {
+            for (std::size_t j = 0; j < len; j++) {
                 bar += "*";
             }
 
-            std::printf("%4d %8s | %s\n", i++, Tools::formatNum(precision, l).c_str(), bar.c_str());
+            std::printf("%4d %8s | %s\n", static_cast<uint32_t>(i++), Tools::formatNum(precision, l).c_str(), bar.c_str());
         }
     }
 

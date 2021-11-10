@@ -91,7 +91,7 @@ Table inline OutputProcessor::getRelTable() const {
         row[6] = std::make_shared<Cell<std::string>>(r->getId());
         row[7] = std::make_shared<Cell<std::string>>(r->getLocator());
         if (total_time.count() != 0) {
-            row[8] = std::make_shared<Cell<long>>(r->size() / (total_time.count() / 1000000.0));
+            row[8] = std::make_shared<Cell<long>>(static_cast<long>(static_cast<double>(r->size()) / (static_cast<double>(total_time.count()) / 1000000.0)));
         } else {
             row[8] = std::make_shared<Cell<long>>(r->size());
         }
@@ -174,9 +174,9 @@ Table inline OutputProcessor::getRulTable() const {
             t[0] = std::make_shared<Cell<std::chrono::microseconds>>(val);
 
             if (t[0]->getTimeVal().count() != 0) {
-                t[9] = std::make_shared<Cell<double>>(t[4]->getLongVal() / (t[0]->getDoubleVal() * 1000));
+                t[9] = std::make_shared<Cell<double>>(static_cast<double>(t[4]->getLongVal()) / (t[0]->getDoubleVal() * 1000));
             } else {
-                t[9] = std::make_shared<Cell<double>>(t[4]->getLongVal() / 1.0);
+                t[9] = std::make_shared<Cell<double>>(static_cast<double>(t[4]->getLongVal()) / 1.0);
             }
             current.second = std::make_shared<Row>(t);
         }

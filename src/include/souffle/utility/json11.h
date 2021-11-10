@@ -423,19 +423,19 @@ public:
 
 class JsonInt final : public Value<Json::NUMBER, long long> {
     double number_value() const override {
-        return m_value;
+        return static_cast<double>(m_value);
     }
     int int_value() const override {
-        return m_value;
+        return static_cast<int>(m_value);
     }
     long long long_value() const override {
-        return static_cast<long long>(m_value);
+        return m_value;
     }
     bool equals(const JsonValue* other) const override {
-        return m_value == other->number_value();
+        return m_value == static_cast<long long>(other->number_value());
     }
     bool less(const JsonValue* other) const override {
-        return m_value < other->number_value();
+        return m_value < static_cast<long long>(other->number_value());
     }
 
 public:

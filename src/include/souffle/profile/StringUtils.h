@@ -63,14 +63,14 @@ inline std::string formatNum(int precision, int64_t amount) {
     }
 
     for (std::size_t i = 0; i < abbreviations.size(); ++i) {
-        if (amount > std::pow(1000, i + 2)) {
+        if (static_cast<double>(amount) > std::pow(1000.0, static_cast<double>(i) + 2.0)) {
             continue;
         }
 
-        double r = amount / std::pow(1000, i + 1);
+        double r = static_cast<double>(amount) / static_cast<double>(std::pow(1000.0, static_cast<double>(i) + 1.0));
         result = std::to_string(r);
 
-        if (r >= 100) {  // 1000 > result >= 100
+        if (r >= 100.0) {  // 1000 > result >= 100
 
             switch (precision) {
                 case 1: result = result.substr(0, 1) + "00"; break;
@@ -78,7 +78,7 @@ inline std::string formatNum(int precision, int64_t amount) {
                 case 3: result = result.substr(0, 3); break;
                 default: result = result.substr(0, precision + 1);
             }
-        } else if (r >= 10) {  // 100 > result >= 10
+        } else if (r >= 10.0) {  // 100 > result >= 10
             switch (precision) {
                 case 1: result = result.substr(0, 1) + "0"; break;
                 case 2: result = result.substr(0, 2); break;
@@ -111,18 +111,18 @@ inline std::string formatMemory(uint64_t kbytes) {
 inline std::string formatTime(std::chrono::microseconds number) {
     uint64_t sec = number.count() / 1000000;
     if (sec >= 100) {
-        uint64_t min = std::floor(sec / 60);
+        auto min = static_cast<uint64_t>(std::floor(sec / 60));
         if (min >= 100) {
-            uint64_t hours = std::floor(min / 60);
+            auto hours = static_cast<uint64_t>(std::floor(static_cast<double>(min) / 60.0));
             if (hours >= 100) {
-                uint64_t days = std::floor(hours / 24);
+                auto days = static_cast<uint64_t>(std::floor(static_cast<double>(hours) / 24.0));
                 return std::to_string(days) + "D";
             }
             return std::to_string(hours) + "h";
         }
         if (min < 10) {
             // temp should always be 1 digit long
-            uint64_t temp = std::floor((sec - (min * 60.0)) * 10.0 / 6.0);
+            auto temp = std::floor((static_cast<double>(sec) - (static_cast<double>(min) * 60.0)) * 10.0 / 6.0);
             return std::to_string(min) + "." + std::to_string(temp).substr(0, 1) + "m";
         }
         return std::to_string(min) + "m";

@@ -1857,7 +1857,7 @@ private:
         auto left_size = left->getNumElements();
         merge(left, iter.cur);
         iter.cur = left;
-        iter.pos += static_cast<field_index_type>(left_size) + 1;
+        iter.pos = static_cast<field_index_type>(iter.pos + static_cast<int>(left_size) + 1);
     }
 
     /**
@@ -2407,8 +2407,8 @@ public:
         out << "  Size of leaf node:  " << sizeof(leaf_node) << "\n";
         out << "  Size of Key:        " << sizeof(Key) << "\n";
         out << "  max keys / node:  " << node::maxKeys << "\n";
-        out << "  avg keys / node:  " << (size() / (double)nodes) << "\n";
-        out << "  avg filling rate: " << ((size() / (double)nodes) / node::maxKeys) << "\n";
+        out << "  avg keys / node:  " << ((double)size() / (double)nodes) << "\n";
+        out << "  avg filling rate: " << (((double)size() / (double)nodes) / node::maxKeys) << "\n";
         out << " ---------------------------------\n";
         out << "  insert-hint (hits/misses/total): " << hint_stats.inserts.getHits() << "/"
             << hint_stats.inserts.getMisses() << "/" << hint_stats.inserts.getAccesses() << "\n";

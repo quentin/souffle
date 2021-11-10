@@ -970,7 +970,7 @@ class FormatListN : public FormatList
         FormatListN(const Args&... args)
             : FormatList(&m_formatterStore[0], N),
             m_formatterStore { FormatArg(args)... }
-        { static_assert(sizeof...(args) == N, "Number of args must be N"); }
+        { static_assert(sizeof...(args) == static_cast<std::size_t>(N), "Number of args must be N"); }
 #else // C++98 version
         void init(int) {}
 #       define TINYFORMAT_MAKE_FORMATLIST_CONSTRUCTOR(n)                \
@@ -1020,9 +1020,9 @@ template<> class FormatListN<0> : public FormatList
 ///
 ///   FormatListRef formatList = makeFormatList( /*...*/ );
 template<typename... Args>
-detail::FormatListN<sizeof...(Args)> makeFormatList(const Args&... args)
+detail::FormatListN<static_cast<int>(sizeof...(Args))> makeFormatList(const Args&... args)
 {
-    return detail::FormatListN<sizeof...(args)>(args...);
+    return detail::FormatListN<static_cast<int>(sizeof...(args))>(args...);
 }
 
 #else // C++98 version
