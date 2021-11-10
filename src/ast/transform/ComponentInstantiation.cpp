@@ -147,7 +147,7 @@ void collectContent(Program& program, const Component& component, const TypeBind
 
             for (const auto& cur : comp->getInstantiations()) {
                 // instantiate sub-component
-                ComponentContent content = getInstantiatedContent(program, *cur, comp,
+                ComponentContent content = getInstantiatedContent(program, *cur, enclosingComponent,
                         componentLookup, orphans, report, activeBinding, maxInstantiationDepth - 1);
 
                 // process types
