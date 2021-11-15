@@ -2986,6 +2986,31 @@ void runFunction(std::string  inputDirectoryArg,
     }
     os << "}\n";  // end of printAll() method
 
+    // issues getDirectiveMap method
+    os << "public:\n";
+    os << "std::string& getADTs() override {\n";
+    for (auto store : storeIOs) {
+        auto const& directive = store->getDirectives();
+        auto name = getRelationName(lookup(store->getRelation()));
+        std::string err;
+        json11::Json types = json11::Json::parse(directive.at("types"), err);
+        os << "static std::string adt_types(\"" << escape(types["ADTs"].dump()) << "\");\n";
+        os << "return adt_types;\n";
+        break;
+    }
+    os << "}\n";
+    os << "std::string& getRecords() override {\n";
+    for (auto store : storeIOs) {
+        auto const& directive = store->getDirectives();
+        auto name = getRelationName(lookup(store->getRelation()));
+        std::string err;
+        json11::Json types = json11::Json::parse(directive.at("types"), err);
+        os << "static std::string record_types(\"" << escape(types["records"].dump()) << "\");\n";
+        os << "return record_types;\n";
+        break;
+    }
+    os << "}\n";
+
     // issue loadAll method
     os << "public:\n";
     os << "void loadAll(std::string inputDirectoryArg = \"\") override {\n";

@@ -806,6 +806,13 @@ public:
      */
     virtual void printAll(std::string outputDirectory = "") = 0;
 
+
+    /**
+     * get the internal DirectiveMap
+     */
+    virtual std::string& getRecords() = 0;
+    virtual std::string& getADTs() = 0;
+
     /**
      * Output all the input relations in stdout, without generating any files. (for debug purposes).
      */

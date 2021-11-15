@@ -266,6 +266,18 @@ public:
     /** Print output data: not implemented */
     void printAll(std::string) override {}
 
+    std::string& getRecords() override {
+        static std::string records;
+        assert(0 && "not implemented");
+        return records;
+    };
+
+    std::string& getADTs() override {
+        static std::string adts;
+        assert(0 && "not implemented");
+        return adts;
+    };
+
     /** Dump inputs: not implemented */
     void dumpInputs() override {}
 
