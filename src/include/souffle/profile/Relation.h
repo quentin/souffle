@@ -185,7 +185,7 @@ public:
     }
 
     /**
-     * Return a map of Rules, indexed by their unique Ids.
+     * Return a map of Rules, indexed by srcLocator.
      *
      * @return the ruleMap
      */
@@ -194,7 +194,7 @@ public:
     }
 
     void addRule(std::shared_ptr<Rule> rule) {
-        ruleMap[rule->getId()] = rule;
+        ruleMap[rule->getLocator()] = rule;
     }
 
     std::vector<std::shared_ptr<Rule>> getRuleRecList() const {
