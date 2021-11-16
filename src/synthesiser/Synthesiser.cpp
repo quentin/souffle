@@ -2853,6 +2853,40 @@ OnDemand<T> make_on_demand(F &&Fun) {
         os << "ProfileEventSingleton::instance().setOutputFile(profiling_fname);\n";
     }
     os << registerRel.str();
+
+    visit(prog.getMain(), [&](const Call& call) {
+        os << "strata.push_back(\"" << call.getName() << "\");\n";
+    });
+
+    std::set<std::string> seen;
+    for (auto& sub : prog.getSubroutines()) {
+        visit(*sub.second, [&](const IO& node) {
+            auto name = node.getRelation();
+            if (seen.count(name)) return;
+            seen.insert(name);
+            os << "relationStratum.emplace(\"" << name << "\", \"" << sub.first << "\");\n";
+        });
+    }
+
+    // functions to purge all relations in a stratum
+    for (auto& sub : prog.getSubroutines()) {
+        os << "purgeFunctions.emplace(\"" << sub.first << "\", [&]() {\n";
+        std::set<std::string> seen;
+        visit(*sub.second, [&](const IO& node) {
+            std::string name = getRelationName(lookup(node.getRelation()));
+            if (seen.count(name) > 0) return;
+            seen.insert(name);
+            os << name << "->purge();\n";
+        });
+        visit(*sub.second, [&](const Insert& node) {
+            std::string name = getRelationName(lookup(node.getRelation()));
+            if (seen.count(name) > 0) return;
+            seen.insert(name);
+            os << name << "->purge();\n";
+        });
+        os << "});\n";
+    }
+
     os << "}\n";
 
     // -- destructor --
@@ -2872,6 +2906,9 @@ std::string             outputDirectory;
 SignalHandler*          signalHandler {SignalHandler::instance()};
 std::atomic<RamDomain>  ctr {};
 std::atomic<std::size_t>     iter {};
+std::vector<std::string> strata;
+std::map<std::string, std::string> relationStratum;
+std::map<std::string, std::function<void()>> purgeFunctions;
 
 void runFunction(std::string  inputDirectoryArg,
                  std::string  outputDirectoryArg,
@@ -2988,28 +3025,29 @@ void runFunction(std::string  inputDirectoryArg,
 
     // issues getDirectiveMap method
     os << "public:\n";
-    os << "std::string& getADTs() override {\n";
-    for (auto store : storeIOs) {
-        auto const& directive = store->getDirectives();
-        auto name = getRelationName(lookup(store->getRelation()));
+    auto store = storeIOs.begin();
+    if (store != storeIOs.end()) {
+        auto const& directive = (*store)->getDirectives();
         std::string err;
         json11::Json types = json11::Json::parse(directive.at("types"), err);
+        os << "std::string& getADTs() override {\n";
         os << "static std::string adt_types(\"" << escape(types["ADTs"].dump()) << "\");\n";
         os << "return adt_types;\n";
-        break;
-    }
-    os << "}\n";
-    os << "std::string& getRecords() override {\n";
-    for (auto store : storeIOs) {
-        auto const& directive = store->getDirectives();
-        auto name = getRelationName(lookup(store->getRelation()));
-        std::string err;
-        json11::Json types = json11::Json::parse(directive.at("types"), err);
+        os << "}\n";
+        os << "std::string& getRecords() override {\n";
         os << "static std::string record_types(\"" << escape(types["records"].dump()) << "\");\n";
         os << "return record_types;\n";
-        break;
+        os << "}\n";
+    } else {
+        os << "std::string& getADTs() override {\n";
+        os << "static std::string adt_types(\"""\");\n";
+        os << "return adt_types;\n";
+        os << "}\n";
+        os << "std::string& getRecords() override {\n";
+        os << "static std::string record_types(\"""\");\n";
+        os << "return record_types;\n";
+        os << "}\n";
     }
-    os << "}\n";
 
     // issue loadAll method
     os << "public:\n";
@@ -3140,6 +3178,20 @@ void runFunction(std::string  inputDirectoryArg,
             subroutineNum++;
         }
     }
+
+    os << "std::vector<std::string>& getStrata() override {\n";
+    os << "    return strata;\n";
+    os << "};\n";
+
+    os << "std::string& getStratum(std::string name) override {\n";
+    os << "    return relationStratum[name];\n";
+    os << "}\n";
+
+
+    os << "void purgeStratum(std::string stratum) override {\n";
+    os << "  purgeFunctions[stratum]();";
+    os << "\n}\n";
+
     // dumpFreqs method
     //  Frequency counts must be emitted after subroutines otherwise lookup tables
     //  are not populated.

@@ -270,13 +270,27 @@ public:
         static std::string records;
         assert(0 && "not implemented");
         return records;
-    };
+    }
 
     std::string& getADTs() override {
         static std::string adts;
         assert(0 && "not implemented");
         return adts;
-    };
+    }
+
+    std::vector<std::string>& getStrata() override {
+        assert(0 && "not implemented");
+    }
+
+    std::string& getStratum(std::string) override {
+        static std::string not_implemented;
+        assert(0 && "not implemented");
+        return not_implemented;
+    }
+
+    void purgeStratum(std::string) override {
+        assert(0 && "not implemented");
+    }
 
     /** Dump inputs: not implemented */
     void dumpInputs() override {}

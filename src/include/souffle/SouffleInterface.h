@@ -814,6 +814,21 @@ public:
     virtual std::string& getADTs() = 0;
 
     /**
+     * Get the vector of stratum names, in the right order
+     */
+    virtual std::vector<std::string>& getStrata() = 0;
+
+    /**
+     * Get the stratum name corresponding to a relation
+     */
+    virtual std::string& getStratum(std::string name) = 0;
+
+    /**
+     * Purge all relations populated in a given stratum
+     */
+    virtual void purgeStratum(std::string stratum) = 0;
+
+    /**
      * Output all the input relations in stdout, without generating any files. (for debug purposes).
      */
     virtual void dumpInputs() = 0;
