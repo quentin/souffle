@@ -48,6 +48,9 @@ void ExecutionPlan::apply(const NodeMapper& map) {
     for (auto& plan : plans) {
         plan.second = map(std::move(plan.second));
     }
+    for (auto& custom : customs) {
+        custom.second = map(std::move(custom.second));
+    }
 }
 
 Node::NodeVec ExecutionPlan::getChildren() const {
