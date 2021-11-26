@@ -362,5 +362,7 @@ private:
     OrderingContext orderingContext = OrderingContext(*this);
     /** Reference to the engine instance */
     Engine& engine;
+    /** Reference to global */
+    Global& global;
 };
 }  // namespace souffle::interpreter

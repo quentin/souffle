@@ -90,8 +90,8 @@ ExpressionPair MakeIndexTransformer::getExpressionPair(
 ExpressionPair MakeIndexTransformer::getLowerUpperExpression(Condition* c, std::size_t& element,
         const std::optional<std::size_t>& identifier, RelationRepresentation rep) {
     if (auto* binRelOp = as<Constraint>(c)) {
-        bool interpreter = !Global::config().has("compile") && !Global::config().has("dl-program") &&
-                           !Global::config().has("generate") && !Global::config().has("swig");
+        bool interpreter = !glb->config().has("compile") && !glb->config().has("dl-program") &&
+                           !glb->config().has("generate") && !glb->config().has("swig");
         bool provenance = rep == RelationRepresentation::PROVENANCE;
         bool btree = (rep == RelationRepresentation::BTREE || rep == RelationRepresentation::DEFAULT ||
                       rep == RelationRepresentation::BTREE_DELETE);
@@ -477,7 +477,8 @@ Own<Operation> MakeIndexTransformer::rewriteIndexScan(const IndexScan* iscan) {
     return nullptr;
 }
 
-bool MakeIndexTransformer::makeIndex(Program& program) {
+bool MakeIndexTransformer::makeIndex(Global& g, Program& program) {
+    glb = &g;
     bool changed = false;
     forEachQueryMap(program, [&](auto&& go, Own<Node> node) -> Own<Node> {
         if (const Scan* scan = as<Scan>(node)) {

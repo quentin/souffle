@@ -286,9 +286,10 @@ RamDomain callStateless(ExecuteFn&& execute, Context& ctxt, Shadow& shadow, souf
 }  // namespace
 
 Engine::Engine(ram::TranslationUnit& tUnit)
-        : profileEnabled(Global::config().has("profile")),
-          frequencyCounterEnabled(Global::config().has("profile-frequency")),
-          numOfThreads(number_of_threads(std::stoi(Global::config().get("jobs")))), tUnit(tUnit),
+        : tUnit(tUnit), global(tUnit.global()), profileEnabled(global.config().has("profile")),
+          frequencyCounterEnabled(global.config().has("profile-frequency")),
+          isProvenance(global.config().has("provenance")),
+          numOfThreads(number_of_threads(std::stoi(global.config().get("jobs")))),
           isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(numOfThreads),
           symbolTable(numOfThreads) {}
 
@@ -352,19 +353,19 @@ const std::vector<void*>& Engine::loadDLL() {
         return dll;
     }
 
-    if (!Global::config().has("libraries")) {
-        Global::config().set("libraries", "functors");
+    if (!global.config().has("libraries")) {
+        global.config().set("libraries", "functors");
     }
-    if (!Global::config().has("library-dir")) {
-        Global::config().set("library-dir", ".");
+    if (!global.config().has("library-dir")) {
+        global.config().set("library-dir", ".");
     }
 
-    for (auto&& library : Global::config().getMany("libraries")) {
+    for (auto&& library : global.config().getMany("libraries")) {
         // The library may be blank
         if (library.empty()) {
             continue;
         }
-        auto paths = Global::config().getMany("library-dir");
+        auto paths = global.config().getMany("library-dir");
         // Set up our paths to have a library appended
         for (std::string& path : paths) {
             if (path.back() != pathSeparator) {
@@ -404,7 +405,7 @@ void Engine::resetIterationNumber() {
 
 void Engine::executeMain() {
     SignalHandler::instance()->set();
-    if (Global::config().has("verbose")) {
+    if (global.config().has("verbose")) {
         SignalHandler::instance()->enableLogging();
     }
 
@@ -419,7 +420,7 @@ void Engine::executeMain() {
         Context ctxt;
         execute(main.get(), ctxt);
     } else {
-        ProfileEventSingleton::instance().setOutputFile(Global::config().get("profile"));
+        ProfileEventSingleton::instance().setOutputFile(global.config().get("profile"));
         // Prepare the frequency table for threaded use
         const ram::Program& program = tUnit.getProgram();
         visit(program, [&](const ram::TupleOperation& node) {
@@ -432,7 +433,7 @@ void Engine::executeMain() {
         ProfileEventSingleton::instance().startTimer();
         ProfileEventSingleton::instance().makeTimeEvent("@time;starttime");
         // Store configuration
-        for (auto&& [k, vs] : Global::config().data())
+        for (auto&& [k, vs] : global.config().data())
             for (auto&& v : vs)
                 ProfileEventSingleton::instance().makeConfigRecord(k, v);
 

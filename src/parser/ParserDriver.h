@@ -41,6 +41,7 @@ namespace souffle {
 
 class ParserDriver {
 public:
+    ParserDriver(Global& g) : glb(g) {}
     virtual ~ParserDriver() = default;
 
     Own<ast::TranslationUnit> translationUnit;
@@ -72,14 +73,17 @@ public:
             const std::string& filename, FILE* in, ErrorReport& errorReport, DebugReport& debugReport);
     Own<ast::TranslationUnit> parse(
             const std::string& code, ErrorReport& errorReport, DebugReport& debugReport);
+    static Own<ast::TranslationUnit> parseTranslationUnit(Global& glb, const std::string& filename, FILE* in,
+            ErrorReport& errorReport, DebugReport& debugReport);
     static Own<ast::TranslationUnit> parseTranslationUnit(
-            const std::string& filename, FILE* in, ErrorReport& errorReport, DebugReport& debugReport);
-    static Own<ast::TranslationUnit> parseTranslationUnit(
-            const std::string& code, ErrorReport& errorReport, DebugReport& debugReport);
+            Global& glb, const std::string& code, ErrorReport& errorReport, DebugReport& debugReport);
 
     void warning(const SrcLocation& loc, const std::string& msg);
     void error(const SrcLocation& loc, const std::string& msg);
     void error(const std::string& msg);
+
+private:
+    Global& glb;
 };
 
 }  // end of namespace souffle

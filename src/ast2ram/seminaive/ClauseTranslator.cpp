@@ -108,7 +108,7 @@ Own<ram::Statement> ClauseTranslator::translateRecursiveClause(
     Own<ram::Statement> rule = translateNonRecursiveClause(clause);
 
     // Add logging
-    if (Global::config().has("profile")) {
+    if (context.getGlobal()->config().has("profile")) {
         const std::string& relationName = getConcreteRelationName(clause.getHead()->getQualifiedName());
         const auto& srcLocation = clause.getSrcLoc();
         const std::string clauseText = stringify(toString(clause));
@@ -279,7 +279,7 @@ Own<ram::Operation> ClauseTranslator::addAtomScan(Own<ram::Operation> op, const 
         }
 
         std::stringstream ss;
-        if (Global::config().has("profile")) {
+        if (context.getGlobal()->config().has("profile")) {
             ss << "@frequency-atom" << ';';
             ss << clause.getHead()->getQualifiedName() << ';';
             ss << version << ';';

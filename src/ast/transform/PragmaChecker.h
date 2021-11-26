@@ -32,10 +32,13 @@ public:
 
     // This helper is used to implement both `--pragma` cmd ln args and `.pragma` statements.
     struct Merger {
-        Merger();
+        Merger(Global&);
         bool operator()(std::string_view key, std::string_view value);
 
         std::set<std::string, std::less<>> locked_keys;
+
+    private:
+        Global& glb;
     };
 
 private:

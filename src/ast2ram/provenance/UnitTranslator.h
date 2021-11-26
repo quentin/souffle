@@ -43,6 +43,8 @@ public:
 
 protected:
     Own<ram::Sequence> generateProgram(const ast::TranslationUnit& translationUnit) override;
+
+private:
     Own<ram::Statement> generateClearExpiredRelations(
             const std::set<const ast::Relation*>& expiredRelations) const override;
     Own<ram::Relation> createRamRelation(
@@ -54,7 +56,6 @@ protected:
     Own<ram::Statement> generateMergeRelations(const ast::Relation* rel, const std::string& destRelation,
             const std::string& srcRelation) const override;
 
-private:
     /** Translate RAM code for subroutine to get subproofs */
     Own<ram::Statement> makeSubproofSubroutine(const ast::Clause& clause);
 
@@ -74,6 +75,8 @@ private:
             ram::Node* node, const std::map<std::size_t, std::string>& idToVar) const;
     Own<ram::Sequence> makeIfStatement(
             Own<ram::Condition> condition, Own<ram::Operation> trueOp, Own<ram::Operation> falseOp) const;
+
+    Global* glb;
 };
 
 }  // namespace souffle::ast2ram::provenance

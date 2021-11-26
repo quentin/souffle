@@ -137,9 +137,9 @@ bool SemanticChecker::transform(TranslationUnit& translationUnit) {
 
 SemanticCheckerImpl::SemanticCheckerImpl(TranslationUnit& tu) : tu(tu) {
     // suppress warnings for given relations
-    if (Global::config().has("suppress-warnings")) {
+    if (tu.global().config().has("suppress-warnings")) {
         std::vector<std::string> suppressedRelations =
-                splitString(Global::config().get("suppress-warnings"), ',');
+                splitString(tu.global().config().get("suppress-warnings"), ',');
 
         if (std::find(suppressedRelations.begin(), suppressedRelations.end(), "*") !=
                 suppressedRelations.end()) {

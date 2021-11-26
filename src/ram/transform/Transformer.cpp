@@ -31,8 +31,8 @@
 namespace souffle::ram::transform {
 
 bool Transformer::apply(TranslationUnit& translationUnit) {
-    const bool debug = Global::config().has("debug-report");
-    const bool verbose = Global::config().has("verbose");
+    const bool debug = translationUnit.global().config().has("debug-report");
+    const bool verbose = translationUnit.global().config().has("verbose");
     std::string ramProgStrOld = debug ? toString(translationUnit.getProgram()) : "";
 
     // invoke the transformation

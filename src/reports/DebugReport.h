@@ -15,6 +15,7 @@
  ***********************************************************************/
 #pragma once
 
+#include "Global.h"
 #include <cstdint>
 #include <ostream>
 #include <stack>
@@ -80,6 +81,7 @@ private:
  */
 class DebugReport {
 public:
+    DebugReport(Global& g) : glb(g) {}
     ~DebugReport();
 
     void flush();
@@ -117,6 +119,7 @@ public:
     }
 
 private:
+    Global& glb;
     std::vector<DebugReportSection> sections;
     std::stack<std::vector<DebugReportSection>> currentSubsections;
     uint32_t nextUniqueId = 0;  // used for generating unique HTML `id` tags

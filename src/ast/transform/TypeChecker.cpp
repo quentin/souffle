@@ -366,7 +366,7 @@ void TypeCheckerImpl::visit_(type_identity<Atom>, const Atom& atom) {
                 return isA<analysis::RecordType>(type) && !isA<analysis::SubsetType>(type);
             });
 
-            if (!validAttribute && !Global::config().has("legacy")) {
+            if (!validAttribute && !tu.global().config().has("legacy")) {
                 auto primaryDiagnostic =
                         DiagnosticMessage("Atom's argument type is not a subtype of its declared type",
                                 arguments[i]->getSrcLoc());

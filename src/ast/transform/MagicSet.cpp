@@ -93,14 +93,14 @@ std::set<QualifiedName> MagicSetTransformer::getWeaklyIgnoredRelations(const Tra
     std::set<QualifiedName> weaklyIgnoredRelations;
 
     // Add magic-transform-exclude relations to the weakly ignored set
-    for (const auto& relStr : splitString(Global::config().get("magic-transform-exclude"), ',')) {
+    for (const auto& relStr : splitString(tu.global().config().get("magic-transform-exclude"), ',')) {
         std::vector<std::string> qualifiers = splitString(relStr, '.');
         weaklyIgnoredRelations.insert(QualifiedName(qualifiers));
     }
 
     // Pick up specified relations from config
     std::set<QualifiedName> specifiedRelations;
-    for (const auto& relStr : splitString(Global::config().get("magic-transform"), ',')) {
+    for (const auto& relStr : splitString(tu.global().config().get("magic-transform"), ',')) {
         std::vector<std::string> qualifiers = splitString(relStr, '.');
         specifiedRelations.insert(QualifiedName(qualifiers));
     }
@@ -273,7 +273,7 @@ std::set<QualifiedName> MagicSetTransformer::getRelationsToNotLabel(const Transl
 
 bool MagicSetTransformer::shouldRun(const TranslationUnit& tu) {
     const Program& program = tu.getProgram();
-    if (Global::config().has("magic-transform")) return true;
+    if (tu.global().config().has("magic-transform")) return true;
     for (const auto* rel : program.getRelations()) {
         if (rel->hasQualifier(RelationQualifier::MAGIC)) return true;
     }

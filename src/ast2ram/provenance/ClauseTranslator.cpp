@@ -133,7 +133,7 @@ Own<ram::Operation> ClauseTranslator::addAtomScan(Own<ram::Operation> op, const 
 
     // add a scan level
     std::stringstream ss;
-    if (Global::config().has("profile")) {
+    if (context.getGlobal()->config().has("profile")) {
         ss << "@frequency-atom" << ';';
         ss << clause.getHead()->getQualifiedName() << ';';
         ss << version << ';';

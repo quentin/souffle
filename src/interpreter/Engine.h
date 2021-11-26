@@ -63,6 +63,10 @@ public:
     void executeSubroutine(
             const std::string& name, const std::vector<RamDomain>& args, std::vector<RamDomain>& ret);
 
+    Global& getGlobal() {
+        return global;
+    }
+
 private:
     /** @brief Generate intermediate representation from RAM */
     void generateIR();
@@ -162,6 +166,10 @@ private:
     template <typename Rel>
     RamDomain evalErase(Rel& rel, const Erase& shadow, Context& ctxt);
 
+    /** Program */
+    ram::TranslationUnit& tUnit;
+    /** Global */
+    Global& global;
     /** If profile is enable in this program */
     const bool profileEnabled;
     const bool frequencyCounterEnabled;
@@ -181,8 +189,6 @@ private:
     std::map<std::string, std::atomic<std::size_t>> reads;
     /** DLL */
     std::vector<void*> dll;
-    /** Program */
-    ram::TranslationUnit& tUnit;
     /** IndexAnalysis */
     ram::analysis::IndexAnalysis& isa;
     /** Record Table Implementation*/

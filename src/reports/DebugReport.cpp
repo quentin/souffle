@@ -108,7 +108,7 @@ DebugReport::~DebugReport() {
 }
 
 void DebugReport::flush() {
-    auto&& dst = Global::config().get("debug-report");
+    auto&& dst = glb.config().get("debug-report");
     if (dst.empty() || empty()) return;
 
     std::ofstream(dst) << *this;
@@ -147,7 +147,7 @@ void DebugReport::print(std::ostream& out) const {
 <head>
 <meta charset=\"UTF-8\">
 <title>Souffle Debug Report ()";
-    out << Global::config().get("") << R"()</title>
+    out << glb.config().get("") << R"()</title>
 <style>
     ul { list-style-type: none; }
     ul > li.leaf { display: inline-block; padding: 0em 1em; }
@@ -280,7 +280,7 @@ void DebugReport::print(std::ostream& out) const {
 </head>
 <body>
 <div class='headerdiv'><h1>Souffle Debug Report ()";
-    out << Global::config().get("") << ")</h1></div>\n";
+    out << glb.config().get("") << ")</h1></div>\n";
     for (const DebugReportSection& section : sections) {
         section.printIndex(out);
     }

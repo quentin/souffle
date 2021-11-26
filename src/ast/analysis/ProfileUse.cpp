@@ -17,6 +17,7 @@
 
 #include "ast/analysis/ProfileUse.h"
 #include "Global.h"
+#include "ast/Program.h"
 #include "ast/QualifiedName.h"
 #include "souffle/profile/ProgramRun.h"
 #include "souffle/profile/Reader.h"
@@ -29,10 +30,10 @@ namespace souffle::ast::analysis {
 /**
  * Run analysis, i.e., retrieve profile information
  */
-void ProfileUseAnalysis::run(const TranslationUnit&) {
+void ProfileUseAnalysis::run(const TranslationUnit& TU) {
     std::string filename;
-    if (Global::config().has("auto-schedule")) {
-        filename = Global::config().get("auto-schedule");
+    if (TU.global().config().has("auto-schedule")) {
+        filename = TU.global().config().get("auto-schedule");
     }
     reader = mk<profile::Reader>(filename, programRun);
     reader->processFile();

@@ -8,6 +8,7 @@
 
 #include "ast/TranslationUnit.h"
 #include "Global.h"
+#include "ast/Program.h"
 #include "ast/analysis/PrecedenceGraph.h"
 #include "ast/analysis/SCCGraph.h"
 #include "reports/DebugReport.h"
@@ -17,7 +18,7 @@ namespace souffle::ast {
 
 /** get analysis: analysis is generated on the fly if not present */
 void TranslationUnit::logAnalysis(Analysis& analysis) const {
-    if (!Global::config().has("debug-report")) return;
+    if (!global().config().has("debug-report")) return;
 
     std::string name = analysis.getName();
     if (as<analysis::PrecedenceGraphAnalysis>(analysis) || as<analysis::SCCGraphAnalysis>(analysis)) {

@@ -182,7 +182,7 @@ void MainConfig::processArgs(int argc, char** argv, const std::string& header, c
         while ((c = getopt_long(argc, argv, shortNames.c_str(), longNames.get(), nullptr)) != -1) {
             // case for the unknown option
             if (c == '?') {
-                std::cerr << Global::config().help();
+                std::cerr << help();
                 throw std::runtime_error("Error: Unknown command line option.");
             }
             // obtain an iterator to the option in the table referenced by the current short name
@@ -217,11 +217,11 @@ void MainConfig::processArgs(int argc, char** argv, const std::string& header, c
     }
 
     // obtain the name of the datalog file, and store it in the option with the empty key
-    if (argc > 1 && !Global::config().has("help") && !Global::config().has("version")) {
+    if (argc > 1 && !has("help") && !has("version")) {
         std::string filename = "";
         // ensure that the optind is less than the total number of arguments
         if (argc > 1 && optind >= argc) {
-            std::cerr << Global::config().help();
+            std::cerr << help();
             throw std::runtime_error("Error: Missing source file path.");
         }
 

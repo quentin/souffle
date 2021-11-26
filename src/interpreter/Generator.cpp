@@ -22,7 +22,7 @@ using NodePtr = Own<Node>;
 using NodePtrVec = std::vector<NodePtr>;
 using RelationHandle = Own<RelationWrapper>;
 
-NodeGenerator::NodeGenerator(Engine& engine) : engine(engine) {
+NodeGenerator::NodeGenerator(Engine& engine) : engine(engine), global(engine.getGlobal()) {
     visit(engine.tUnit.getProgram(), [&](const ram::Relation& relation) {
         assert(relationMap.find(relation.getName()) == relationMap.end() && "double-naming of relations");
         relationMap[relation.getName()] = &relation;
@@ -205,14 +205,14 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Negation>, const ram::Negation&
 NodePtr NodeGenerator::visit_(type_identity<ram::EmptinessCheck>, const ram::EmptinessCheck& emptiness) {
     std::size_t relId = encodeRelation(emptiness.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("EmptinessCheck", lookup(emptiness.getRelation()));
+    NodeType type = constructNodeType(global, "EmptinessCheck", lookup(emptiness.getRelation()));
     return mk<EmptinessCheck>(type, &emptiness, rel);
 }
 
 NodePtr NodeGenerator::visit_(type_identity<ram::RelationSize>, const ram::RelationSize& size) {
     std::size_t relId = encodeRelation(size.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("RelationSize", lookup(size.getRelation()));
+    NodeType type = constructNodeType(global, "RelationSize", lookup(size.getRelation()));
     return mk<RelationSize>(type, &size, rel);
 }
 
@@ -226,7 +226,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ExistenceCheck>, const ram::Exi
         }
     }
     const auto& ramRelation = lookup(exists.getRelation());
-    NodeType type = constructNodeType("ExistenceCheck", ramRelation);
+    NodeType type = constructNodeType(global, "ExistenceCheck", ramRelation);
     return mk<ExistenceCheck>(type, &exists, isTotal, encodeView(&exists), std::move(superOp),
             ramRelation.isTemp(), ramRelation.getName());
 }
@@ -234,7 +234,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ExistenceCheck>, const ram::Exi
 NodePtr NodeGenerator::visit_(
         type_identity<ram::ProvenanceExistenceCheck>, const ram::ProvenanceExistenceCheck& provExists) {
     SuperInstruction superOp = getExistenceSuperInstInfo(provExists);
-    NodeType type = constructNodeType("ProvenanceExistenceCheck", lookup(provExists.getRelation()));
+    NodeType type = constructNodeType(global, "ProvenanceExistenceCheck", lookup(provExists.getRelation()));
     return mk<ProvenanceExistenceCheck>(type, &provExists, dispatch(*(--provExists.getChildNodes().end())),
             encodeView(&provExists), std::move(superOp));
 }
@@ -258,7 +258,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Scan>, const ram::Scan& scan) {
     orderingContext.addTupleWithDefaultOrder(scan.getTupleId(), scan);
     std::size_t relId = encodeRelation(scan.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("Scan", lookup(scan.getRelation()));
+    NodeType type = constructNodeType(global, "Scan", lookup(scan.getRelation()));
     return mk<Scan>(type, &scan, rel, visit_(type_identity<ram::TupleOperation>(), scan));
 }
 
@@ -266,7 +266,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ParallelScan>, const ram::Paral
     orderingContext.addTupleWithDefaultOrder(pScan.getTupleId(), pScan);
     std::size_t relId = encodeRelation(pScan.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("ParallelScan", lookup(pScan.getRelation()));
+    NodeType type = constructNodeType(global, "ParallelScan", lookup(pScan.getRelation()));
     auto res = mk<ParallelScan>(type, &pScan, rel, visit_(type_identity<ram::TupleOperation>(), pScan));
     res->setViewContext(parentQueryViewContext);
     return res;
@@ -275,7 +275,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ParallelScan>, const ram::Paral
 NodePtr NodeGenerator::visit_(type_identity<ram::IndexScan>, const ram::IndexScan& iScan) {
     orderingContext.addTupleWithIndexOrder(iScan.getTupleId(), iScan);
     SuperInstruction indexOperation = getIndexSuperInstInfo(iScan);
-    NodeType type = constructNodeType("IndexScan", lookup(iScan.getRelation()));
+    NodeType type = constructNodeType(global, "IndexScan", lookup(iScan.getRelation()));
     return mk<IndexScan>(type, &iScan, nullptr, visit_(type_identity<ram::TupleOperation>(), iScan),
             encodeView(&iScan), std::move(indexOperation));
 }
@@ -285,7 +285,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ParallelIndexScan>, const ram::
     SuperInstruction indexOperation = getIndexSuperInstInfo(piscan);
     std::size_t relId = encodeRelation(piscan.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("ParallelIndexScan", lookup(piscan.getRelation()));
+    NodeType type = constructNodeType(global, "ParallelIndexScan", lookup(piscan.getRelation()));
     auto res = mk<ParallelIndexScan>(type, &piscan, rel, visit_(type_identity<ram::TupleOperation>(), piscan),
             encodeIndexPos(piscan), std::move(indexOperation));
     res->setViewContext(parentQueryViewContext);
@@ -296,7 +296,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::IfExists>, const ram::IfExists&
     orderingContext.addTupleWithDefaultOrder(ifexists.getTupleId(), ifexists);
     std::size_t relId = encodeRelation(ifexists.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("IfExists", lookup(ifexists.getRelation()));
+    NodeType type = constructNodeType(global, "IfExists", lookup(ifexists.getRelation()));
     return mk<IfExists>(type, &ifexists, rel, dispatch(ifexists.getCondition()),
             visit_(type_identity<ram::TupleOperation>(), ifexists));
 }
@@ -305,7 +305,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ParallelIfExists>, const ram::P
     orderingContext.addTupleWithDefaultOrder(pIfExists.getTupleId(), pIfExists);
     std::size_t relId = encodeRelation(pIfExists.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("ParallelIfExists", lookup(pIfExists.getRelation()));
+    NodeType type = constructNodeType(global, "ParallelIfExists", lookup(pIfExists.getRelation()));
     auto res = mk<ParallelIfExists>(type, &pIfExists, rel, dispatch(pIfExists.getCondition()),
             visit_(type_identity<ram::TupleOperation>(), pIfExists));
     res->setViewContext(parentQueryViewContext);
@@ -315,7 +315,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::ParallelIfExists>, const ram::P
 NodePtr NodeGenerator::visit_(type_identity<ram::IndexIfExists>, const ram::IndexIfExists& iIfExists) {
     orderingContext.addTupleWithIndexOrder(iIfExists.getTupleId(), iIfExists);
     SuperInstruction indexOperation = getIndexSuperInstInfo(iIfExists);
-    NodeType type = constructNodeType("IndexIfExists", lookup(iIfExists.getRelation()));
+    NodeType type = constructNodeType(global, "IndexIfExists", lookup(iIfExists.getRelation()));
     return mk<IndexIfExists>(type, &iIfExists, nullptr, dispatch(iIfExists.getCondition()),
             visit_(type_identity<ram::TupleOperation>(), iIfExists), encodeView(&iIfExists),
             std::move(indexOperation));
@@ -327,7 +327,7 @@ NodePtr NodeGenerator::visit_(
     SuperInstruction indexOperation = getIndexSuperInstInfo(piIfExists);
     std::size_t relId = encodeRelation(piIfExists.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("ParallelIndexIfExists", lookup(piIfExists.getRelation()));
+    NodeType type = constructNodeType(global, "ParallelIndexIfExists", lookup(piIfExists.getRelation()));
     auto res = mk<ParallelIndexIfExists>(type, &piIfExists, rel, dispatch(piIfExists.getCondition()),
             dispatch(piIfExists.getOperation()), encodeIndexPos(piIfExists), std::move(indexOperation));
     res->setViewContext(parentQueryViewContext);
@@ -352,7 +352,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Aggregate>, const ram::Aggregat
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), aggregate);
     std::size_t relId = encodeRelation(aggregate.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("Aggregate", lookup(aggregate.getRelation()));
+    NodeType type = constructNodeType(global, "Aggregate", lookup(aggregate.getRelation()));
     return mk<Aggregate>(type, &aggregate, rel, std::move(expr), std::move(cond), std::move(nested));
 }
 
@@ -365,7 +365,7 @@ NodePtr NodeGenerator::visit_(
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), pAggregate);
     std::size_t relId = encodeRelation(pAggregate.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("ParallelAggregate", lookup(pAggregate.getRelation()));
+    NodeType type = constructNodeType(global, "ParallelAggregate", lookup(pAggregate.getRelation()));
     auto res = mk<ParallelAggregate>(
             type, &pAggregate, rel, std::move(expr), std::move(cond), std::move(nested));
     res->setViewContext(parentQueryViewContext);
@@ -382,7 +382,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::IndexAggregate>, const ram::Ind
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), iAggregate);
     std::size_t relId = encodeRelation(iAggregate.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("IndexAggregate", lookup(iAggregate.getRelation()));
+    NodeType type = constructNodeType(global, "IndexAggregate", lookup(iAggregate.getRelation()));
     return mk<IndexAggregate>(type, &iAggregate, rel, std::move(expr), std::move(cond), std::move(nested),
             encodeView(&iAggregate), std::move(indexOperation));
 }
@@ -397,7 +397,7 @@ NodePtr NodeGenerator::visit_(
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), piAggregate);
     std::size_t relId = encodeRelation(piAggregate.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("ParallelIndexAggregate", lookup(piAggregate.getRelation()));
+    NodeType type = constructNodeType(global, "ParallelIndexAggregate", lookup(piAggregate.getRelation()));
     auto res = mk<ParallelIndexAggregate>(type, &piAggregate, rel, std::move(expr), std::move(cond),
             std::move(nested), encodeView(&piAggregate), std::move(indexOperation));
     res->setViewContext(parentQueryViewContext);
@@ -416,7 +416,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::GuardedInsert>, const ram::Guar
     SuperInstruction superOp = getInsertSuperInstInfo(guardedInsert);
     std::size_t relId = encodeRelation(guardedInsert.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("GuardedInsert", lookup(guardedInsert.getRelation()));
+    NodeType type = constructNodeType(global, "GuardedInsert", lookup(guardedInsert.getRelation()));
     auto condition = guardedInsert.getCondition();
     return mk<GuardedInsert>(type, &guardedInsert, rel, std::move(superOp), dispatch(*condition));
 }
@@ -425,7 +425,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Insert>, const ram::Insert& ins
     SuperInstruction superOp = getInsertSuperInstInfo(insert);
     std::size_t relId = encodeRelation(insert.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("Insert", lookup(insert.getRelation()));
+    NodeType type = constructNodeType(global, "Insert", lookup(insert.getRelation()));
     return mk<Insert>(type, &insert, rel, std::move(superOp));
 }
 
@@ -433,7 +433,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Erase>, const ram::Erase& erase
     SuperInstruction superOp = getEraseSuperInstInfo(erase);
     std::size_t relId = encodeRelation(erase.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("Erase", lookup(erase.getRelation()));
+    NodeType type = constructNodeType(global, "Erase", lookup(erase.getRelation()));
     return mk<Erase>(type, &erase, rel, std::move(superOp));
 }
 
@@ -498,7 +498,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::DebugInfo>, const ram::DebugInf
 NodePtr NodeGenerator::visit_(type_identity<ram::Clear>, const ram::Clear& clear) {
     std::size_t relId = encodeRelation(clear.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("Clear", lookup(clear.getRelation()));
+    NodeType type = constructNodeType(global, "Clear", lookup(clear.getRelation()));
     return mk<Clear>(type, &clear, rel);
 }
 

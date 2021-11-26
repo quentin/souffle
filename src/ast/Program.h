@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "Global.h"
 #include "ast/Clause.h"
 #include "ast/Component.h"
 #include "ast/ComponentInit.h"

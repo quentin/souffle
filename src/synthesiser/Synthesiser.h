@@ -43,6 +43,9 @@ private:
     /** RAM translation unit */
     ram::TranslationUnit& translationUnit;
 
+    /** Global */
+    Global& glb;
+
     /** RAM identifier to C++ identifier map */
     std::map<const std::string, const std::string> identifiers;
 
@@ -117,8 +120,7 @@ protected:
     }
 
 public:
-    explicit Synthesiser(/*const std::size_t laneCount, */ ram::TranslationUnit& tUnit)
-            : /*recordTable(laneCount),*/ translationUnit(tUnit) {
+    explicit Synthesiser(ram::TranslationUnit& tUnit) : translationUnit(tUnit), glb(tUnit.global()) {
         visit(tUnit.getProgram(),
                 [&](const ram::Relation& relation) { relationMap[relation.getName()] = &relation; });
     }
