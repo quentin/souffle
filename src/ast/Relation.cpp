@@ -56,7 +56,7 @@ Node::NodeVec Relation::getChildren() const {
 }
 
 void Relation::print(std::ostream& os) const {
-    os << ".decl " << getQualifiedName() << "(" << join(attributes, ", ") << ")" << join(qualifiers, " ")
+    os << ".decl " << getQualifiedName() << "(" << join(attributes, ", ") << ") " << join(qualifiers, " ")
        << " " << representation;
     if (!functionalDependencies.empty()) {
         os << " choice-domain " << join(functionalDependencies, ", ");
