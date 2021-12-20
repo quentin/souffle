@@ -131,8 +131,8 @@ namespace souffle {
     std::map<char const*, std::string> env;
     if (glb.config().has("library-dir")) {
         auto escapeLdPath = [](auto&& xs) { return escape(xs, {':', ' '}, "\\"); };
-        auto ld_path = toString(join(
-                map(glb.config().getMany("library-dir"), escapeLdPath), std::string(1, PATHdelimiter)));
+        auto ld_path = toString(
+                join(map(glb.config().getMany("library-dir"), escapeLdPath), std::string(1, PATHdelimiter)));
 #if defined(_MSC_VER)
         std::size_t l;
         std::wstring env_path(ld_path.length() + 1, L' ');
@@ -225,14 +225,14 @@ bool processArgs(Global& glb, int argc, char** argv) {
     footer << "All rights reserved." << std::endl;
     footer << "============================================================================" << std::endl;
 
-        versionFooter = footer.str();
+    versionFooter = footer.str();
 
     // command line options, the environment will be filled with the arguments passed to them, or
     // the empty string if they take none
     // main option, the datalog program itself, has an empty key
     std::vector<MainOption> options{{"", 0, "", "", false, ""},
-                {"auto-schedule", 'a', "FILE", "", false,
-                        "Use profile auto-schedule <FILE> for auto-scheduling."},
+            {"auto-schedule", 'a', "FILE", "", false,
+                    "Use profile auto-schedule <FILE> for auto-scheduling."},
             {"fact-dir", 'F', "DIR", ".", false, "Specify directory for fact files."},
             {"include-dir", 'I', "DIR", ".", true, "Specify directory for include files."},
             {"output-dir", 'D', "DIR", ".", false,
@@ -265,7 +265,7 @@ bool processArgs(Global& glb, int argc, char** argv) {
             {"dl-program", 'o', "FILE", "", false,
                     "Generate C++ source code, written to <FILE>, and compile this to a "
                     "binary executable (without executing it)."},
-                {"index-stats", '\x9', "", "", false, "Enable collection of index statistics"},
+            {"index-stats", '\x9', "", "", false, "Enable collection of index statistics"},
             {"live-profile", '\1', "", "", false, "Enable live profiling."},
             {"profile", 'p', "FILE", "", false, "Enable profiling, and write profile data to <FILE>."},
             {"profile-use", 'u', "FILE", "", false,
@@ -291,11 +291,143 @@ bool processArgs(Global& glb, int argc, char** argv) {
                     "\ttype-analysis"},
             {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
             {"help", 'h', "", "", false, "Display this help message."},
-                {"legacy", '\6', "", "", false, "Enable legacy support."},
-                {"preprocessor", '\7', "CMD", "", false, "C preprocessor to use."}};
-        glb.config().processArgs(argc, argv, header.str(), versionFooter, options);
+            {"legacy", '\6', "", "", false, "Enable legacy support."},
+            {"preprocessor", '\7', "CMD", "", false, "C preprocessor to use."}};
+    glb.config().processArgs(argc, argv, header.str(), versionFooter, options);
 
     return true;
+}
+
+Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb) {
+    // Equivalence pipeline
+    auto equivalencePipeline =
+            mk<ast::transform::PipelineTransformer>(mk<ast::transform::NameUnnamedVariablesTransformer>(),
+                    mk<ast::transform::FixpointTransformer>(mk<ast::transform::MinimiseProgramTransformer>()),
+                    mk<ast::transform::ReplaceSingletonVariablesTransformer>(),
+                    mk<ast::transform::RemoveRelationCopiesTransformer>(),
+                    mk<ast::transform::RemoveEmptyRelationsTransformer>(),
+                    mk<ast::transform::RemoveRedundantRelationsTransformer>());
+
+    // Magic-Set pipeline
+    auto magicPipeline = mk<ast::transform::PipelineTransformer>(
+            mk<ast::transform::ConditionalTransformer>(
+                    glb.config().has("magic-transform"), mk<ast::transform::ExpandEqrelsTransformer>()),
+            mk<ast::transform::MagicSetTransformer>(), mk<ast::transform::ResolveAliasesTransformer>(),
+            mk<ast::transform::RemoveRelationCopiesTransformer>(),
+            mk<ast::transform::RemoveEmptyRelationsTransformer>(),
+            mk<ast::transform::RemoveRedundantRelationsTransformer>(), clone(equivalencePipeline));
+
+    // Partitioning pipeline
+    auto partitionPipeline =
+            mk<ast::transform::PipelineTransformer>(mk<ast::transform::NameUnnamedVariablesTransformer>(),
+                    mk<ast::transform::PartitionBodyLiteralsTransformer>(),
+                    mk<ast::transform::ReplaceSingletonVariablesTransformer>());
+
+    // Provenance pipeline
+    auto provenancePipeline = mk<ast::transform::ConditionalTransformer>(glb.config().has("provenance"),
+            mk<ast::transform::PipelineTransformer>(mk<ast::transform::ExpandEqrelsTransformer>(),
+                    mk<ast::transform::NameUnnamedVariablesTransformer>()));
+
+    // Main pipeline
+    auto pipeline = mk<ast::transform::PipelineTransformer>(mk<ast::transform::ComponentChecker>(),
+            mk<ast::transform::ComponentInstantiationTransformer>(),
+            mk<ast::transform::IODefaultsTransformer>(),
+            mk<ast::transform::SimplifyAggregateTargetExpressionTransformer>(),
+            mk<ast::transform::UniqueAggregationVariablesTransformer>(),
+            mk<ast::transform::FixpointTransformer>(mk<ast::transform::PipelineTransformer>(
+                    mk<ast::transform::ResolveAnonymousRecordAliasesTransformer>(),
+                    mk<ast::transform::FoldAnonymousRecords>())),
+            mk<ast::transform::SubsumptionQualifierTransformer>(), mk<ast::transform::SemanticChecker>(),
+            mk<ast::transform::GroundWitnessesTransformer>(),
+            mk<ast::transform::UniqueAggregationVariablesTransformer>(),
+            mk<ast::transform::MaterializeSingletonAggregationTransformer>(),
+            mk<ast::transform::FixpointTransformer>(
+                    mk<ast::transform::MaterializeAggregationQueriesTransformer>()),
+            mk<ast::transform::RemoveRedundantSumsTransformer>(),
+            mk<ast::transform::NormaliseGeneratorsTransformer>(),
+            mk<ast::transform::ResolveAliasesTransformer>(),
+            mk<ast::transform::RemoveBooleanConstraintsTransformer>(),
+            mk<ast::transform::ResolveAliasesTransformer>(), mk<ast::transform::MinimiseProgramTransformer>(),
+            mk<ast::transform::InlineUnmarkExcludedTransform>(),
+            mk<ast::transform::InlineRelationsTransformer>(), mk<ast::transform::GroundedTermsChecker>(),
+            mk<ast::transform::ResolveAliasesTransformer>(),
+            mk<ast::transform::RemoveRedundantRelationsTransformer>(),
+            mk<ast::transform::RemoveRelationCopiesTransformer>(),
+            mk<ast::transform::RemoveEmptyRelationsTransformer>(),
+            mk<ast::transform::ReplaceSingletonVariablesTransformer>(),
+            mk<ast::transform::FixpointTransformer>(mk<ast::transform::PipelineTransformer>(
+                    mk<ast::transform::ReduceExistentialsTransformer>(),
+                    mk<ast::transform::RemoveRedundantRelationsTransformer>())),
+            mk<ast::transform::RemoveRelationCopiesTransformer>(), std::move(partitionPipeline),
+            std::move(equivalencePipeline), mk<ast::transform::RemoveRelationCopiesTransformer>(),
+            std::move(magicPipeline), mk<ast::transform::ReorderLiteralsTransformer>(),
+            mk<ast::transform::RemoveEmptyRelationsTransformer>(),
+            mk<ast::transform::AddNullariesToAtomlessAggregatesTransformer>(),
+            mk<ast::transform::ReorderLiteralsTransformer>(), mk<ast::transform::ExecutionPlanChecker>(),
+            std::move(provenancePipeline), mk<ast::transform::IOAttributesTransformer>());
+
+    return pipeline;
+}
+
+Own<ast2ram::UnitTranslator> getUnitTranslator(Global& glb) {
+    auto translationStrategy =
+            glb.config().has("provenance")
+                    ? mk<ast2ram::TranslationStrategy, ast2ram::provenance::TranslationStrategy>()
+                    : mk<ast2ram::TranslationStrategy, ast2ram::seminaive::TranslationStrategy>();
+    auto unitTranslator = Own<ast2ram::UnitTranslator>(translationStrategy->createUnitTranslator());
+    return unitTranslator;
+}
+
+Own<ram::transform::Transformer> ramTransformerSequence(Global& glb) {
+    using namespace ram::transform;
+    Own<Transformer> ramTransform = mk<TransformerSequence>(
+            mk<LoopTransformer>(mk<TransformerSequence>(mk<ExpandFilterTransformer>(),
+                    mk<HoistConditionsTransformer>(), mk<MakeIndexTransformer>())),
+            mk<IfConversionTransformer>(), mk<IfExistsConversionTransformer>(),
+            mk<CollapseFiltersTransformer>(), mk<TupleIdTransformer>(),
+            mk<LoopTransformer>(
+                    mk<TransformerSequence>(mk<HoistAggregateTransformer>(), mk<TupleIdTransformer>())),
+            mk<ExpandFilterTransformer>(), mk<HoistConditionsTransformer>(), mk<CollapseFiltersTransformer>(),
+            mk<EliminateDuplicatesTransformer>(), mk<ReorderConditionsTransformer>(),
+            mk<LoopTransformer>(mk<ReorderFilterBreak>()),
+            mk<ConditionalTransformer>(
+                    // job count of 0 means all cores are used.
+                    [&]() -> bool { return std::stoi(glb.config().get("jobs")) != 1; },
+                    mk<ParallelTransformer>()),
+            mk<ReportIndexTransformer>());
+
+    return ramTransform;
+}
+
+bool interpretTranslationUnit(Global& glb, ram::TranslationUnit& ramTranslationUnit) {
+    try {
+        std::thread profiler;
+        // Start up profiler if needed
+        if (glb.config().has("live-profile")) {
+            profiler = std::thread([]() { profile::Tui().runProf(); });
+        }
+
+        // configure and execute interpreter
+        Own<interpreter::Engine> interpreter(mk<interpreter::Engine>(ramTranslationUnit));
+        interpreter->executeMain();
+        // If the profiler was started, join back here once it exits.
+        if (profiler.joinable()) {
+            profiler.join();
+        }
+        if (glb.config().has("provenance")) {
+            // only run explain interface if interpreted
+            interpreter::ProgInterface interface(*interpreter);
+            if (glb.config().get("provenance") == "explain") {
+                explain(interface, false);
+            } else if (glb.config().get("provenance") == "explore") {
+                explain(interface, true);
+            }
+        }
+        return true;
+    } catch (std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return false;
+    }
 }
 
 int main(int argc, char** argv) {
@@ -442,427 +574,326 @@ int main(int argc, char** argv) {
     } else {
         /* Create the pipe to establish a communication between cpp and souffle */
 
-    std::string cmd;
+        std::string cmd;
 
-    if (Global::config().has("preprocessor")) {
-        cmd = Global::config().get("preprocessor");
-    } else {
-        cmd = which("mcpp");
-        if (isExecutable(cmd)) {
-            cmd += " -e utf8 -W0";
+        if (Global::config().has("preprocessor")) {
+            cmd = Global::config().get("preprocessor");
         } else {
-            cmd = which("gcc");
+            cmd = which("mcpp");
             if (isExecutable(cmd)) {
-                cmd += " -x c -E";
+                cmd += " -e utf8 -W0";
             } else {
-                std::cerr << "failed to locate mcpp or gcc pre-processors\n";
-                throw std::runtime_error("failed to locate mcpp or gcc pre-processors");
+                cmd = which("gcc");
+                if (isExecutable(cmd)) {
+                    cmd += " -x c -E";
+                } else {
+                    std::cerr << "failed to locate mcpp or gcc pre-processors\n";
+                    throw std::runtime_error("failed to locate mcpp or gcc pre-processors");
+                }
             }
         }
-    }
 
-    cmd += " " + toString(join(Global::config().getMany("include-dir"), " ",
-                         [&](auto&& os, auto&& dir) { tfm::format(os, "-I \"%s\"", dir); }));
+        cmd += " " + toString(join(Global::config().getMany("include-dir"), " ",
+                             [&](auto&& os, auto&& dir) { tfm::format(os, "-I \"%s\"", dir); }));
 
         if (Global::config().has("macro")) {
             cmd += " " + Global::config().get("macro");
         }
         // Add RamDomain size as a macro
         cmd += " -DRAM_DOMAIN_SIZE=" + std::to_string(RAM_DOMAIN_SIZE);
-    cmd += " \"" + Global::config().get("") + "\"";
+        cmd += " \"" + Global::config().get("") + "\"";
 #if defined(_MSC_VER)
-    // cl.exe prints the input file name on the standard error stream,
-    // we must silent it in order to preserve an empty error output
-    // because Souffle test-suite is sensible to error outputs.
-    cmd += " 2> nul";
+        // cl.exe prints the input file name on the standard error stream,
+        // we must silent it in order to preserve an empty error output
+        // because Souffle test-suite is sensible to error outputs.
+        cmd += " 2> nul";
 #endif
 
-    /* Time taking for parsing */
-    auto parser_start = std::chrono::high_resolution_clock::now();
+        /* Time taking for parsing */
+        auto parser_start = std::chrono::high_resolution_clock::now();
 
-    // ------- parse program -------------
+        // ------- parse program -------------
 
-    // parse file
-    ErrorReport errReport(glb.config().has("no-warn"));
-    DebugReport debugReport(glb);
-    Own<ast::TranslationUnit> astTranslationUnit =
-            ParserDriver::parseTranslationUnit(glb, "<stdin>", in, errReport, debugReport);
+        // parse file
+        ErrorReport errReport(glb.config().has("no-warn"));
+        DebugReport debugReport(glb);
+        Own<ast::TranslationUnit> astTranslationUnit =
+                ParserDriver::parseTranslationUnit(glb, "<stdin>", in, errReport, debugReport);
 
-    if (using_preprocessor) {
-        // close input pipe
-        int preprocessor_status = pclose(in);
-        if (preprocessor_status == -1) {
-            perror(nullptr);
-            throw std::runtime_error("failed to close pre-processor pipe");
-    } else if (preprocessor_status != 0) {
-        std::cerr << "Pre-processors command failed with code " << preprocessor_status << ": '" << cmd
-                  << "'\n";
-        throw std::runtime_error("Pre-processor command failed");
-        }
-    } else {
-        fclose(in);
-    }
-
-    /* Report run-time of the parser if verbose flag is set */
-    if (glb.config().has("verbose")) {
-        auto parser_end = std::chrono::high_resolution_clock::now();
-        std::cout << "Parse time: " << std::chrono::duration<double>(parser_end - parser_start).count()
-                  << "sec\n";
-    }
-
-    auto hasShowOpt = [&](auto&&... kind) { return (glb.config().has("show", kind) || ...); };
-
-    // `--show parse-errors` is special in that it (ab?)used the return code to specify the # of errors.
-    //  Other `--show` modes can be used in conjunction with each other.
-    if (hasShowOpt("parse-errors")) {
-        if (1 < glb.config().getMany("show").size()) {
-            std::cerr << "WARNING: `--show parse-errors` inhibits other `--show` actions.\n";
-        }
-
-        std::cout << astTranslationUnit->getErrorReport();
-        return static_cast<int>(astTranslationUnit->getErrorReport().getNumErrors());
-    }
-
-    // ------- check for parse errors -------------
-    astTranslationUnit->getErrorReport().exitIfErrors();
-
-    // ------- rewriting / optimizations -------------
-
-    /* set up additional global options based on pragma declaratives */
-    (mk<ast::transform::PragmaChecker>())->apply(*astTranslationUnit);
-
-    if (hasShowOpt("initial-ast", "initial-datalog")) {
-        std::cout << astTranslationUnit->getProgram() << std::endl;
-        // no other show options specified -> bail, we're done.
-        if (glb.config().getMany("show").size() == 1) return 0;
-    }
-
-    /* construct the transformation pipeline */
-
-    // Equivalence pipeline
-    auto equivalencePipeline =
-            mk<ast::transform::PipelineTransformer>(mk<ast::transform::NameUnnamedVariablesTransformer>(),
-                    mk<ast::transform::FixpointTransformer>(mk<ast::transform::MinimiseProgramTransformer>()),
-                    mk<ast::transform::ReplaceSingletonVariablesTransformer>(),
-                    mk<ast::transform::RemoveRelationCopiesTransformer>(),
-                    mk<ast::transform::RemoveEmptyRelationsTransformer>(),
-                    mk<ast::transform::RemoveRedundantRelationsTransformer>());
-
-    // Magic-Set pipeline
-    auto magicPipeline = mk<ast::transform::PipelineTransformer>(
-            mk<ast::transform::ConditionalTransformer>(
-                    Global::config().has("magic-transform"), mk<ast::transform::ExpandEqrelsTransformer>()),
-            mk<ast::transform::MagicSetTransformer>(), mk<ast::transform::ResolveAliasesTransformer>(),
-            mk<ast::transform::RemoveRelationCopiesTransformer>(),
-            mk<ast::transform::RemoveEmptyRelationsTransformer>(),
-            mk<ast::transform::RemoveRedundantRelationsTransformer>(), clone(equivalencePipeline));
-
-    // Partitioning pipeline
-    auto partitionPipeline =
-            mk<ast::transform::PipelineTransformer>(mk<ast::transform::NameUnnamedVariablesTransformer>(),
-                    mk<ast::transform::PartitionBodyLiteralsTransformer>(),
-                    mk<ast::transform::ReplaceSingletonVariablesTransformer>());
-
-    // Provenance pipeline
-    auto provenancePipeline = mk<ast::transform::ConditionalTransformer>(glb.config().has("provenance"),
-            mk<ast::transform::PipelineTransformer>(mk<ast::transform::ExpandEqrelsTransformer>(),
-                    mk<ast::transform::NameUnnamedVariablesTransformer>()));
-
-    // Main pipeline
-    auto pipeline = mk<ast::transform::PipelineTransformer>(mk<ast::transform::ComponentChecker>(),
-            mk<ast::transform::ComponentInstantiationTransformer>(),
-            mk<ast::transform::IODefaultsTransformer>(),
-            mk<ast::transform::SimplifyAggregateTargetExpressionTransformer>(),
-            mk<ast::transform::UniqueAggregationVariablesTransformer>(),
-            mk<ast::transform::FixpointTransformer>(mk<ast::transform::PipelineTransformer>(
-                    mk<ast::transform::ResolveAnonymousRecordAliasesTransformer>(),
-                    mk<ast::transform::FoldAnonymousRecords>())),
-            mk<ast::transform::SubsumptionQualifierTransformer>(), mk<ast::transform::SemanticChecker>(),
-            mk<ast::transform::GroundWitnessesTransformer>(),
-            mk<ast::transform::UniqueAggregationVariablesTransformer>(),
-            mk<ast::transform::MaterializeSingletonAggregationTransformer>(),
-            mk<ast::transform::FixpointTransformer>(
-                    mk<ast::transform::MaterializeAggregationQueriesTransformer>()),
-            mk<ast::transform::RemoveRedundantSumsTransformer>(),
-            mk<ast::transform::NormaliseGeneratorsTransformer>(),
-            mk<ast::transform::ResolveAliasesTransformer>(),
-            mk<ast::transform::RemoveBooleanConstraintsTransformer>(),
-            mk<ast::transform::ResolveAliasesTransformer>(), mk<ast::transform::MinimiseProgramTransformer>(),
-            mk<ast::transform::InlineUnmarkExcludedTransform>(),
-            mk<ast::transform::InlineRelationsTransformer>(), mk<ast::transform::GroundedTermsChecker>(),
-            mk<ast::transform::ResolveAliasesTransformer>(),
-            mk<ast::transform::RemoveRedundantRelationsTransformer>(),
-            mk<ast::transform::RemoveRelationCopiesTransformer>(),
-            mk<ast::transform::RemoveEmptyRelationsTransformer>(),
-            mk<ast::transform::ReplaceSingletonVariablesTransformer>(),
-            mk<ast::transform::FixpointTransformer>(mk<ast::transform::PipelineTransformer>(
-                    mk<ast::transform::ReduceExistentialsTransformer>(),
-                    mk<ast::transform::RemoveRedundantRelationsTransformer>())),
-            mk<ast::transform::RemoveRelationCopiesTransformer>(), std::move(partitionPipeline),
-            std::move(equivalencePipeline), mk<ast::transform::RemoveRelationCopiesTransformer>(),
-            std::move(magicPipeline), mk<ast::transform::RemoveEmptyRelationsTransformer>(),
-            mk<ast::transform::AddNullariesToAtomlessAggregatesTransformer>(),
-            mk<ast::transform::ExecutionPlanChecker>(), std::move(provenancePipeline),
-            mk<ast::transform::IOAttributesTransformer>());
-
-    // Disable unwanted transformations
-    if (glb.config().has("disable-transformers")) {
-        std::vector<std::string> givenTransformers =
-                splitString(glb.config().get("disable-transformers"), ',');
-        pipeline->disableTransformers(
-                std::set<std::string>(givenTransformers.begin(), givenTransformers.end()));
-    }
-
-    // Set up the debug report if necessary
-    if (glb.config().has("debug-report")) {
-        auto parser_end = std::chrono::high_resolution_clock::now();
-        std::stringstream ss;
-
-        // Add current time
-        std::time_t time = std::time(nullptr);
-        ss << "Executed at ";
-        ss << std::put_time(std::localtime(&time), "%F %T") << "\n";
-
-        // Add config
-        ss << "(\n";
-        ss << join(glb.config().data(), ",\n", [](std::ostream& out, const auto& arg) {
-            out << "  \"" << arg.first << "\" -> \"" << arg.second << '"';
-        });
-        ss << "\n)";
-
-        debugReport.addSection("Configuration", "Configuration", ss.str());
-
-        // Add parsing runtime
-        std::string runtimeStr =
-                "(" + std::to_string(std::chrono::duration<double>(parser_end - parser_start).count()) + "s)";
-        debugReport.addSection("Parsing", "Parsing " + runtimeStr, "");
-
-        pipeline->setDebugReport();
-    }
-
-    // Toggle pipeline verbosity
-    pipeline->setVerbosity(glb.config().has("verbose"));
-
-    // Apply all the transformations
-    pipeline->apply(*astTranslationUnit);
-
-    // Output the transformed datalog (support alias opt name of 'datalog')
-    if (hasShowOpt("transformed-ast", "transformed-datalog")) {
-        std::cout << astTranslationUnit->getProgram() << std::endl;
-    }
-
-    // Output the precedence graph in graphviz dot format
-    if (hasShowOpt("precedence-graph")) {
-        astTranslationUnit->getAnalysis<ast::analysis::PrecedenceGraphAnalysis>().printHTML(std::cout);
-        std::cout << std::endl;
-    }
-
-    // Output the precedence graph in text format
-    if (hasShowOpt("precedence-graph-text")) {
-        astTranslationUnit->getAnalysis<ast::analysis::PrecedenceGraphAnalysis>().print(std::cout);
-        std::cout << std::endl;
-    }
-
-    // Output the scc graph in graphviz dot format
-    if (hasShowOpt("scc-graph")) {
-        astTranslationUnit->getAnalysis<ast::analysis::SCCGraphAnalysis>().printHTML(std::cout);
-        std::cout << std::endl;
-    }
-
-    // Output the scc graph in text format
-    if (hasShowOpt("scc-graph-text")) {
-        astTranslationUnit->getAnalysis<ast::analysis::SCCGraphAnalysis>().print(std::cout);
-        std::cout << std::endl;
-    }
-
-    // Output the type analysis
-    if (hasShowOpt("type-analysis")) {
-        astTranslationUnit->getAnalysis<ast::analysis::TypeAnalysis>().print(std::cout);
-        std::cout << std::endl;
-    }
-
-    // bail if we've nothing else left to show
-    if (glb.config().has("show") && !hasShowOpt("initial-ram", "transformed-ram")) return 0;
-
-    // ------- execution -------------
-    /* translate AST to RAM */
-    debugReport.startSection();
-    auto translationStrategy =
-            glb.config().has("provenance")
-                    ? mk<ast2ram::TranslationStrategy, ast2ram::provenance::TranslationStrategy>()
-                    : mk<ast2ram::TranslationStrategy, ast2ram::seminaive::TranslationStrategy>();
-    auto unitTranslator = Own<ast2ram::UnitTranslator>(translationStrategy->createUnitTranslator());
-    auto ramTranslationUnit = unitTranslator->translateUnit(*astTranslationUnit);
-    debugReport.endSection("ast-to-ram", "Translate AST to RAM");
-
-    if (hasShowOpt("initial-ram")) {
-        std::cout << ramTranslationUnit->getProgram();
-        // bail if we've nothing else left to show
-        if (!hasShowOpt("transformed-ram")) return 0;
-    }
-
-    // Apply RAM transforms
-    {
-        using namespace ram::transform;
-        Own<Transformer> ramTransform = mk<TransformerSequence>(
-                mk<LoopTransformer>(mk<TransformerSequence>(mk<ExpandFilterTransformer>(),
-                        mk<HoistConditionsTransformer>(), mk<MakeIndexTransformer>())),
-                mk<IfConversionTransformer>(), mk<IfExistsConversionTransformer>(),
-                mk<CollapseFiltersTransformer>(), mk<TupleIdTransformer>(),
-                mk<LoopTransformer>(
-                        mk<TransformerSequence>(mk<HoistAggregateTransformer>(), mk<TupleIdTransformer>())),
-                mk<ExpandFilterTransformer>(), mk<HoistConditionsTransformer>(),
-                mk<CollapseFiltersTransformer>(), mk<EliminateDuplicatesTransformer>(),
-                mk<ReorderConditionsTransformer>(), mk<LoopTransformer>(mk<ReorderFilterBreak>()),
-                mk<ConditionalTransformer>(
-                        // job count of 0 means all cores are used.
-                        [&]() -> bool { return std::stoi(glb.config().get("jobs")) != 1; },
-                        mk<ParallelTransformer>()),
-                mk<ReportIndexTransformer>());
-
-        ramTransform->apply(*ramTranslationUnit);
-    }
-
-    if (ramTranslationUnit->getErrorReport().getNumIssues() != 0) {
-        std::cerr << ramTranslationUnit->getErrorReport();
-    }
-
-    // Output the transformed RAM program and return
-    if (hasShowOpt("transformed-ram")) {
-        std::cout << ramTranslationUnit->getProgram();
-        return 0;
-    }
-
-    const bool execute_mode = glb.config().has("compile");
-    const bool compile_mode = glb.config().has("dl-program");
-    const bool generate_mode = glb.config().has("generate");
-
-    const bool must_interpret = !execute_mode && !compile_mode && !generate_mode && !glb.config().has("swig");
-    const bool must_execute = execute_mode;
-    const bool must_compile = must_execute || compile_mode || Global::config().has("swig");
-
-    try {
-        if (must_interpret) {
-            // ------- interpreter -------------
-
-            std::thread profiler;
-            // Start up profiler if needed
-            if (glb.config().has("live-profile")) {
-#ifdef _MSC_VER
-                throw("No live-profile on Windows\n.");
-#else
-                profiler = std::thread([]() { profile::Tui().runProf(); });
-#endif
-            }
-
-            // configure and execute interpreter
-            Own<interpreter::Engine> interpreter(mk<interpreter::Engine>(*ramTranslationUnit));
-            interpreter->executeMain();
-            // If the profiler was started, join back here once it exits.
-            if (profiler.joinable()) {
-                profiler.join();
-            }
-            if (glb.config().has("provenance")) {
-#ifdef _MSC_VER
-                throw("No explain/explore provenance on Windows\n.");
-#else
-                // only run explain interface if interpreted
-                interpreter::ProgInterface interface(*interpreter);
-                if (glb.config().get("provenance") == "explain") {
-                    explain(interface, false);
-                } else if (glb.config().get("provenance") == "explore") {
-                    explain(interface, true);
-                }
-#endif
+        if (using_preprocessor) {
+            // close input pipe
+            int preprocessor_status = pclose(in);
+            if (preprocessor_status == -1) {
+                perror(nullptr);
+                throw std::runtime_error("failed to close pre-processor pipe");
+            } else if (preprocessor_status != 0) {
+                std::cerr << "Pre-processors command failed with code " << preprocessor_status << ": '" << cmd
+                          << "'\n";
+                throw std::runtime_error("Pre-processor command failed");
             }
         } else {
-            // ------- compiler -------------
-            auto synthesiser = mk<synthesiser::Synthesiser>(*ramTranslationUnit);
+            fclose(in);
+        }
 
-            // Find the base filename for code generation and execution
-            std::string baseFilename;
-            if (compile_mode) {
-                baseFilename = glb.config().get("dl-program");
-            } else if (generate_mode) {
-                baseFilename = glb.config().get("generate");
+        /* Report run-time of the parser if verbose flag is set */
+        if (glb.config().has("verbose")) {
+            auto parser_end = std::chrono::high_resolution_clock::now();
+            std::cout << "Parse time: " << std::chrono::duration<double>(parser_end - parser_start).count()
+                      << "sec\n";
+        }
 
-                // trim .cpp extension if it exists
-                if (baseFilename.size() >= 4 && baseFilename.substr(baseFilename.size() - 4) == ".cpp") {
-                    baseFilename = baseFilename.substr(0, baseFilename.size() - 4);
+        auto hasShowOpt = [&](auto&&... kind) { return (glb.config().has("show", kind) || ...); };
+
+        // `--show parse-errors` is special in that it (ab?)used the return code to specify the # of errors.
+        //  Other `--show` modes can be used in conjunction with each other.
+        if (hasShowOpt("parse-errors")) {
+            if (1 < glb.config().getMany("show").size()) {
+                std::cerr << "WARNING: `--show parse-errors` inhibits other `--show` actions.\n";
+            }
+
+            std::cout << astTranslationUnit->getErrorReport();
+            return static_cast<int>(astTranslationUnit->getErrorReport().getNumErrors());
+        }
+
+        // ------- check for parse errors -------------
+        astTranslationUnit->getErrorReport().exitIfErrors();
+
+        // ------- rewriting / optimizations -------------
+
+        /* set up additional global options based on pragma declaratives */
+        (mk<ast::transform::PragmaChecker>())->apply(*astTranslationUnit);
+
+        if (hasShowOpt("initial-ast", "initial-datalog")) {
+            std::cout << astTranslationUnit->getProgram() << std::endl;
+            // no other show options specified -> bail, we're done.
+            if (glb.config().getMany("show").size() == 1) return 0;
+        }
+
+        /* construct the transformation pipeline */
+        auto pipeline = astTransformationPipeline(glb);
+
+        // Disable unwanted transformations
+        if (glb.config().has("disable-transformers")) {
+            std::vector<std::string> givenTransformers =
+                    splitString(glb.config().get("disable-transformers"), ',');
+            pipeline->disableTransformers(
+                    std::set<std::string>(givenTransformers.begin(), givenTransformers.end()));
+        }
+
+        // Set up the debug report if necessary
+        if (glb.config().has("debug-report")) {
+            auto parser_end = std::chrono::high_resolution_clock::now();
+            std::stringstream ss;
+
+            // Add current time
+            std::time_t time = std::time(nullptr);
+            ss << "Executed at ";
+            ss << std::put_time(std::localtime(&time), "%F %T") << "\n";
+
+            // Add config
+            ss << "(\n";
+            ss << join(glb.config().data(), ",\n", [](std::ostream& out, const auto& arg) {
+                out << "  \"" << arg.first << "\" -> \"" << arg.second << '"';
+            });
+            ss << "\n)";
+
+            debugReport.addSection("Configuration", "Configuration", ss.str());
+
+            // Add parsing runtime
+            std::string runtimeStr =
+                    "(" + std::to_string(std::chrono::duration<double>(parser_end - parser_start).count()) +
+                    "s)";
+            debugReport.addSection("Parsing", "Parsing " + runtimeStr, "");
+
+            pipeline->setDebugReport();
+        }
+
+        // Toggle pipeline verbosity
+        pipeline->setVerbosity(glb.config().has("verbose"));
+
+        // Apply all the transformations
+        pipeline->apply(*astTranslationUnit);
+
+        // Output the transformed datalog (support alias opt name of 'datalog')
+        if (hasShowOpt("transformed-ast", "transformed-datalog")) {
+            std::cout << astTranslationUnit->getProgram() << std::endl;
+        }
+
+        // Output the precedence graph in graphviz dot format
+        if (hasShowOpt("precedence-graph")) {
+            astTranslationUnit->getAnalysis<ast::analysis::PrecedenceGraphAnalysis>().printHTML(std::cout);
+            std::cout << std::endl;
+        }
+
+        // Output the precedence graph in text format
+        if (hasShowOpt("precedence-graph-text")) {
+            astTranslationUnit->getAnalysis<ast::analysis::PrecedenceGraphAnalysis>().print(std::cout);
+            std::cout << std::endl;
+        }
+
+        // Output the scc graph in graphviz dot format
+        if (hasShowOpt("scc-graph")) {
+            astTranslationUnit->getAnalysis<ast::analysis::SCCGraphAnalysis>().printHTML(std::cout);
+            std::cout << std::endl;
+        }
+
+        // Output the scc graph in text format
+        if (hasShowOpt("scc-graph-text")) {
+            astTranslationUnit->getAnalysis<ast::analysis::SCCGraphAnalysis>().print(std::cout);
+            std::cout << std::endl;
+        }
+
+        // Output the type analysis
+        if (hasShowOpt("type-analysis")) {
+            astTranslationUnit->getAnalysis<ast::analysis::TypeAnalysis>().print(std::cout);
+            std::cout << std::endl;
+        }
+
+        // bail if we've nothing else left to show
+        if (glb.config().has("show") && !hasShowOpt("initial-ram", "transformed-ram")) return 0;
+
+        // ------- execution -------------
+        /* translate AST to RAM */
+        debugReport.startSection();
+        auto unitTranslator = getUnitTranslator(glb);
+        auto ramTranslationUnit = unitTranslator->translateUnit(*astTranslationUnit);
+        debugReport.endSection("ast-to-ram", "Translate AST to RAM");
+
+        if (hasShowOpt("initial-ram")) {
+            std::cout << ramTranslationUnit->getProgram();
+            // bail if we've nothing else left to show
+            if (!hasShowOpt("transformed-ram")) return 0;
+        }
+
+        // Apply RAM transforms
+        {
+            auto ramTransform = ramTransformerSequence(glb);
+            ramTransform->apply(*ramTranslationUnit);
+        }
+
+        if (ramTranslationUnit->getErrorReport().getNumIssues() != 0) {
+            std::cerr << ramTranslationUnit->getErrorReport();
+        }
+
+        // Output the transformed RAM program and return
+        if (hasShowOpt("transformed-ram")) {
+            std::cout << ramTranslationUnit->getProgram();
+            return 0;
+        }
+
+        const bool execute_mode = glb.config().has("compile");
+        const bool compile_mode = glb.config().has("dl-program");
+        const bool generate_mode = glb.config().has("generate");
+
+        const bool must_interpret =
+                !execute_mode && !compile_mode && !generate_mode && !glb.config().has("swig");
+        const bool must_execute = execute_mode;
+        const bool must_compile = must_execute || compile_mode || Global::config().has("swig");
+
+        try {
+            if (must_interpret) {
+                // ------- interpreter -------------
+                const bool success = interpretTranslationUnit(glb, *ramTranslationUnit);
+                if (!success) {
+                    std::exit(EXIT_FAILURE);
+#ifdef _MSC_VER
+                    throw("No live-profile on Windows\n.");
+#else
+#endif
+#ifdef _MSC_VER
+                    throw("No explain/explore provenance on Windows\n.");
+#else
+#endif
                 }
             } else {
-                baseFilename = tempFile();
-            }
+                // ------- compiler -------------
+                auto synthesiser = mk<synthesiser::Synthesiser>(*ramTranslationUnit);
 
-            if (baseName(baseFilename) == "/" || baseName(baseFilename) == ".") {
-                baseFilename = tempFile();
-            }
+                // Find the base filename for code generation and execution
+                std::string baseFilename;
+                if (compile_mode) {
+                    baseFilename = glb.config().get("dl-program");
+                } else if (generate_mode) {
+                    baseFilename = glb.config().get("generate");
 
-            std::string baseIdentifier = identifier(simpleName(baseFilename));
-            std::string sourceFilename = baseFilename + ".cpp";
-
-            bool withSharedLibrary;
-            auto synthesisStart = std::chrono::high_resolution_clock::now();
-            const bool emitToStdOut = glb.config().has("generate", "-");
-            if (emitToStdOut)
-                synthesiser->generateCode(std::cout, baseIdentifier, withSharedLibrary);
-            else {
-                std::ofstream os{sourceFilename};
-                synthesiser->generateCode(os, baseIdentifier, withSharedLibrary);
-                os.close();
-            }
-            if (glb.config().has("verbose")) {
-                auto synthesisEnd = std::chrono::high_resolution_clock::now();
-                std::cout << "Synthesis time: "
-                          << std::chrono::duration<double>(synthesisEnd - synthesisStart).count() << "sec\n";
-            }
-
-            if (withSharedLibrary) {
-                if (!glb.config().has("libraries")) {
-                    glb.config().set("libraries", "functors");
+                    // trim .cpp extension if it exists
+                    if (baseFilename.size() >= 4 && baseFilename.substr(baseFilename.size() - 4) == ".cpp") {
+                        baseFilename = baseFilename.substr(0, baseFilename.size() - 4);
+                    }
+                } else {
+                    baseFilename = tempFile();
                 }
-                if (!glb.config().has("library-dir")) {
-                    glb.config().set("library-dir", ".");
+
+                if (baseName(baseFilename) == "/" || baseName(baseFilename) == ".") {
+                    baseFilename = tempFile();
                 }
-            }
 
-            if (must_compile) {
-                /* Fail if a souffle-compile executable is not found */
-                const auto souffle_compile = findTool("souffle-compile.py", souffleExecutable, ".");
-                if (!souffle_compile) throw std::runtime_error("failed to locate souffle-compile.py");
+                std::string baseIdentifier = identifier(simpleName(baseFilename));
+                std::string sourceFilename = baseFilename + ".cpp";
 
-                auto t_bgn = std::chrono::high_resolution_clock::now();
-                compileToBinary(glb, *souffle_compile, sourceFilename);
-                auto t_end = std::chrono::high_resolution_clock::now();
-
+                bool withSharedLibrary;
+                auto synthesisStart = std::chrono::high_resolution_clock::now();
+                const bool emitToStdOut = glb.config().has("generate", "-");
+                if (emitToStdOut)
+                    synthesiser->generateCode(std::cout, baseIdentifier, withSharedLibrary);
+                else {
+                    std::ofstream os{sourceFilename};
+                    synthesiser->generateCode(os, baseIdentifier, withSharedLibrary);
+                    os.close();
+                }
                 if (glb.config().has("verbose")) {
-                    std::cout << "Compilation time: " << std::chrono::duration<double>(t_end - t_bgn).count()
+                    auto synthesisEnd = std::chrono::high_resolution_clock::now();
+                    std::cout << "Synthesis time: "
+                              << std::chrono::duration<double>(synthesisEnd - synthesisStart).count()
                               << "sec\n";
                 }
-            }
 
-            // run compiled C++ program if requested.
-            if (must_execute) {
-                std::string binaryFilename = baseFilename;
+                if (withSharedLibrary) {
+                    if (!glb.config().has("libraries")) {
+                        glb.config().set("libraries", "functors");
+                    }
+                    if (!glb.config().has("library-dir")) {
+                        glb.config().set("library-dir", ".");
+                    }
+                }
+
+                if (must_compile) {
+                    /* Fail if a souffle-compile executable is not found */
+                    const auto souffle_compile = findTool("souffle-compile.py", souffleExecutable, ".");
+                    if (!souffle_compile) throw std::runtime_error("failed to locate souffle-compile.py");
+
+                    auto t_bgn = std::chrono::high_resolution_clock::now();
+                    compileToBinary(glb, *souffle_compile, sourceFilename);
+                    auto t_end = std::chrono::high_resolution_clock::now();
+
+                    if (glb.config().has("verbose")) {
+                        std::cout << "Compilation time: "
+                                  << std::chrono::duration<double>(t_end - t_bgn).count() << "sec\n";
+                    }
+                }
+
+                // run compiled C++ program if requested.
+                if (must_execute) {
+                    std::string binaryFilename = baseFilename;
 #if defined(_MSC_VER)
-                binaryFilename += ".exe";
+                    binaryFilename += ".exe";
 #endif
-                executeBinaryAndExit(glb, binaryFilename);
+                    executeBinaryAndExit(glb, binaryFilename);
+                }
             }
+        } catch (std::exception& e) {
+            std::cerr << e.what() << std::endl;
+            std::exit(EXIT_FAILURE);
         }
-    } catch (std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
 
-    /* Report overall run-time in verbose mode */
-    if (glb.config().has("verbose")) {
-        auto souffle_end = std::chrono::high_resolution_clock::now();
-        std::cout << "Total time: " << std::chrono::duration<double>(souffle_end - souffle_start).count()
-                  << "sec\n";
-    }
+        /* Report overall run-time in verbose mode */
+        if (glb.config().has("verbose")) {
+            auto souffle_end = std::chrono::high_resolution_clock::now();
+            std::cout << "Total time: " << std::chrono::duration<double>(souffle_end - souffle_start).count()
+                      << "sec\n";
+        }
 
-    return 0;
-}
+        return 0;
+    }
 
 }  // end of namespace souffle
