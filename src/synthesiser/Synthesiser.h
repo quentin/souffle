@@ -24,6 +24,7 @@
 #include "souffle/RecordTable.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "synthesiser/Relation.h"
+#include "souffle/SouffleTypes.h"
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -92,6 +93,9 @@ protected:
 
     /** Generate code */
     void emitCode(std::ostream& out, const ram::Statement& stmt);
+
+    /** Generate type registry code */
+    void emitTypes(std::ostream& out, const ram::Program& prog);
 
     /** Lookup frequency counter */
     unsigned lookupFreqIdx(const std::string& txt);

@@ -47,9 +47,10 @@ protected:
 private:
     Own<ram::Statement> generateClearExpiredRelations(
             const std::set<const ast::Relation*>& expiredRelations) const override;
-    Own<ram::Relation> createRamRelation(
-            const ast::Relation* baseRelation, std::string ramRelationName) const override;
-    VecOwn<ram::Relation> createRamRelations(const std::vector<std::size_t>& sccOrdering) const override;
+    Own<ram::Relation> createRamRelation(interface::TypeRegistry&, const ast::Relation* baseRelation,
+            std::string ramRelationName) const override;
+    VecOwn<ram::Relation> createRamRelations(
+            interface::TypeRegistry&, const std::vector<std::size_t>& sccOrdering) const override;
     void addAuxiliaryArity(
             const ast::Relation* relation, std::map<std::string, std::string>& directives) const override;
 

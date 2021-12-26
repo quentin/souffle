@@ -19,6 +19,7 @@
 #include "FunctorOps.h"
 #include "Global.h"
 #include "RelationTag.h"
+#include "ast/analysis/typesystem/TypeEnvironment.h"
 #include "ram/AbstractParallel.h"
 #include "ram/Aggregate.h"
 #include "ram/AutoIncrement.h"
@@ -2756,6 +2757,8 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         os << "  std::size_t reads[" << numRead << "]{};\n";
     }
 
+    emitTypes(os, prog);
+
     // print relation definitions
     std::stringstream initCons;     // initialization of constructor
     std::stringstream registerRel;  // registration of relations
@@ -2764,6 +2767,8 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         empty = false;
         return initCons;
     };
+
+    initConsSep() << "typeRegistry()";
 
     // `pf` must be a ctor param (see below)
     if (glb.config().has("profile")) {
@@ -2815,9 +2820,10 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
 
             auto foundIn = [&](auto&& set) { return contains(set, rel->getName()) ? "true" : "false"; };
 
-            tfm::format(initConsSep(), "wrapper_%s(%s, *%s, *this, \"%s\", %s, %s, %s)", cppName, relCtr++,
-                    cppName, datalogName, strLitAry(rel->getAttributeTypes()),
-                    strLitAry(rel->getAttributeNames()), rel->getAuxiliaryArity());
+            tfm::format(initConsSep(),
+                    "wrapper_%s(%s, *%s, *this, \"%s\", %s, %s, %s, typeRegistry.getTuple(\"%s\"))", cppName,
+                    relCtr++, cppName, datalogName, strLitAry(rel->getAttributeTypes()),
+                    strLitAry(rel->getAttributeNames()), rel->getAuxiliaryArity(), datalogName);
             tfm::format(registerRel, "addRelation(\"%s\", wrapper_%s, %s, %s);\n", datalogName, cppName,
                     foundIn(loadRelations), foundIn(storeRelations));
         }
@@ -3095,6 +3101,7 @@ void runFunction(std::string  inputDirectoryArg,
             subroutineNum++;
         }
     }
+
     // dumpFreqs method
     //  Frequency counts must be emitted after subroutines otherwise lookup tables
     //  are not populated.
@@ -3196,6 +3203,116 @@ void runFunction(std::string  inputDirectoryArg,
     *recordTable_os << "> recordTable{};\n";
 
     os.flushAll(sos);
+}
+
+void emitType(std::ostream& out, const interface::TypeRegistry& TR,
+        std::set<const interface::TypeDesc*>& done, const interface::TypeDesc* T) {
+    if (!done.insert(T).second) {
+        return;
+    }
+
+    if (T->isADT()) {
+        out << "{\n";
+        out << "const auto T = newADT(\"" << T->canonicalIdentifier() << "\");\n";
+        out << "}\n";
+    }
+
+    if (T->aux()) {
+        emitType(out, TR, done, T->aux());
+    }
+
+    for (const auto& Pair : T->elements()) {
+        const auto* E = Pair.second;
+        emitType(out, TR, done, E);
+    }
+
+    out << "{\n";
+
+    if (T->isSubset()) {
+        out << "const auto U = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
+        out << "const auto T = newSubset(\"" << T->canonicalIdentifier() << "\",U);\n";
+    } else if (T->isUnion()) {
+        out << "const auto T = newUnion(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    } else if (T->isRecord()) {
+        out << "const auto T = newRecord(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    } else if (T->isBranch()) {
+        out << "const auto B = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
+        out << "const auto T = newBranch(\"" << T->canonicalIdentifier() << "\", B);\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    } else if (T->isTuple()) {
+        out << "const auto T = newTuple(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    }
+
+    out << "}\n";
+
+    if (!T->identifiers().empty()) {
+        out << "{\n";
+        out << "const auto T = get(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Id : T->identifiers()) {
+            out << "newEquivalent(\"" << Id << "\", T);\n";
+        }
+        out << "}\n";
+    }
+}
+
+void Synthesiser::emitTypes(std::ostream& out, const Program& prog) {
+    const interface::TypeRegistry& TR = prog.getTypeRegistry();
+
+    out << "private:\n";
+    out << "/*\n";
+    TR.printAll(out);
+    out << "*/\n";
+    out << "class SpecializedTypeRegistry : public interface::TypeRegistry {\n";
+    out << "public:\n";
+    out << "SpecializedTypeRegistry() : interface::TypeRegistry() {\n";
+
+    std::set<const interface::TypeDesc*> done;
+    for (std::size_t i = 0; i < TR.numCanonicalTypes(); ++i) {
+        const interface::TypeDesc* T = TR.getCanonicalType(i);
+        emitType(out, TR, done, T);
+    }
+
+    for (const auto& rel : prog.getRelations()) {
+        const interface::TypeDesc* T = rel->getTypeDescriptor();
+        emitType(out, TR, done, T);
+    }
+
+    out << "}\n";
+    out << "};\n";
+    out << "const SpecializedTypeRegistry typeRegistry;\n";
+
+    out << "public:\n";
+    out << "/** types */\n";
+    out << "const interface::TypeRegistry& getTypeRegistry() const override {\n";
+    out << "return typeRegistry;\n";
+    out << "}\n";
 }
 
 }  // namespace souffle::synthesiser

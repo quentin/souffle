@@ -18,6 +18,7 @@
 #include "Global.h"
 #include <cstdint>
 #include <ostream>
+#include <optional>
 #include <stack>
 #include <string>
 #include <string_view>
@@ -81,15 +82,17 @@ private:
  */
 class DebugReport {
 public:
-    DebugReport(Global& g) : glb(g) {}
+    DebugReport();
+
+    DebugReport(Global& glb);
+
+    DebugReport(const std::string& report_path, const std::string& program_name);
+
     ~DebugReport();
 
     void flush();
 
-    void addSection(DebugReportSection section) {
-        auto& buf = currentSubsections.empty() ? sections : currentSubsections.top();
-        buf.emplace_back(std::move(section));
-    }
+    void addSection(DebugReportSection section);
 
     void addSection(std::string id, std::string title, std::string_view code);
     void addCodeSection(std::string id, std::string title, std::string_view language, std::string_view prev,
@@ -119,14 +122,15 @@ public:
     }
 
 private:
-    Global& glb;
+    bool enabled;
+    std::optional<std::string> reportPath;
+    std::optional<std::string> programName;
+
     std::vector<DebugReportSection> sections;
     std::stack<std::vector<DebugReportSection>> currentSubsections;
     uint32_t nextUniqueId = 0;  // used for generating unique HTML `id` tags
 
-    bool empty() const {
-        return sections.empty();
-    }
+    bool empty() const;
 };
 
 }  // end of namespace souffle

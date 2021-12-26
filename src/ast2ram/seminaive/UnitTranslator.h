@@ -16,6 +16,8 @@
 
 #include "ast2ram/UnitTranslator.h"
 #include "souffle/utility/ContainerUtil.h"
+#include "ast/Program.h"
+#include "souffle/SouffleTypes.h"
 #include <map>
 #include <set>
 #include <string>
@@ -51,8 +53,10 @@ public:
 protected:
     void addRamSubroutine(std::string subroutineID, Own<ram::Statement> subroutine);
     virtual Own<ram::Relation> createRamRelation(
-            const ast::Relation* baseRelation, std::string ramRelationName) const;
-    virtual VecOwn<ram::Relation> createRamRelations(const std::vector<std::size_t>& sccOrdering) const;
+            interface::TypeRegistry&, const ast::Relation* baseRelation, std::string ramRelationName) const;
+    virtual VecOwn<ram::Relation> createRamRelations(
+            interface::TypeRegistry&, const std::vector<std::size_t>& sccOrdering) const;
+    Own<interface::TypeRegistry> createTypeRegistry(const ast::Program& prog) const;
     Own<ram::Statement> translateRecursiveClauses(
             const std::set<const ast::Relation*>& scc, const ast::Relation* rel) const;
     Own<ram::Statement> translateSubsumptiveRecursiveClauses(

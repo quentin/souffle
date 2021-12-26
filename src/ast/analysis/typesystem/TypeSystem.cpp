@@ -385,7 +385,7 @@ bool haveCommonSupertype(const Type& a, const Type& b) {
     }
 
     return any_of(a.getTypeEnvironment().getTypes(),
-            [&](const Type& type) { return isSubtypeOf(a, type) && isSubtypeOf(b, type); });
+            [&](const Type* type) { return isSubtypeOf(a, *type) && isSubtypeOf(b, *type); });
 }
 
 TypeAttribute getTypeAttribute(const Type& type) {

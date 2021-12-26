@@ -48,9 +48,9 @@ namespace souffle::interpreter {
 class RelInterface : public souffle::Relation {
 public:
     RelInterface(RelationWrapper& r, SymbolTable& s, std::string n, std::vector<std::string> t,
-            std::vector<std::string> an, std::size_t i)
+            std::vector<std::string> an, std::size_t i, const interface::TypeDesc* td)
             : relation(r), symTable(s), name(std::move(n)), types(std::move(t)), attrNames(std::move(an)),
-              id(i) {}
+              typeDesc(td), id(i) {}
     ~RelInterface() override = default;
 
     /** Insert tuple */
@@ -103,6 +103,11 @@ public:
     const char* getAttrName(std::size_t idx) const override {
         assert(idx < getArity() && "exceeded tuple size");
         return attrNames[idx].c_str();
+    }
+
+    /** Get tuple type descriptor */
+    const interface::TypeDesc* getTypeDescriptor() const override {
+        return typeDesc;
     }
 
     /** Get number of tuples in relation */
@@ -195,6 +200,9 @@ private:
     /** Attribute Names */
     std::vector<std::string> attrNames;
 
+    /** Tuple type descriptor */
+    const interface::TypeDesc* typeDesc;
+
     /** Unique id for wrapper */
     std::size_t id;
 };
@@ -227,8 +235,9 @@ public:
             // construct types and names vectors
             std::vector<std::string> types = rel.getAttributeTypes();
             std::vector<std::string> attrNames = rel.getAttributeNames();
+            const interface::TypeDesc* typeDesc = rel.getTypeDescriptor();
 
-            auto* interface = new RelInterface(interpreterRel, symTable, rel.getName(), types, attrNames, id);
+            auto* interface = new RelInterface(interpreterRel, symTable, rel.getName(), types, attrNames, id, typeDesc);
             interfaces.push_back(interface);
             bool input = false;
             bool output = false;
@@ -285,6 +294,10 @@ public:
 
     RecordTable& getRecordTable() override {
         return recordTable;
+    }
+
+    const interface::TypeRegistry& getTypeRegistry() const override {
+        return prog.getTypeRegistry();
     }
 
 private:

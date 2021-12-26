@@ -10,8 +10,8 @@
 #include "ram/transform/Transformer.h"
 
 namespace souffle {
-int main(int argc, char** argv);
-bool processArgs(Global& glb, int argc, char** argv);
+const char* packageVersion();
+int main(Global& glb, const char* souffle_executable);
 Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb);
 Own<ast2ram::UnitTranslator> getUnitTranslator(Global& glb);
 Own<ram::transform::Transformer> ramTransformerSequence(Global& glb);
