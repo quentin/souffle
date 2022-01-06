@@ -710,17 +710,9 @@ Own<interface::TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Progr
     for (const auto* Ty : prog.getTypes()) {
         if (isA<ast::RecordType>(Ty)) {
             TR->newRecord(Ty->getQualifiedName().toString());
-        }
-    }
-
-    for (const auto* Ty : prog.getTypes()) {
-        if (isA<ast::UnionType>(Ty)) {
+        } else if (isA<ast::UnionType>(Ty)) {
             TR->newUnion(Ty->getQualifiedName().toString());
-        }
-    }
-
-    for (const auto* Ty : prog.getTypes()) {
-        if (isA<ast::AlgebraicDataType>(Ty)) {
+        } else if (isA<ast::AlgebraicDataType>(Ty)) {
             TR->newADT(Ty->getQualifiedName().toString());
         }
     }

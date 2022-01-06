@@ -235,10 +235,17 @@ private:
 
 struct TypeRegistry {
     TypeRegistry() {
-        newPrimitive("number");
-        newPrimitive("symbol");
-        newPrimitive("unsigned");
-        newPrimitive("float");
+        auto Number = newPrimitive("number");
+        newEquivalent("__numberConstant", Number);
+
+        auto Unsigned = newPrimitive("unsigned");
+        newEquivalent("__unsignedConstant", Unsigned);
+
+        auto Float = newPrimitive("float");
+        newEquivalent("__floatConstant", Float);
+
+        auto Symbol = newPrimitive("symbol");
+        newEquivalent("__symbolConstant", Symbol);
     }
 
     std::ostream& printAll(std::ostream& Out) const {
