@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include "ast2ram/UnitTranslator.h"
-#include "souffle/utility/ContainerUtil.h"
 #include "ast/Program.h"
+#include "ast2ram/UnitTranslator.h"
 #include "souffle/SouffleTypes.h"
+#include "souffle/utility/ContainerUtil.h"
 #include <map>
 #include <set>
 #include <string>

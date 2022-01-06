@@ -17,8 +17,8 @@
 
 #include "Global.h"
 #include <cstdint>
-#include <ostream>
 #include <optional>
+#include <ostream>
 #include <stack>
 #include <string>
 #include <string_view>

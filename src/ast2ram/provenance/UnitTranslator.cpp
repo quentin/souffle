@@ -67,8 +67,7 @@ Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& t
     return ramProgram;
 }
 
-Own<ram::Relation> UnitTranslator::createRamRelation(
-        interface::TypeRegistry& typeRegistry,
+Own<ram::Relation> UnitTranslator::createRamRelation(interface::TypeRegistry& typeRegistry,
         const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
 
@@ -106,7 +105,8 @@ std::string UnitTranslator::getInfoRelationName(const ast::Clause* clause) const
     return getConcreteRelationName(infoRelQualifiedName);
 }
 
-VecOwn<ram::Relation> UnitTranslator::createRamRelations(interface::TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
+VecOwn<ram::Relation> UnitTranslator::createRamRelations(
+        interface::TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
     // Regular relations
     auto ramRelations = seminaive::UnitTranslator::createRamRelations(typeRegistry, sccOrdering);
 
@@ -135,13 +135,13 @@ VecOwn<ram::Relation> UnitTranslator::createRamRelations(interface::TypeRegistry
         auto bodyLiterals = clause->getBodyLiterals();
         for (std::size_t i = 0; i < bodyLiterals.size(); i++) {
             const auto* literal = bodyLiterals.at(i);
-          if (isA<ast::Atom>(literal) || isA<ast::Negation>(literal) ||
-              isA<ast::BinaryConstraint>(literal)) {
-            const std::string attName = "rel_" + std::to_string(i);
-            attributeNames.push_back(attName);
-            attributeTypeQualifiers.push_back("s:symbol");
-            typeRegistry.addElement(typeDesc, attName, typeRegistry.get("symbol"));
-          }
+            if (isA<ast::Atom>(literal) || isA<ast::Negation>(literal) ||
+                    isA<ast::BinaryConstraint>(literal)) {
+                const std::string attName = "rel_" + std::to_string(i);
+                attributeNames.push_back(attName);
+                attributeTypeQualifiers.push_back("s:symbol");
+                typeRegistry.addElement(typeDesc, attName, typeRegistry.get("symbol"));
+            }
         }
 
         // (4) Clause representation
@@ -150,8 +150,8 @@ VecOwn<ram::Relation> UnitTranslator::createRamRelations(interface::TypeRegistry
         typeRegistry.addElement(typeDesc, "clause_repr", typeRegistry.get("symbol"));
 
         // Create the info relation
-        ramRelations.push_back(mk<ram::Relation>(infoRelName, attributeNames.size(), 0,
-                attributeNames, attributeTypeQualifiers, RelationRepresentation::INFO, typeDesc));
+        ramRelations.push_back(mk<ram::Relation>(infoRelName, attributeNames.size(), 0, attributeNames,
+                attributeTypeQualifiers, RelationRepresentation::INFO, typeDesc));
     }
 
     return ramRelations;

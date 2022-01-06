@@ -100,7 +100,8 @@ public:
     }
 
     Relation* cloning() const override {
-        return new Relation(name, arity, auxiliaryArity, attributeNames, attributeTypes, representation, typeDesc);
+        return new Relation(
+                name, arity, auxiliaryArity, attributeNames, attributeTypes, representation, typeDesc);
     }
 
 protected:

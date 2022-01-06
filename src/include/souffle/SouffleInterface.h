@@ -18,8 +18,8 @@
 
 #include "souffle/RamTypes.h"
 #include "souffle/RecordTable.h"
-#include "souffle/SymbolTable.h"
 #include "souffle/SouffleTypes.h"
+#include "souffle/SymbolTable.h"
 #include "souffle/utility/MiscUtil.h"
 #include <algorithm>
 #include <cassert>

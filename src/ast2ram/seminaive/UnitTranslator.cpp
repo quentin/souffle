@@ -761,9 +761,9 @@ Own<interface::TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Progr
             const auto* UniType = TR->get(Uni->getQualifiedName().toString());
             int I = 0;
             for (const auto& Elem : Uni->getTypes()) {
-              const auto* ElemType = TR->get(Elem.toString());
-              TR->addElement(UniType, std::to_string(I), ElemType);
-              ++I;
+                const auto* ElemType = TR->get(Elem.toString());
+                TR->addElement(UniType, std::to_string(I), ElemType);
+                ++I;
             }
         }
     }
@@ -774,8 +774,8 @@ Own<interface::TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Progr
             const auto* Rec = as<ast::RecordType>(Ty);
             const auto* RecType = TR->get(Rec->getQualifiedName().toString());
             for (const auto& Field : Rec->getFields()) {
-              const auto* FieldType = TR->get(Field->getTypeName().toString());
-              TR->addElement(RecType, Field->getName(), FieldType);
+                const auto* FieldType = TR->get(Field->getTypeName().toString());
+                TR->addElement(RecType, Field->getName(), FieldType);
             }
         }
     }
@@ -797,7 +797,7 @@ Own<interface::TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Progr
 
     // create relation types
     for (const auto* Rel : prog.getRelations()) {
-      Rel->getQualifiedName();
+        Rel->getQualifiedName();
     }
 
     return TR;
@@ -862,8 +862,8 @@ Own<ram::TranslationUnit> UnitTranslator::translateUnit(ast::TranslationUnit& tu
     // Combine all parts into the final RAM program
     ErrorReport& errReport = tu.getErrorReport();
     DebugReport& debugReport = tu.getDebugReport();
-    auto ramProgram =
-            mk<ram::Program>(std::move(ramRelations), std::move(ramMain), std::move(ramSubroutines), std::move(typeRegistry));
+    auto ramProgram = mk<ram::Program>(
+            std::move(ramRelations), std::move(ramMain), std::move(ramSubroutines), std::move(typeRegistry));
 
     // Add the translated program to the debug report
     if (glb->config().has("debug-report")) {

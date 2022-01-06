@@ -19,9 +19,9 @@
 #include "ram/Node.h"
 #include "ram/Relation.h"
 #include "ram/Statement.h"
+#include "souffle/SouffleTypes.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/MiscUtil.h"
-#include "souffle/SouffleTypes.h"
 #include <cassert>
 #include <map>
 #include <memory>
@@ -53,8 +53,10 @@ private:
     Program() = default;
 
 public:
-    Program(VecOwn<Relation> rels, Own<Statement> main, std::map<std::string, Own<Statement>> subs, Own<interface::TypeRegistry> tyReg)
-            : relations(std::move(rels)), main(std::move(main)), subroutines(std::move(subs)), typeRegistry(std::move(tyReg)) {
+    Program(VecOwn<Relation> rels, Own<Statement> main, std::map<std::string, Own<Statement>> subs,
+            Own<interface::TypeRegistry> tyReg)
+            : relations(std::move(rels)), main(std::move(main)), subroutines(std::move(subs)),
+              typeRegistry(std::move(tyReg)) {
         assert(this->main != nullptr && "Main program is a null-pointer");
         assert(allValidPtrs(relations));
         assert(allValidPtrs(makeTransformRange(subroutines, [](auto&& kv) { return kv.second.get(); })));
@@ -85,7 +87,7 @@ public:
     }
 
     const interface::TypeRegistry& getTypeRegistry() const {
-      return *typeRegistry;
+        return *typeRegistry;
     }
 
     Program* cloning() const override {

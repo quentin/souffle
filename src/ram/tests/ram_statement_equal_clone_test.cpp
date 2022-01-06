@@ -357,10 +357,10 @@ TEST(LogTimer, CloneAndEquals) {
 }
 
 TEST(DebugInfo, CloneAndEquals) {
-    Relation edge(
-            "edge", 4, 1, {"src", "dest", "a", "b"}, {"i", "i", "i", "i"}, RelationRepresentation::DEFAULT, nullptr);
-    Relation path(
-            "path", 4, 1, {"src", "dest", "a", "b"}, {"i", "i", "i", "i"}, RelationRepresentation::DEFAULT, nullptr);
+    Relation edge("edge", 4, 1, {"src", "dest", "a", "b"}, {"i", "i", "i", "i"},
+            RelationRepresentation::DEFAULT, nullptr);
+    Relation path("path", 4, 1, {"src", "dest", "a", "b"}, {"i", "i", "i", "i"},
+            RelationRepresentation::DEFAULT, nullptr);
     /* BEGIN_DEBUG "path(x,y,1,(@level_num_0+1)) :- \n   edge(x,y,_,@level_num_0).\nin file /edge.dl
      * [17:1-17:26];" QUERY FOR t0 IN edge IF (NOT (edge = ∅)) IF (NOT (t0.0,t0.1,⊥,⊥) ∈ path) INSERT (t0.0,
      * t0.1, number(1), (t0.3+number(1))) INTO path END DEBUG

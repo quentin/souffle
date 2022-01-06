@@ -22,9 +22,9 @@
 #include "ram/TranslationUnit.h"
 #include "ram/utility/Visitor.h"
 #include "souffle/RecordTable.h"
+#include "souffle/SouffleTypes.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "synthesiser/Relation.h"
-#include "souffle/SouffleTypes.h"
 #include <cstddef>
 #include <map>
 #include <memory>

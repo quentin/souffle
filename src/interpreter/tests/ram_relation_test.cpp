@@ -62,8 +62,8 @@ const std::string testInterpreterStore(
     const std::size_t arity = attribs.size();
 
     VecOwn<ram::Relation> rels;
-    Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", arity, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
+    Own<ram::Relation> myrel = mk<ram::Relation>(
+            "test", arity, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(arity)},
@@ -252,7 +252,7 @@ TEST(IO_store, SignedChangedDelimiter) {
 
     std::vector<std::string> attribsTypes(len, "i");
 
-    Own<ram::Relation> myrel =
+    Own<ram::Relation> myrel = mk<ram::Relation>(
             mk<ram::Relation>("test", len, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{

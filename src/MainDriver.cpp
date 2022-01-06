@@ -337,7 +337,7 @@ bool interpretTranslationUnit(Global& glb, ram::TranslationUnit& ramTranslationU
 }
 
 const char* packageVersion() {
-  return PACKAGE_VERSION;
+    return PACKAGE_VERSION;
 }
 
 int main(Global& glb, const char* souffle_executable) {

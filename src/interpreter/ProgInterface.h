@@ -237,7 +237,8 @@ public:
             std::vector<std::string> attrNames = rel.getAttributeNames();
             const interface::TypeDesc* typeDesc = rel.getTypeDescriptor();
 
-            auto* interface = new RelInterface(interpreterRel, symTable, rel.getName(), types, attrNames, id, typeDesc);
+            auto* interface =
+                    new RelInterface(interpreterRel, symTable, rel.getName(), types, attrNames, id, typeDesc);
             interfaces.push_back(interface);
             bool input = false;
             bool output = false;
