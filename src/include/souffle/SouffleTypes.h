@@ -124,6 +124,15 @@ struct TypeDesc {
         return Elements[Pos].second;
     }
 
+    const TypeDesc* getElementType(const std::string_view Name) const {
+        const auto It = std::find_if(Elements.begin(), Elements.end(),
+                [&](const TypeElement& Elem) { return Elem.first == Name; });
+        if (It == Elements.end()) {
+            return nullptr;
+        }
+        return It->second;
+    }
+
     std::ostream& print(std::ostream& Out) const {
         for (const auto& Id : Identifiers) {
             Out << ".type " << Id << " = " << canonicalIdentifier() << "\n";
@@ -250,9 +259,7 @@ struct TypeRegistry {
 
     std::ostream& printAll(std::ostream& Out) const {
         for (const auto& Pair : CanonicalTypeDescriptors) {
-            if (!Pair.second->isBranch() && !Pair.second->isTuple()) {
-                Pair.second->print(Out);
-            }
+            Pair.second->print(Out);
         }
         return Out;
     }
@@ -303,6 +310,8 @@ struct TypeRegistry {
                 return false;
             }
             T = It->second.get();
+        } else if (Dest->isBranch()) {
+            T = const_cast<TypeDesc*>(Dest);
         } else {
             auto It = TypeDescriptors.find(Dest->canonicalIdentifier());
             if (It == TypeDescriptors.end()) {
@@ -400,7 +409,7 @@ struct TypeRegistry {
     }
 
     const TypeDesc* newBranch(const std::string& Id, const TypeDesc* BaseADT) {
-        if (TypeDescriptors.count(Id) != 0) {
+        if (BranchDescriptors.count(Id) != 0) {
             return nullptr;
         }
 
@@ -417,7 +426,7 @@ struct TypeRegistry {
 
         std::shared_ptr<TypeDesc> T(new TypeDesc(Branch, *TypeRef, Id));
         if (TypeRef->addElement(Id, T.get())) {
-            TypeDescriptors.emplace(Id, T);
+            BranchDescriptors.emplace(Id, T);
             return T.get();
         } else {
             return nullptr;
@@ -438,6 +447,7 @@ private:
     std::map<std::string, std::shared_ptr<TypeDesc>> CanonicalTypeDescriptors;
     std::map<std::string, std::shared_ptr<TypeDesc>> TypeDescriptors;
     std::map<std::string, std::shared_ptr<TypeDesc>> TupleDescriptors;
+    std::map<std::string, std::shared_ptr<TypeDesc>> BranchDescriptors;
 };
 
 }  // namespace interface
