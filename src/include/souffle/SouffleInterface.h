@@ -424,7 +424,7 @@ public:
      *
      * @return Pointer to the constant TypeDesc of a relation's tuple.
      */
-    virtual const interface::TypeDesc* getTypeDescriptor() const = 0;
+    virtual const TypeDesc* getTypeDescriptor() const = 0;
 
     /**
      * Delete all the tuples in relation.
@@ -838,7 +838,7 @@ public:
     /**
      * Get the types registry.
      */
-    virtual const interface::TypeRegistry& getTypeRegistry() const = 0;
+    virtual const TypeRegistry& getTypeRegistry() const = 0;
 
     /**
      * Get the number of threads to be used

@@ -79,7 +79,7 @@ const std::string testInterpreterStore(
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<ram::Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
@@ -275,7 +275,7 @@ TEST(IO_store, SignedChangedDelimiter) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
@@ -350,7 +350,7 @@ TEST(IO_store, MixedTypes) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
@@ -415,7 +415,7 @@ TEST(IO_load, Signed) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
@@ -477,7 +477,7 @@ TEST(IO_load, Float) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
@@ -539,7 +539,7 @@ TEST(IO_load, Unsigned) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
@@ -601,7 +601,7 @@ TEST(IO_load, MixedTypesLoad) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<interface::TypeRegistry> tyreg = mk<interface::TypeRegistry>();
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;

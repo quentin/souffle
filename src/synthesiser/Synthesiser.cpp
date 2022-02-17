@@ -3205,8 +3205,8 @@ void runFunction(std::string  inputDirectoryArg,
     os.flushAll(sos);
 }
 
-void emitType(std::ostream& out, const interface::TypeRegistry& TR,
-        std::set<const interface::TypeDesc*>& done, const interface::TypeDesc* T) {
+void emitType(std::ostream& out, const TypeRegistry& TR,
+        std::set<const TypeDesc*>& done, const TypeDesc* T) {
     if (!done.insert(T).second) {
         return;
     }
@@ -3283,24 +3283,24 @@ void emitType(std::ostream& out, const interface::TypeRegistry& TR,
 }
 
 void Synthesiser::emitTypes(std::ostream& out, const Program& prog) {
-    const interface::TypeRegistry& TR = prog.getTypeRegistry();
+    const TypeRegistry& TR = prog.getTypeRegistry();
 
     out << "private:\n";
     out << "/*\n";
     TR.printAll(out);
     out << "*/\n";
-    out << "class SpecializedTypeRegistry : public interface::TypeRegistry {\n";
+    out << "class SpecializedTypeRegistry : public TypeRegistry {\n";
     out << "public:\n";
-    out << "SpecializedTypeRegistry() : interface::TypeRegistry() {\n";
+    out << "SpecializedTypeRegistry() : TypeRegistry() {\n";
 
-    std::set<const interface::TypeDesc*> done;
+    std::set<const TypeDesc*> done;
     for (std::size_t i = 0; i < TR.numCanonicalTypes(); ++i) {
-        const interface::TypeDesc* T = TR.getCanonicalType(i);
+        const TypeDesc* T = TR.getCanonicalType(i);
         emitType(out, TR, done, T);
     }
 
     for (const auto& rel : prog.getRelations()) {
-        const interface::TypeDesc* T = rel->getTypeDescriptor();
+        const TypeDesc* T = rel->getTypeDescriptor();
         emitType(out, TR, done, T);
     }
 
@@ -3310,7 +3310,7 @@ void Synthesiser::emitTypes(std::ostream& out, const Program& prog) {
 
     out << "public:\n";
     out << "/** types */\n";
-    out << "const interface::TypeRegistry& getTypeRegistry() const override {\n";
+    out << "const TypeRegistry& getTypeRegistry() const override {\n";
     out << "return typeRegistry;\n";
     out << "}\n";
 }

@@ -11,9 +11,7 @@
 
 namespace souffle {
 
-namespace interface {
-
-enum TypeKind {
+enum class TypeKind {
     /// primitive type
     Primitive,
     /// subset type
@@ -43,35 +41,35 @@ struct TypeDesc {
     }
 
     bool isPrimitive() const {
-        return Kind == Primitive;
+        return Kind == TypeKind::Primitive;
     }
 
     bool isSubset() const {
-        return Kind == Subset;
+        return Kind == TypeKind::Subset;
     }
 
     bool isUnion() const {
-        return Kind == Union;
+        return Kind == TypeKind::Union;
     }
 
     bool isTuple() const {
-        return Kind == Tuple;
+        return Kind == TypeKind::Tuple;
     }
 
     bool isADT() const {
-        return Kind == ADT;
+        return Kind == TypeKind::ADT;
     }
 
     bool isRecord() const {
-        return Kind == Record;
+        return Kind == TypeKind::Record;
     }
 
     bool isBranch() const {
-        return Kind == Branch;
+        return Kind == TypeKind::Branch;
     }
 
     bool isEnumADT() const {
-        if (Kind != ADT) {
+        if (Kind != TypeKind::ADT) {
             return false;
         }
         // all branches must be empty in an enum ADT.
@@ -209,7 +207,7 @@ private:
 
     TypeDesc(const TypeKind K, const TypeDesc& B, const std::string& Id)
             : Kind(K), Aux(&B), CanonicalIdentifier(Id) {
-        assert(K == Subset || K == Branch);
+        assert(K == TypeKind::Subset || K == TypeKind::Branch);
     }
 
     TypeDesc(const TypeKind K, const std::string& Id) : Kind(K), Aux(nullptr), CanonicalIdentifier(Id) {}
@@ -233,7 +231,7 @@ private:
 
         Elements.emplace_back(Id, Ty);
 
-        if (Kind == ADT) {
+        if (Kind == TypeKind::ADT) {
             // must sort elements
             std::sort(Elements.begin(), Elements.end(),
                     [](const TypeElement& A, const TypeElement& B) { return A.first < B.first; });
@@ -324,8 +322,8 @@ struct TypeRegistry {
             return false;
         }
 
-        if (T->kind() == Record || T->kind() == Tuple || T->kind() == ADT || T->kind() == Branch ||
-                T->kind() == Union) {
+        if (T->kind() == TypeKind::Record || T->kind() == TypeKind::Tuple || T->kind() == TypeKind::ADT || T->kind() == TypeKind::Branch ||
+                T->kind() == TypeKind::Union) {
             return T->addElement(ElemId, ElemTy);
         } else {
             return false;
@@ -337,7 +335,7 @@ struct TypeRegistry {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(Primitive, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Primitive, Id));
         TypeDescriptors.emplace(Id, T);
         CanonicalTypeDescriptors.emplace(Id, T);
         return T.get();
@@ -369,7 +367,7 @@ struct TypeRegistry {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(Subset, *Base, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Subset, *Base, Id));
         TypeDescriptors.emplace(Id, T);
         CanonicalTypeDescriptors.emplace(Id, T);
         return T.get();
@@ -380,7 +378,7 @@ struct TypeRegistry {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(Union, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Union, Id));
         TypeDescriptors.emplace(Id, T);
         CanonicalTypeDescriptors.emplace(Id, T);
         return T.get();
@@ -391,7 +389,7 @@ struct TypeRegistry {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(Record, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Record, Id));
         TypeDescriptors.emplace(Id, T);
         CanonicalTypeDescriptors.emplace(Id, T);
         return T.get();
@@ -402,7 +400,7 @@ struct TypeRegistry {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(ADT, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::ADT, Id));
         TypeDescriptors.emplace(Id, T);
         CanonicalTypeDescriptors.emplace(Id, T);
         return T.get();
@@ -424,7 +422,7 @@ struct TypeRegistry {
 
         auto& TypeRef = It->second;
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(Branch, *TypeRef, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Branch, *TypeRef, Id));
         if (TypeRef->addElement(Id, T.get())) {
             BranchDescriptors.emplace(Id, T);
             return T.get();
@@ -438,7 +436,7 @@ struct TypeRegistry {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(Tuple, RelId));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Tuple, RelId));
         TupleDescriptors.emplace(RelId, T);
         return T.get();
     }
@@ -450,5 +448,4 @@ private:
     std::map<std::string, std::shared_ptr<TypeDesc>> BranchDescriptors;
 };
 
-}  // namespace interface
 }  // namespace souffle

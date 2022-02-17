@@ -64,7 +64,7 @@ private:
     AttrStrSeq attrNames;
     const uint32_t id;
     const arity_type numAuxAttribs;
-    const interface::TypeDesc* typeDesc;
+    const TypeDesc* typeDesc;
 
     // NB: internal wrapper. does not satisfy the `iterator` concept.
     class iterator_wrapper : public iterator_base {
@@ -98,7 +98,7 @@ private:
 
 public:
     RelationWrapper(uint32_t id, RelType& r, SouffleProgram& p, std::string name, const AttrStrSeq& t,
-            const AttrStrSeq& n, arity_type numAuxAttribs, const interface::TypeDesc* typeDesc)
+            const AttrStrSeq& n, arity_type numAuxAttribs, const TypeDesc* typeDesc)
             : relation(r), program(p), name(std::move(name)), attrTypes(t), attrNames(n), id(id),
               numAuxAttribs(numAuxAttribs), typeDesc(typeDesc) {}
 
@@ -149,7 +149,7 @@ public:
     SymbolTable& getSymbolTable() const override {
         return program.getSymbolTable();
     }
-    const interface::TypeDesc* getTypeDescriptor() const override {
+    const TypeDesc* getTypeDescriptor() const override {
         return typeDesc;
     }
 

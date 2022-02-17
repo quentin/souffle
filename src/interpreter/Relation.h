@@ -45,7 +45,7 @@ struct RelationWrapper {
 
 public:
     RelationWrapper(arity_type arity, arity_type auxiliaryArity, std::string relName,
-            const interface::TypeDesc* typeDesc)
+            const TypeDesc* typeDesc)
             : relName(std::move(relName)), arity(arity), auxiliaryArity(auxiliaryArity), typeDesc(typeDesc) {}
 
     virtual ~RelationWrapper() = default;
@@ -126,7 +126,7 @@ public:
         return auxiliaryArity;
     }
 
-    const interface::TypeDesc* getTypeDescriptor() const {
+    const TypeDesc* getTypeDescriptor() const {
         return typeDesc;
     }
 
@@ -151,7 +151,7 @@ protected:
 
     arity_type arity;
     arity_type auxiliaryArity;
-    const interface::TypeDesc* typeDesc;
+    const TypeDesc* typeDesc;
 };
 
 /**
@@ -188,7 +188,7 @@ public:
      * Creates a relation, build all necessary indexes.
      */
     Relation(std::size_t auxiliaryArity, const std::string& name,
-            const ram::analysis::IndexCluster& indexSelection, const interface::TypeDesc* typeDesc)
+            const ram::analysis::IndexCluster& indexSelection, const TypeDesc* typeDesc)
             : RelationWrapper(Arity, auxiliaryArity, name, typeDesc) {
         for (const auto& order : indexSelection.getAllOrders()) {
             ram::analysis::LexOrder fullOrder = order;

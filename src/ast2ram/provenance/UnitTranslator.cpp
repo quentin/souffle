@@ -67,7 +67,7 @@ Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& t
     return ramProgram;
 }
 
-Own<ram::Relation> UnitTranslator::createRamRelation(interface::TypeRegistry& typeRegistry,
+Own<ram::Relation> UnitTranslator::createRamRelation(TypeRegistry& typeRegistry,
         const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
 
@@ -106,7 +106,7 @@ std::string UnitTranslator::getInfoRelationName(const ast::Clause* clause) const
 }
 
 VecOwn<ram::Relation> UnitTranslator::createRamRelations(
-        interface::TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
+        TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
     // Regular relations
     auto ramRelations = seminaive::UnitTranslator::createRamRelations(typeRegistry, sccOrdering);
 

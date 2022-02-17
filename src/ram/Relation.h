@@ -38,7 +38,7 @@ class Relation : public Node {
 public:
     Relation(std::string name, std::size_t arity, std::size_t auxiliaryArity,
             std::vector<std::string> attributeNames, std::vector<std::string> attributeTypes,
-            RelationRepresentation representation, const interface::TypeDesc* typeDesc)
+            RelationRepresentation representation, const TypeDesc* typeDesc)
             : representation(representation), name(std::move(name)), arity(arity),
               auxiliaryArity(auxiliaryArity), attributeNames(std::move(attributeNames)),
               attributeTypes(std::move(attributeTypes)), typeDesc(typeDesc) {
@@ -90,7 +90,7 @@ public:
         return auxiliaryArity;
     }
 
-    const interface::TypeDesc* getTypeDescriptor() const {
+    const TypeDesc* getTypeDescriptor() const {
         return typeDesc;
     }
 
@@ -149,7 +149,7 @@ protected:
     /** Type of attributes */
     const std::vector<std::string> attributeTypes;
 
-    const interface::TypeDesc* typeDesc;
+    const TypeDesc* typeDesc;
 };
 
 }  // namespace souffle::ram

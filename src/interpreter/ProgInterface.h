@@ -106,7 +106,7 @@ public:
     }
 
     /** Get tuple type descriptor */
-    const interface::TypeDesc* getTypeDescriptor() const override {
+    const TypeDesc* getTypeDescriptor() const override {
         return typeDesc;
     }
 
@@ -201,7 +201,7 @@ private:
     std::vector<std::string> attrNames;
 
     /** Tuple type descriptor */
-    const interface::TypeDesc* typeDesc;
+    const TypeDesc* typeDesc;
 
     /** Unique id for wrapper */
     std::size_t id;
@@ -235,7 +235,7 @@ public:
             // construct types and names vectors
             std::vector<std::string> types = rel.getAttributeTypes();
             std::vector<std::string> attrNames = rel.getAttributeNames();
-            const interface::TypeDesc* typeDesc = rel.getTypeDescriptor();
+            const TypeDesc* typeDesc = rel.getTypeDescriptor();
 
             auto* interface =
                     new RelInterface(interpreterRel, symTable, rel.getName(), types, attrNames, id, typeDesc);
@@ -297,7 +297,7 @@ public:
         return recordTable;
     }
 
-    const interface::TypeRegistry& getTypeRegistry() const override {
+    const TypeRegistry& getTypeRegistry() const override {
         return prog.getTypeRegistry();
     }
 

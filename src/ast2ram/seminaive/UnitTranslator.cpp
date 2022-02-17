@@ -642,7 +642,7 @@ Own<ram::Statement> UnitTranslator::generateStoreRelation(const ast::Relation* r
     return mk<ram::Sequence>(std::move(storeStmts));
 }
 
-Own<ram::Relation> UnitTranslator::createRamRelation(interface::TypeRegistry& typeRegistry,
+Own<ram::Relation> UnitTranslator::createRamRelation(TypeRegistry& typeRegistry,
         const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
     auto representation = baseRelation->getRepresentation();
@@ -665,7 +665,7 @@ Own<ram::Relation> UnitTranslator::createRamRelation(interface::TypeRegistry& ty
 }
 
 VecOwn<ram::Relation> UnitTranslator::createRamRelations(
-        interface::TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
+        TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
     VecOwn<ram::Relation> ramRelations;
     for (const auto& scc : sccOrdering) {
         bool isRecursive = context->isRecursiveSCC(scc);
@@ -704,8 +704,8 @@ VecOwn<ram::Relation> UnitTranslator::createRamRelations(
     return ramRelations;
 }
 
-Own<interface::TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Program& prog) const {
-    Own<interface::TypeRegistry> TR = mk<interface::TypeRegistry>();
+Own<TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Program& prog) const {
+    Own<TypeRegistry> TR = mk<TypeRegistry>();
 
     for (const auto* Ty : prog.getTypes()) {
         if (isA<ast::RecordType>(Ty)) {

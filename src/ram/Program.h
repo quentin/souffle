@@ -54,7 +54,7 @@ private:
 
 public:
     Program(VecOwn<Relation> rels, Own<Statement> main, std::map<std::string, Own<Statement>> subs,
-            Own<interface::TypeRegistry> tyReg)
+            Own<TypeRegistry> tyReg)
             : relations(std::move(rels)), main(std::move(main)), subroutines(std::move(subs)),
               typeRegistry(std::move(tyReg)) {
         assert(this->main != nullptr && "Main program is a null-pointer");
@@ -86,7 +86,7 @@ public:
         return *subroutines.at(name);
     }
 
-    const interface::TypeRegistry& getTypeRegistry() const {
+    const TypeRegistry& getTypeRegistry() const {
         return *typeRegistry;
     }
 
@@ -158,7 +158,7 @@ protected:
     std::map<std::string, Own<Statement>> subroutines;
 
     /** Types */
-    Own<interface::TypeRegistry> typeRegistry;
+    Own<TypeRegistry> typeRegistry;
 };
 
 }  // namespace souffle::ram
