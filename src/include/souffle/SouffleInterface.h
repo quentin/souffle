@@ -934,9 +934,19 @@ public:
     virtual SymbolTable& getSymbolTable() = 0;
 
     /**
+     * Set the symbol table of the program.
+     */
+    virtual void setSymbolTable(std::shared_ptr<SymbolTable> symTable) = 0;
+
+    /**
      * Get the record table of the program.
      */
     virtual RecordTable& getRecordTable() = 0;
+
+    /**
+     * Set teh record table of the program.
+     */
+    virtual void setRecordTable(std::shared_ptr<RecordTable> recTable) = 0;
 
     /**
      * Remove all the tuples from the outputRelations, calling the purge method of each.

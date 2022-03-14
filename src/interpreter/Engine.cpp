@@ -143,21 +143,6 @@ namespace souffle::interpreter {
 namespace {
 constexpr RamDomain RAM_BIT_SHIFT_MASK = RAM_DOMAIN_SIZE - 1;
 
-#ifdef _OPENMP
-std::size_t number_of_threads(const std::size_t user_specified) {
-    if (user_specified > 0) {
-        omp_set_num_threads(static_cast<int>(user_specified));
-        return user_specified;
-    } else {
-        return omp_get_max_threads();
-    }
-}
-#else
-std::size_t number_of_threads(const std::size_t) {
-    return 1;
-}
-#endif
-
 /** Construct an arguments tuple for a stateful functor call. */
 template <std::size_t Arity, std::size_t... Is>
 constexpr auto statefulCallTuple(souffle::SymbolTable* symbolTable, souffle::RecordTable* recordTable,
@@ -286,12 +271,23 @@ RamDomain callStateless(ExecuteFn&& execute, Context& ctxt, Shadow& shadow, souf
 
 }  // namespace
 
-Engine::Engine(ram::TranslationUnit& tUnit, const std::size_t numberOfThreadsOrZero)
+Engine::Engine(ram::TranslationUnit& tUnit, const std::size_t numberOfThreadsOrZero,
+        std::shared_ptr<SymbolTable> symTable, std::shared_ptr<RecordTable> recTable)
         : tUnit(tUnit), global(tUnit.global()), profileEnabled(global.config().has("profile")),
           frequencyCounterEnabled(global.config().has("profile-frequency")),
           numOfThreads(number_of_threads(numberOfThreadsOrZero)),
-          isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(numOfThreads),
-          symbolTable(numOfThreads) {}
+          isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(recTable),
+          symbolTable(symTable) {
+    if (!symbolTable) {
+        symbolTable = std::make_shared<SymbolTableImpl>(numOfThreads);
+    }
+    symbolTable->setNumThreads(numOfThreads);
+
+    if (!recordTable) {
+        recordTable = std::make_shared<SpecializedRecordTable<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>>(numOfThreads);
+    }
+    recordTable->setNumThreads(numOfThreads);
+}
 
 Engine::RelationHandle& Engine::getRelationHandle(const std::size_t idx) {
     return *relations[idx];
@@ -312,11 +308,11 @@ Global& Engine::getGlobal() {
 }
 
 SymbolTable& Engine::getSymbolTable() {
-    return symbolTable;
+    return *symbolTable;
 }
 
 RecordTable& Engine::getRecordTable() {
-    return recordTable;
+    return *recordTable;
 }
 
 ram::TranslationUnit& Engine::getTranslationUnit() {
@@ -2090,6 +2086,16 @@ RamDomain Engine::evalGuardedInsert(Rel& rel, const GuardedInsert& shadow, Conte
     // insert in target relation
     rel.insert(tuple);
     return true;
+}
+
+void Engine::setSymbolTable(std::shared_ptr<SymbolTable> ptr) {
+    symbolTable = ptr;
+    symbolTable->setNumThreads(numOfThreads);
+}
+
+void Engine::setRecordTable(std::shared_ptr<RecordTable> ptr) {
+    recordTable = ptr;
+    recordTable->setNumThreads(numOfThreads);
 }
 
 }  // namespace souffle::interpreter

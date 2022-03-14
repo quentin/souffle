@@ -27,8 +27,6 @@
 #include "souffle/RamTypes.h"
 #include "souffle/RecordTable.h"
 #include "souffle/SymbolTable.h"
-#include "souffle/datastructure/RecordTableImpl.h"
-#include "souffle/datastructure/SymbolTableImpl.h"
 #include "souffle/utility/ContainerUtil.h"
 #include <atomic>
 #include <cstddef>
@@ -55,7 +53,8 @@ class Engine {
     friend NodeGenerator;
 
 public:
-    Engine(ram::TranslationUnit& tUnit, const std::size_t numThreads);
+    Engine(ram::TranslationUnit& tUnit, const std::size_t numThreads, std::shared_ptr<SymbolTable> symTable,
+            std::shared_ptr<RecordTable> recTable);
 
     /** @brief Execute the main program */
     void executeMain();
@@ -72,6 +71,10 @@ public:
 
     /** @brief Return the record table */
     RecordTable& getRecordTable();
+
+    void setSymbolTable(std::shared_ptr<SymbolTable> ptr);
+
+    void setRecordTable(std::shared_ptr<RecordTable> ptr);
 
 private:
     /** @brief Generate intermediate representation from RAM */
@@ -192,11 +195,11 @@ private:
     /** IndexAnalysis */
     ram::analysis::IndexAnalysis& isa;
     /** Record Table Implementation*/
-    SpecializedRecordTable<0, 1, 2, 3, 4, 5, 6, 7, 8, 9> recordTable;
+    std::shared_ptr<RecordTable> recordTable;
     /** Symbol table for relations */
     VecOwn<RelationHandle> relations;
     /** Symbol table */
-    SymbolTableImpl symbolTable;
+    std::shared_ptr<SymbolTable> symbolTable;
 };
 
 }  // namespace souffle::interpreter

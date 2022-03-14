@@ -32,6 +32,8 @@
 #include "reports/DebugReport.h"
 #include "reports/ErrorReport.h"
 #include "souffle/RamTypes.h"
+#include "souffle/datastructure/RecordTableImpl.h"
+#include "souffle/datastructure/SymbolTableImpl.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -68,7 +70,7 @@ RamDomain evalExpression(Own<Expression> expression) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::string name("test");
     std::vector<RamDomain> ret;

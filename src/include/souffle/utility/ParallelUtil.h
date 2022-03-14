@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <memory>
 #include <new>
+#include <optional>
 
 // https://bugs.llvm.org/show_bug.cgi?id=41423
 #if defined(__cpp_lib_hardware_interference_size) && (__cpp_lib_hardware_interference_size != 201703L)
@@ -880,5 +881,24 @@ inline Lock& getOutputLock() {
     static Lock outputLock;
     return outputLock;
 }
+
+#ifdef _OPENMP
+/**
+ * Set and return the number of threads for OpenMP operations.
+ * @param user_specified is 0 if the maximum number of threads should be determined automatically.
+ */
+inline std::size_t number_of_threads(const std::size_t user_specified) {
+    if (user_specified > 0) {
+        omp_set_num_threads(static_cast<int>(user_specified));
+        return user_specified;
+    } else {
+        return omp_get_max_threads();
+    }
+}
+#else
+inline std::size_t number_of_threads(const std::optional<std::size_t>) {
+    return 1;
+}
+#endif
 
 }  // namespace souffle

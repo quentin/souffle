@@ -88,6 +88,10 @@ public:
         }
     }
 
+    void setNumThreads(const std::size_t count) override {
+        setNumLanes(count);
+    }
+
     /**
      * @brief Set the number of concurrent access lanes.
      * This function is not thread-safe, do not call when other threads are using the datastructure.

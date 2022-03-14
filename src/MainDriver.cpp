@@ -522,7 +522,8 @@ bool interpretTranslationUnit(Global& glb, ram::TranslationUnit& ramTranslationU
 
         // configure and execute interpreter
         const std::size_t numThreadsOrZero = std::stoi(glb.config().get("jobs"));
-        Own<interpreter::Engine> interpreter(mk<interpreter::Engine>(ramTranslationUnit, numThreadsOrZero));
+        Own<interpreter::Engine> interpreter(mk<interpreter::Engine>(ramTranslationUnit, numThreadsOrZero, nullptr, nullptr));
+
 
         interpreter->executeMain();
         // If the profiler was started, join back here once it exits.
