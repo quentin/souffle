@@ -171,9 +171,21 @@ namespace souffle {
  */
 void compileToBinary(Global& glb, const std::string& command, std::string_view sourceFilename) {
     std::vector<std::string> argv;
+
+    argv.push_back(command);
+
+#ifndef NDEBUG
+    // compile with debug
+    argv.push_back("-g");
+#endif
+
     if (glb.config().has("swig")) {
         argv.push_back("-s");
         argv.push_back(glb.config().get("swig"));
+    }
+
+    if (glb.config().has("verbose")) {
+        argv.push_back("-v");
     }
 
     for (auto&& path : glb.config().getMany("library-dir")) {

@@ -306,6 +306,14 @@ RamDomain Engine::incCounter() {
     return counter++;
 }
 
+Global& Engine::getGlobal() {
+    return global;
+}
+
+symboltable& getsymboltable() {
+    return symboltable;
+}
+
 RecordTable& Engine::getRecordTable() {
     return recordTable;
 }

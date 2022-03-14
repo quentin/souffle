@@ -55,17 +55,26 @@ class Engine {
     friend NodeGenerator;
 
 public:
-    Engine(ram::TranslationUnit& tUnit);
+    Engine(ram::TranslationUnit& tUnit, SymbolTable& symTable, RecordTable& recTable);
 
     /** @brief Execute the main program */
     void executeMain();
+
     /** @brief Execute the subroutine program */
     void executeSubroutine(
             const std::string& name, const std::vector<RamDomain>& args, std::vector<RamDomain>& ret);
 
-    Global& getGlobal() {
-        return global;
-    }
+    /** @brief Execute the program */
+    RamDomain execute(const Node*, Context&);
+
+    /** @brief Return the global object this engine uses */
+    Global& getGlobal();
+
+    /** @brief Return the string symbol table */
+    symboltable& getsymboltable();
+
+    /** @brief Return the record table */
+    RecordTable& getRecordTable();
 
 private:
     /** @brief Generate intermediate representation from RAM */
@@ -76,16 +85,8 @@ private:
     void swapRelation(const std::size_t ramRel1, const std::size_t ramRel2);
     /** @brief Return a reference to the relation on the given index */
     RelationHandle& getRelationHandle(const std::size_t idx);
-    /** @brief Return the string symbol table */
-    SymbolTable& getSymbolTable() {
-        return symbolTable;
-    }
-    /** @brief Return the record table */
-    RecordTable& getRecordTable();
     /** @brief Return the ram::TranslationUnit */
     ram::TranslationUnit& getTranslationUnit();
-    /** @brief Execute the program */
-    RamDomain execute(const Node*, Context&);
     /** @brief Return method handler */
     void* getMethodHandle(const std::string& method);
     /** @brief Load DLL */
@@ -192,11 +193,12 @@ private:
     /** IndexAnalysis */
     ram::analysis::IndexAnalysis& isa;
     /** Record Table Implementation*/
-    SpecializedRecordTable<0, 1, 2, 3, 4, 5, 6, 7, 8, 9> recordTable;
+    // SpecializedRecordTable<0, 1, 2, 3, 4, 5, 6, 7, 8, 9> recordTable;
+    RecordTable& recordTable;
     /** Symbol table for relations */
     VecOwn<RelationHandle> relations;
     /** Symbol table */
-    SymbolTableImpl symbolTable;
+    SymbolTable& symbolTable;
 };
 
 }  // namespace souffle::interpreter
