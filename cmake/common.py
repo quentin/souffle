@@ -45,6 +45,7 @@ def compare_files(expected_file, actual_file):
 
     if actual_lines != expected_lines:
         os.sys.stdout.writelines(difflib.unified_diff(open(expected_file).readlines(), open(actual_file).readlines(), fromfile=expected_file, tofile=actual_file))
+        os.sys.stdout.write("\n")
         os.sys.exit("Found output difference, expected file:'{}', actual file:'{}".format(expected_file, actual_file))
 
     return True

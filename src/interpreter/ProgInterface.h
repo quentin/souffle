@@ -212,9 +212,7 @@ private:
  */
 class ProgInterface : public SouffleProgram {
 public:
-    explicit ProgInterface(Engine& interp)
-            : prog(interp.getTranslationUnit().getProgram()), exec(interp), symTable(interp.getSymbolTable()),
-              recordTable(interp.getRecordTable()) {
+    explicit ProgInterface(Engine& interp) : prog(interp.getTranslationUnit().getProgram()), exec(interp) {
         std::size_t id = 0;
 
         // Retrieve AST Relations and store them in a map
@@ -237,8 +235,8 @@ public:
             std::vector<std::string> attrNames = rel.getAttributeNames();
             const TypeDesc* typeDesc = rel.getTypeDescriptor();
 
-            auto* interface =
-                    new RelInterface(interpreterRel, symTable, rel.getName(), types, attrNames, id, typeDesc);
+            auto* interface = new RelInterface(
+                    interpreterRel, getSymbolTable(), rel.getName(), types, attrNames, id, typeDesc);
             interfaces.push_back(interface);
             bool input = false;
             bool output = false;
@@ -290,11 +288,19 @@ public:
 
     /** Get symbol table */
     SymbolTable& getSymbolTable() override {
-        return symTable;
+        return exec.getSymbolTable();
+    }
+
+    void setSymbolTable(std::shared_ptr<SymbolTable> ptr) override {
+        exec.setSymbolTable(ptr);
     }
 
     RecordTable& getRecordTable() override {
-        return recordTable;
+        return exec.getRecordTable();
+    }
+
+    void setRecordTable(std::shared_ptr<RecordTable> ptr) override {
+        exec.setRecordTable(ptr);
     }
 
     const TypeRegistry& getTypeRegistry() const override {
@@ -304,8 +310,6 @@ public:
 private:
     const ram::Program& prog;
     Engine& exec;
-    SymbolTable& symTable;
-    RecordTable& recordTable;
     std::vector<RelInterface*> interfaces;
 };
 

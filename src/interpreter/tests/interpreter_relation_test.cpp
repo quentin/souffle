@@ -20,7 +20,7 @@
 #include "interpreter/Relation.h"
 #include "ram/analysis/Index.h"
 #include "souffle/SouffleInterface.h"
-#include "souffle/SymbolTable.h"
+#include "souffle/datastructure/SymbolTableImpl.h"
 #include <iosfwd>
 #include <string>
 #include <utility>

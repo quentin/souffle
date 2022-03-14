@@ -85,6 +85,7 @@
 #include "souffle/SignalHandler.h"
 #include "souffle/SymbolTable.h"
 #include "souffle/TypeAttribute.h"
+#include "souffle/datastructure/RecordTableImpl.h"
 #include "souffle/datastructure/SymbolTableImpl.h"
 #include "souffle/io/IOSystem.h"
 #include "souffle/io/ReadStream.h"
@@ -141,21 +142,6 @@ namespace souffle::interpreter {
 
 namespace {
 constexpr RamDomain RAM_BIT_SHIFT_MASK = RAM_DOMAIN_SIZE - 1;
-
-#ifdef _OPENMP
-std::size_t number_of_threads(const std::size_t user_specified) {
-    if (user_specified > 0) {
-        omp_set_num_threads(static_cast<int>(user_specified));
-        return user_specified;
-    } else {
-        return omp_get_max_threads();
-    }
-}
-#else
-std::size_t number_of_threads(const std::size_t) {
-    return 1;
-}
-#endif
 
 /** Construct an arguments tuple for a stateful functor call. */
 template <std::size_t Arity, std::size_t... Is>
@@ -285,12 +271,20 @@ RamDomain callStateless(ExecuteFn&& execute, Context& ctxt, Shadow& shadow, souf
 
 }  // namespace
 
-Engine::Engine(ram::TranslationUnit& tUnit)
+Engine::Engine(ram::TranslationUnit& tUnit, const std::size_t numberOfThreads,
+        std::shared_ptr<SymbolTable> symTable, std::shared_ptr<RecordTable> recTable)
         : tUnit(tUnit), global(tUnit.global()), profileEnabled(global.config().has("profile")),
-          frequencyCounterEnabled(global.config().has("profile-frequency")),
-          numOfThreads(number_of_threads(std::stoi(global.config().get("jobs")))),
-          isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(numOfThreads),
-          symbolTable(numOfThreads) {}
+          frequencyCounterEnabled(global.config().has("profile-frequency")), numOfThreads(numberOfThreads),
+          isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(recTable),
+          symbolTable(symTable) {
+    if (!symbolTable) {
+        symbolTable = std::make_shared<SymbolTableImpl>(numOfThreads);
+    }
+
+    if (!recordTable) {
+        recordTable = std::make_shared<SpecializedRecordTable<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>>(numOfThreads);
+    }
+}
 
 Engine::RelationHandle& Engine::getRelationHandle(const std::size_t idx) {
     return *relations[idx];
@@ -310,12 +304,12 @@ Global& Engine::getGlobal() {
     return global;
 }
 
-symboltable& getsymboltable() {
-    return symboltable;
+SymbolTable& Engine::getSymbolTable() {
+    return *symbolTable;
 }
 
 RecordTable& Engine::getRecordTable() {
-    return recordTable;
+    return *recordTable;
 }
 
 ram::TranslationUnit& Engine::getTranslationUnit() {
@@ -2088,6 +2082,14 @@ RamDomain Engine::evalGuardedInsert(Rel& rel, const GuardedInsert& shadow, Conte
     // insert in target relation
     rel.insert(tuple);
     return true;
+}
+
+void Engine::setSymbolTable(std::shared_ptr<SymbolTable> ptr) {
+    symbolTable = ptr;
+}
+
+void Engine::setRecordTable(std::shared_ptr<RecordTable> ptr) {
+    recordTable = ptr;
 }
 
 }  // namespace souffle::interpreter

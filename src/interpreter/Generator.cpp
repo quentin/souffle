@@ -49,6 +49,24 @@ NodePtr NodeGenerator::generateTree(const ram::Node& root) {
             encodeView(provExists);
         }
     });
+
+    // Encode all string constants, in lexical order
+    // First gather all symbols, then encode them in lexical order.
+    //
+    // This maximise the chance that identifiers of constant symbols are in a
+    // deterministic order (when the symbol table is initially empty).
+    //
+    // Hence tests are more deterministic.
+    std::set<std::string> constantSymbols;
+    visit(root, [&](const ram::Node& node) {
+        if (const ram::StringConstant* sc = as<ram::StringConstant>(&node)) {
+            constantSymbols.insert(sc->getConstant());
+        }
+    });
+    for (const auto& sc : constantSymbols) {
+        engine.getSymbolTable().encode(sc);
+    }
+
     // Parse program
     return dispatch(root);
 }

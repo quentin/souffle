@@ -88,7 +88,7 @@ const std::string testInterpreterStore(
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -284,7 +284,7 @@ TEST(IO_store, SignedChangedDelimiter) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -356,7 +356,7 @@ TEST(IO_store, MixedTypes) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -424,7 +424,7 @@ TEST(IO_load, Signed) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -486,7 +486,7 @@ TEST(IO_load, Float) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -548,7 +548,7 @@ TEST(IO_load, Unsigned) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -610,7 +610,7 @@ TEST(IO_load, MixedTypesLoad) {
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1, nullptr, nullptr);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;

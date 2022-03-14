@@ -124,6 +124,15 @@ public:
      * happened.
      */
     virtual std::pair<RamDomain, bool> findOrInsert(const std::string& symbol) = 0;
+
+    /**
+     * @brief Gives a hint about the number of threads that may use this
+     * symbol table concurrently.
+     *
+     * The given number of threads may be used by the implementation as a hint
+     * to setup or dimension internal data structures for optimal concurrency.
+     */
+    virtual void setNumThreads(const std::size_t){};
 };
 
 }  // namespace souffle

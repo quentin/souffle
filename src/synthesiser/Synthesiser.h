@@ -26,6 +26,7 @@
 #include "souffle/utility/ContainerUtil.h"
 #include "synthesiser/Relation.h"
 #include <cstddef>
+#include <iomanip>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -122,6 +123,14 @@ protected:
             return RamUnsigned(idx);
         }
     }
+
+    std::string convertSymbolToIdentifier(const std::string& symbol) const;
+
+    /** return the hexadecimal representation of the given value, 16 characters long. */
+    std::string toHex(const std::size_t value) const;
+
+    /** return the C++ raw-string literal for the given string. */
+    std::string rawStr(const std::string& str) const;
 
 public:
     explicit Synthesiser(ram::TranslationUnit& tUnit) : translationUnit(tUnit), glb(tUnit.global()) {

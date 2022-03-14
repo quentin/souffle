@@ -359,7 +359,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << R"_(directiveMap["fact-dir"] = inputDirectory;)_";
                 out << "}\n";
                 out << "IOSystem::getInstance().getReader(";
-                out << "directiveMap, symTable, recordTable";
+                out << "directiveMap, getSymbolTable(), getRecordTable()";
                 out << ")->readAll(*" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()));
                 out << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << \"Error loading " << io.getRelation()
@@ -375,7 +375,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << R"_(directiveMap["output-dir"] = outputDirectory;)_";
                 out << "}\n";
                 out << "IOSystem::getInstance().getWriter(";
-                out << "directiveMap, symTable, recordTable";
+                out << "directiveMap, getSymbolTable(), getRecordTable()";
                 out << ")->writeAll(*" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()))
                     << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
@@ -631,9 +631,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
         void visit_(type_identity<DebugInfo>, const DebugInfo& dbg, std::ostream& out) override {
             PRINT_BEGIN_COMMENT(out);
-            out << "signalHandler->setMsg(R\"_(";
-            out << dbg.getMessage();
-            out << ")_\");\n";
+            out << "signalHandler->setMsg(";
+            out << synthesiser.rawStr(dbg.getMessage());
+            out << ");\n";
 
             // insert statements of the rule
             dispatch(dbg.getStatement(), out);
@@ -1077,7 +1077,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             // Unpack tuple
             out << "const RamDomain *"
                 << "env" << unpack.getTupleId() << " = "
-                << "recordTable.unpack(ref," << arity << ");"
+                << "recordTable->unpack(ref," << arity << ");"
                 << "\n";
 
             out << "{\n";
@@ -1939,9 +1939,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
     out << ")";                 \
     break
 #define COMPARE_STRING(op)                \
-    out << "(symTable.decode(";           \
+    out << "(symTable->decode(";           \
     EVAL_CHILD(RamDomain, getLHS);        \
-    out << ") " #op " symTable.decode(";  \
+    out << ") " #op " symTable->decode(";  \
     EVAL_CHILD(RamDomain, getRHS);        \
     out << "))";                          \
     break
@@ -1969,34 +1969,34 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // strings
                 case BinaryConstraintOp::MATCH: {
                     synthesiser.UsingStdRegex = true;
-                    out << "regex_wrapper(symTable.decode(";
+                    out << "regex_wrapper(symTable->decode(";
                     dispatch(rel.getLHS(), out);
-                    out << "),symTable.decode(";
+                    out << "),symTable->decode(";
                     dispatch(rel.getRHS(), out);
                     out << "))";
                     break;
                 }
                 case BinaryConstraintOp::NOT_MATCH: {
                     synthesiser.UsingStdRegex = true;
-                    out << "!regex_wrapper(symTable.decode(";
+                    out << "!regex_wrapper(symTable->decode(";
                     dispatch(rel.getLHS(), out);
-                    out << "),symTable.decode(";
+                    out << "),symTable->decode(";
                     dispatch(rel.getRHS(), out);
                     out << "))";
                     break;
                 }
                 case BinaryConstraintOp::CONTAINS: {
-                    out << "(symTable.decode(";
+                    out << "(symTable->decode(";
                     dispatch(rel.getRHS(), out);
-                    out << ").find(symTable.decode(";
+                    out << ").find(symTable->decode(";
                     dispatch(rel.getLHS(), out);
                     out << ")) != std::string::npos)";
                     break;
                 }
                 case BinaryConstraintOp::NOT_CONTAINS: {
-                    out << "(symTable.decode(";
+                    out << "(symTable->decode(";
                     dispatch(rel.getRHS(), out);
-                    out << ").find(symTable.decode(";
+                    out << ").find(symTable->decode(";
                     dispatch(rel.getLHS(), out);
                     out << ")) == std::string::npos)";
                     break;
@@ -2144,7 +2144,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
         void visit_(
                 type_identity<StringConstant>, const StringConstant& constant, std::ostream& out) override {
             PRINT_BEGIN_COMMENT(out);
-            out << "RamSigned(" << synthesiser.convertSymbol2Idx(constant.getConstant()) << ")";
+            out << "RamSigned(" << synthesiser.convertSymbolToIdentifier(constant.getConstant()) << ")";
             PRINT_END_COMMENT(out);
         }
 
@@ -2162,16 +2162,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
         void visit_(
                 type_identity<IntrinsicOperator>, const IntrinsicOperator& op, std::ostream& out) override {
-#define MINMAX_SYMBOL(op)                   \
-    {                                       \
-        out << "symTable.encode(" #op "({"; \
-        for (auto& cur : args) {            \
-            out << "symTable.decode(";      \
-            dispatch(*cur, out);            \
-            out << "), ";                   \
-        }                                   \
-        out << "}))";                       \
-        break;                              \
+#define MINMAX_SYMBOL(op)                    \
+    {                                        \
+        out << "symTable->encode(" #op "({"; \
+        for (auto& cur : args) {             \
+            out << "symTable->decode(";      \
+            dispatch(*cur, out);             \
+            out << "), ";                    \
+        }                                    \
+        out << "}))";                        \
+        break;                               \
     }
 
             PRINT_BEGIN_COMMENT(out);
@@ -2250,13 +2250,13 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
 #define CONV_TO_STRING(opcode, ty)                \
     case FunctorOp::opcode: {                     \
-        out << "symTable.encode(std::to_string("; \
+        out << "symTable->encode(std::to_string("; \
         dispatch(*args[0], out);                  \
         out << "))";                              \
     } break;
 #define CONV_FROM_STRING(opcode, ty)                                            \
     case FunctorOp::opcode: {                                                   \
-        out << "souffle::evaluator::symbol2numeric<" #ty ">(symTable.decode(";  \
+        out << "souffle::evaluator::symbol2numeric<" #ty ">(symTable->decode(";  \
         dispatch(*args[0], out);                                                \
         out << "))";                                                            \
     } break;
@@ -2271,7 +2271,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 }
                 // TODO: change the signature of `STRLEN` to return an unsigned?
                 case FunctorOp::STRLEN: {
-                    out << "static_cast<RamSigned>(symTable.decode(";
+                    out << "static_cast<RamSigned>(symTable->decode(";
                     dispatch(*args[0], out);
                     out << ").size())";
                     break;
@@ -2356,15 +2356,15 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
                 // strings
                 case FunctorOp::CAT: {
-                    out << "symTable.encode(";
+                    out << "symTable->encode(";
                     std::size_t i = 0;
                     while (i < args.size() - 1) {
-                        out << "symTable.decode(";
+                        out << "symTable->decode(";
                         dispatch(*args[i], out);
                         out << ") + ";
                         i++;
                     }
-                    out << "symTable.decode(";
+                    out << "symTable->decode(";
                     dispatch(*args[i], out);
                     out << "))";
                     break;
@@ -2372,8 +2372,8 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
                 /** Ternary Functor Operators */
                 case FunctorOp::SUBSTR: {
-                    out << "symTable.encode(";
-                    out << "substr_wrapper(symTable.decode(";
+                    out << "symTable->encode(";
+                    out << "substr_wrapper(symTable->decode(";
                     dispatch(*args[0], out);
                     out << "),(";
                     dispatch(*args[1], out);
@@ -2426,7 +2426,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             auto args = op.getArguments();
             if (op.isStateful()) {
-                out << "functors::" << name << "(&symTable, &recordTable";
+                out << "functors::" << name << "(symTable.get(), recordTable.get()";
                 for (auto& arg : args) {
                     out << ",";
                     dispatch(*arg, out);
@@ -2436,7 +2436,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 const std::vector<TypeAttribute>& argTypes = op.getArgsTypes();
 
                 if (op.getReturnType() == TypeAttribute::Symbol) {
-                    out << "symTable.encode(";
+                    out << "symTable->encode(";
                 }
                 out << "functors::" << name << "(";
 
@@ -2461,7 +2461,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                             out << ")";
                             break;
                         case TypeAttribute::Symbol:
-                            out << "symTable.decode(";
+                            out << "symTable->decode(";
                             dispatch(*args[i], out);
                             out << ").c_str()";
                             break;
@@ -2485,7 +2485,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             synthesiser.arities.emplace(arity);
 
-            out << "pack(recordTable,"
+            out << "pack(*recordTable,"
                 << "Tuple<RamDomain," << arity << ">";
             if (pack.getArguments().size() == 0) {
                 out << "{{}}";
@@ -2724,24 +2724,35 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
     os << "public:\n";
 
     // declare symbol table
-    os << "// -- initialize symbol table --\n";
-
-    // issue symbol table with string constants
-    visit(prog, [&](const StringConstant& sc) { convertSymbol2Idx(sc.getConstant()); });
-    os << "SymbolTableImpl symTable";
-    if (!symbolMap.empty()) {
-        os << "{\n";
-        for (const auto& x : symbolIndex) {
-            os << "\tR\"_(" << x << ")_\",\n";
-        }
-        os << "}";
-    }
-    os << ";";
+    os << "std::shared_ptr<SymbolTable> symTable;\n";
 
     // declare record table
-    os << "// -- initialize record table --\n";
+    os << "std::shared_ptr<RecordTable> recordTable;\n";
 
-    auto recordTable_os = os.delayed();
+    std::stringstream registerSymbols;
+    {
+        std::set<std::string> constantSymbols;
+
+        visit(prog, [&](const StringConstant& sc) { constantSymbols.insert(sc.getConstant()); });
+
+        for (const std::string& sc : constantSymbols) {
+            const std::string ident = convertSymbolToIdentifier(sc);
+            const std::string dchars = toHex(std::hash<std::string>{}(sc));  // 16 chars
+            os << "RamDomain " << ident << ";\n";
+            registerSymbols << ident << " = symTable->encode(" << rawStr(sc) << ");\n";
+        }
+    }
+
+    std::stringstream initRT;
+    {
+        initRT << "recordTable = std::make_shared<SpecializedRecordTable<0";
+        for (std::size_t arity : arities) {
+            if (arity > 0) {
+                initRT << "," << arity;
+            }
+        }
+        initRT << ">>();\n";
+    }
 
     if (glb.config().has("profile")) {
         os << "private:\n";
@@ -2840,10 +2851,20 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         os << "ProfileEventSingleton::instance().setOutputFile(profiling_fname);\n";
     }
     os << registerRel.str();
+    os << "symTable = std::make_shared<SymbolTableImpl>();\n";
+    os << initRT.str();
+    os << "initSymbols();\n";
     os << "}\n";
+
     // -- destructor --
 
     os << "~" << classname << "() {\n";
+    os << "}\n";
+
+    //
+    os << "private:\n";
+    os << "void initSymbols() {\n";
+    os << registerSymbols.str();
     os << "}\n";
 
     // issue state variables for the evaluation
@@ -2965,7 +2986,7 @@ void runFunction(std::string  inputDirectoryArg,
         os << R"_(directiveMap["output-dir"] = outputDirectoryArg;)_";
         os << "}\n";
         os << "IOSystem::getInstance().getWriter(";
-        os << "directiveMap, symTable, recordTable";
+        os << "directiveMap, getSymbolTable(), getRecordTable()";
         os << ")->writeAll(*" << getRelationName(lookup(store->getRelation())) << ");\n";
 
         os << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
@@ -2985,7 +3006,7 @@ void runFunction(std::string  inputDirectoryArg,
         os << R"_(directiveMap["fact-dir"] = inputDirectoryArg;)_";
         os << "}\n";
         os << "IOSystem::getInstance().getReader(";
-        os << "directiveMap, symTable, recordTable";
+        os << "directiveMap, getSymbolTable(), getRecordTable()";
         os << ")->readAll(*" << getRelationName(lookup(load->getRelation()));
         os << ");\n";
         os << "} catch (std::exception& e) {std::cerr << \"Error loading " << load->getRelation()
@@ -3014,7 +3035,7 @@ void runFunction(std::string  inputDirectoryArg,
         os << "\"" << escapeJSONstring(types.dump()) << "\"";
         os << ";\n";
         os << "IOSystem::getInstance().getWriter(";
-        os << "rwOperation, symTable, recordTable";
+        os << "rwOperation, getSymbolTable(), getRecordTable()";
         os << ")->writeAll(*" << relName << ");\n";
         os << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
     };
@@ -3037,17 +3058,26 @@ void runFunction(std::string  inputDirectoryArg,
 
     os << "public:\n";
     os << "SymbolTable& getSymbolTable() override {\n";
-    os << "return symTable;\n";
+    os << "return *symTable;\n";
     os << "}\n";  // end of getSymbolTable() method
 
     os << "RecordTable& getRecordTable() override {\n";
-    os << "return recordTable;\n";
+    os << "return *recordTable;\n";
     os << "}\n";  // end of getRecordTable() method
+
+    os << "void setSymbolTable(std::shared_ptr<SymbolTable> ptr) override {\n";
+    os << "symTable = ptr;\n";
+    os << "initSymbols();\n";
+    os << "}\n";
+
+    os << "void setRecordTable(std::shared_ptr<RecordTable> ptr) override {\n";
+    os << "recordTable = ptr;\n";
+    os << "}\n";
 
     os << "void setNumThreads(std::size_t numThreadsValue) override {\n";
     os << "SouffleProgram::setNumThreads(numThreadsValue);\n";
-    os << "symTable.setNumLanes(getNumThreads());\n";
-    os << "recordTable.setNumLanes(getNumThreads());\n";
+    os << "getSymbolTable().setNumThreads(getNumThreads());\n";
+    os << "getRecordTable().setNumThreads(getNumThreads());\n";
     os << "}\n";  // end of setNumThreads
 
     if (!prog.getSubroutines().empty()) {
@@ -3194,19 +3224,10 @@ void runFunction(std::string  inputDirectoryArg,
     os << "}\n";
     os << "\n#endif\n";
 
-    *recordTable_os << "SpecializedRecordTable<0";
-    for (std::size_t arity : arities) {
-        if (arity > 0) {
-            *recordTable_os << "," << arity;
-        }
-    }
-    *recordTable_os << "> recordTable{};\n";
-
     os.flushAll(sos);
 }
 
-void emitType(std::ostream& out, const TypeRegistry& TR,
-        std::set<const TypeDesc*>& done, const TypeDesc* T) {
+void emitType(std::ostream& out, const TypeRegistry& TR, std::set<const TypeDesc*>& done, const TypeDesc* T) {
     if (!done.insert(T).second) {
         return;
     }
@@ -3313,6 +3334,38 @@ void Synthesiser::emitTypes(std::ostream& out, const Program& prog) {
     out << "const TypeRegistry& getTypeRegistry() const override {\n";
     out << "return typeRegistry;\n";
     out << "}\n";
+}
+
+std::string Synthesiser::convertSymbolToIdentifier(const std::string& symbol) const {
+    std::ostringstream ident;
+    ident << "SYMBOL_";
+    std::size_t count = 0;
+    for (const char c : symbol) {
+        if (count > 12) {
+            break;
+        }
+        if (('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')) {
+            ident << c;
+            ++count;
+        }
+    }
+
+    ident << "_";
+    ident << toHex(std::hash<std::string>{}(symbol));
+
+    return ident.str();
+}
+
+std::string Synthesiser::toHex(const std::size_t V) const {
+    static_assert(sizeof(std::size_t) <= 64);
+    std::stringstream s;
+    s << std::hex << std::setw(16) << std::setfill('0') << V;
+    return s.str();
+}
+
+std::string Synthesiser::rawStr(const std::string& str) const {
+    std::string dchars = toHex(std::hash<std::string>{}(str));
+    return std::string("R\"") + dchars + "(" + str + ")" + dchars + "\"";
 }
 
 }  // namespace souffle::synthesiser

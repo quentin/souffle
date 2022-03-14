@@ -35,6 +35,15 @@ public:
     virtual RamDomain pack(const std::initializer_list<RamDomain>& List) = 0;
 
     virtual const RamDomain* unpack(const RamDomain Ref, const std::size_t Arity) const = 0;
+
+    /**
+     * @brief Gives a hint about the number of threads that may use this
+     * record table concurrently.
+     *
+     * The given number of threads may be used by the implementation as a hint
+     * to setup or dimension internal data structures for optimal concurrency.
+     */
+    virtual void setNumThreads(const std::size_t){};
 };
 
 /** @brief helper to convert tuple to record reference for the synthesiser */

@@ -200,9 +200,15 @@ private:
     /// identifier.
     const std::string CanonicalIdentifier;
 
-    /// The list of equivalent type identifiers (aliases)
+    /// The sorted list of equivalent type identifiers (aliases)
     IdentifierList Identifiers;
 
+    /**
+     * The list of elements of this type.
+     *
+     * For a record or an ADT branch: the list of fields in declaration order.
+     * For an ADT: the list of branches sorted lexicographically.
+     */
     TypeElementList Elements;
 
     TypeDesc(const TypeKind K, const TypeDesc& B, const std::string& Id)
@@ -216,11 +222,13 @@ private:
         if (Id == CanonicalIdentifier) {
             return;
         }
-        if (std::find(Identifiers.begin(), Identifiers.end(), Id) != Identifiers.end()) {
+
+        auto Lb = std::lower_bound(Identifiers.begin(), Identifiers.end(), Id);
+        if (Lb != Identifiers.end() && *Lb == Id) {
             return;
         }
-        Identifiers.emplace_back(Id);
-        return;
+
+        Identifiers.insert(Lb, Id);
     }
 
     bool addElement(const std::string& Id, const TypeDesc* Ty) {
@@ -322,8 +330,8 @@ struct TypeRegistry {
             return false;
         }
 
-        if (T->kind() == TypeKind::Record || T->kind() == TypeKind::Tuple || T->kind() == TypeKind::ADT || T->kind() == TypeKind::Branch ||
-                T->kind() == TypeKind::Union) {
+        if (T->kind() == TypeKind::Record || T->kind() == TypeKind::Tuple || T->kind() == TypeKind::ADT ||
+                T->kind() == TypeKind::Branch || T->kind() == TypeKind::Union) {
             return T->addElement(ElemId, ElemTy);
         } else {
             return false;

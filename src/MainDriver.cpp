@@ -96,6 +96,8 @@
 #include "souffle/profile/Tui.h"
 #include "souffle/provenance/Explain.h"
 #endif
+#include "souffle/datastructure/RecordTableImpl.h"
+#include "souffle/datastructure/SymbolTableImpl.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/FileUtil.h"
 #include "souffle/utility/MiscUtil.h"
@@ -326,7 +328,10 @@ bool interpretTranslationUnit(Global& glb, ram::TranslationUnit& ramTranslationU
         }
 
         // configure and execute interpreter
-        Own<interpreter::Engine> interpreter(mk<interpreter::Engine>(ramTranslationUnit));
+        const std::size_t numThreads = number_of_threads(std::stoi(glb.config().get("jobs")));
+        Own<interpreter::Engine> interpreter(
+                mk<interpreter::Engine>(ramTranslationUnit, numThreads, nullptr, nullptr));
+
         interpreter->executeMain();
         // If the profiler was started, join back here once it exits.
         if (profiler.joinable()) {
