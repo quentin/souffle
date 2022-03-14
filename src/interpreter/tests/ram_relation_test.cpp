@@ -252,7 +252,7 @@ TEST(IO_store, SignedChangedDelimiter) {
 
     std::vector<std::string> attribsTypes(len, "i");
 
-    Own<ram::Relation> myrel = mk<ram::Relation>(
+    Own<ram::Relation> myrel =
             mk<ram::Relation>("test", len, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{

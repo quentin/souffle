@@ -288,7 +288,6 @@ RamDomain callStateless(ExecuteFn&& execute, Context& ctxt, Shadow& shadow, souf
 Engine::Engine(ram::TranslationUnit& tUnit)
         : tUnit(tUnit), global(tUnit.global()), profileEnabled(global.config().has("profile")),
           frequencyCounterEnabled(global.config().has("profile-frequency")),
-          isProvenance(global.config().has("provenance")),
           numOfThreads(number_of_threads(std::stoi(global.config().get("jobs")))),
           isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(numOfThreads),
           symbolTable(numOfThreads) {}

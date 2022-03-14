@@ -48,7 +48,7 @@ namespace souffle::interpreter {
 class RelInterface : public souffle::Relation {
 public:
     RelInterface(RelationWrapper& r, SymbolTable& s, std::string n, std::vector<std::string> t,
-            std::vector<std::string> an, std::size_t i, const interface::TypeDesc* td)
+            std::vector<std::string> an, std::size_t i, const TypeDesc* td)
             : relation(r), symTable(s), name(std::move(n)), types(std::move(t)), attrNames(std::move(an)),
               typeDesc(td), id(i) {}
     ~RelInterface() override = default;
