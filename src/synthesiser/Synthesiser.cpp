@@ -2731,6 +2731,13 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
 
     std::stringstream registerSymbols;
     {
+        // Encode all string constants, in lexical order
+        // First gather all symbols, then encode them in lexical order.
+        //
+        // This maximise the chance that identifiers of constant symbols are in a
+        // deterministic order (when the symbol table is initially empty).
+        //
+        // Hence tests are more deterministic.
         std::set<std::string> constantSymbols;
 
         visit(prog, [&](const StringConstant& sc) { constantSymbols.insert(sc.getConstant()); });
