@@ -523,7 +523,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Clear>, const ram::Clear& clear
 NodePtr NodeGenerator::visit_(type_identity<ram::CountUniqueKeys>, const ram::CountUniqueKeys& count) {
     std::size_t relId = encodeRelation(count.getRelation());
     auto rel = getRelationHandle(relId);
-    NodeType type = constructNodeType("CountUniqueKeys", lookup(count.getRelation()));
+    NodeType type = constructNodeType(global, "CountUniqueKeys", lookup(count.getRelation()));
     return mk<CountUniqueKeys>(type, &count, rel, encodeIndexPos(count));
 }
 

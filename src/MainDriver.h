@@ -29,6 +29,9 @@ namespace souffle {
 /** Return the package version string. */
 const char* packageVersion();
 
+/** Return the copyright and version footer banner string. */
+std::string versionFooter();
+
 /** Return the command-line options that can be passed to `MainConfig::processArgs()`. */
 std::vector<MainOption> getMainOptions();
 

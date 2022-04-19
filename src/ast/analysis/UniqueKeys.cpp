@@ -441,7 +441,8 @@ analysis::StratumUniqueKeys UniqueKeysAnalysis::computeRuleVersionStatements(
     return statements;
 }
 
-std::vector<analysis::StratumUniqueKeys> UniqueKeysAnalysis::computeUniqueKeyStatements() {
+std::vector<analysis::StratumUniqueKeys> UniqueKeysAnalysis::computeUniqueKeyStatements(
+        const bool hasIndexStats) {
     auto* prog = program;
     auto getSccAtoms = [prog](const ast::Clause* clause, const std::set<const ast::Relation*>& scc) {
         const auto& sccAtoms = filter(ast::getBodyLiterals<ast::Atom>(*clause),
@@ -454,8 +455,7 @@ std::vector<analysis::StratumUniqueKeys> UniqueKeysAnalysis::computeUniqueKeySta
     std::vector<analysis::StratumUniqueKeys> uniqueKeyStatements;
     uniqueKeyStatements.resize(sccOrdering.size());
 
-    auto& config = Global::config();
-    if (!config.has("index-stats")) {
+    if (!hasIndexStats) {
         return uniqueKeyStatements;
     }
 
@@ -564,7 +564,9 @@ void UniqueKeysAnalysis::run(const TranslationUnit& translationUnit) {
     topsortSCCGraphAnalysis = &translationUnit.getAnalysis<TopologicallySortedSCCGraphAnalysis>();
     recursiveClauses = &translationUnit.getAnalysis<RecursiveClausesAnalysis>();
     polyAnalysis = &translationUnit.getAnalysis<ast::analysis::PolymorphicObjectsAnalysis>();
-    uniqueKeyStatements = computeUniqueKeyStatements();
+
+    const bool hasIndexStats = translationUnit.global().config().has("index-stats");
+    uniqueKeyStatements = computeUniqueKeyStatements(hasIndexStats);
 }
 
 void UniqueKeysAnalysis::print(std::ostream& os) const {

@@ -22,20 +22,11 @@ bool processArgs(Global& glb, int argc, char** argv) {
     header << "----------------------------------------------------------------------------" << std::endl;
     header << "Options:" << std::endl;
 
-    std::stringstream footer;
-    footer << "----------------------------------------------------------------------------" << std::endl;
-    footer << "Version: " << packageVersion() << "" << std::endl;
-    footer << "----------------------------------------------------------------------------" << std::endl;
-    footer << "Copyright (c) 2016-22 The Souffle Developers." << std::endl;
-    footer << "Copyright (c) 2013-16 Oracle and/or its affiliates." << std::endl;
-    footer << "All rights reserved." << std::endl;
-    footer << "============================================================================" << std::endl;
-
     // command line options, the environment will be filled with the arguments passed to them, or
     // the empty string if they take none
     // main option, the datalog program itself, has an empty key
     const std::vector<MainOption> options = getMainOptions();
-    glb.config().processArgs(argc, argv, header.str(), footer.str(), options);
+    glb.config().processArgs(argc, argv, header.str(), versionFooter(), options);
 
     return true;
 }

@@ -280,11 +280,10 @@ Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb) 
                     mk<ast::transform::RemoveRedundantRelationsTransformer>())),
             mk<ast::transform::RemoveRelationCopiesTransformer>(), std::move(partitionPipeline),
             std::move(equivalencePipeline), mk<ast::transform::RemoveRelationCopiesTransformer>(),
-            std::move(magicPipeline), mk<ast::transform::ReorderLiteralsTransformer>(),
-            mk<ast::transform::RemoveEmptyRelationsTransformer>(),
+            std::move(magicPipeline), mk<ast::transform::RemoveEmptyRelationsTransformer>(),
             mk<ast::transform::AddNullariesToAtomlessAggregatesTransformer>(),
-            mk<ast::transform::ReorderLiteralsTransformer>(), mk<ast::transform::ExecutionPlanChecker>(),
-            std::move(provenancePipeline), mk<ast::transform::IOAttributesTransformer>());
+            mk<ast::transform::ExecutionPlanChecker>(), std::move(provenancePipeline),
+            mk<ast::transform::IOAttributesTransformer>());
 
     return pipeline;
 }
@@ -357,8 +356,23 @@ const char* packageVersion() {
     return PACKAGE_VERSION;
 }
 
+std::string versionFooter() {
+    std::stringstream footer;
+    footer << "----------------------------------------------------------------------------" << std::endl;
+    footer << "Version: " << packageVersion() << "" << std::endl;
+    footer << "----------------------------------------------------------------------------" << std::endl;
+    footer << "Copyright (c) 2016-22 The Souffle Developers." << std::endl;
+    footer << "Copyright (c) 2013-16 Oracle and/or its affiliates." << std::endl;
+    footer << "All rights reserved." << std::endl;
+    footer << "============================================================================" << std::endl;
+
+    return footer.str();
+}
+
 std::vector<MainOption> getMainOptions() {
     std::vector<MainOption> options{{"", 0, "", "", false, ""},
+            {"auto-schedule", 'a', "FILE", "", false,
+                    "Use profile auto-schedule <FILE> for auto-scheduling."},
             {"fact-dir", 'F', "DIR", ".", false, "Specify directory for fact files."},
             {"include-dir", 'I', "DIR", ".", true, "Specify directory for include files."},
             {"output-dir", 'D', "DIR", ".", false,
@@ -391,17 +405,18 @@ std::vector<MainOption> getMainOptions() {
             {"dl-program", 'o', "FILE", "", false,
                     "Generate C++ source code, written to <FILE>, and compile this to a "
                     "binary executable (without executing it)."},
-            {"live-profile", '\1', "", "", false, "Enable live profiling."},
+            {"live-profile", '\x1', "", "", false, "Enable live profiling."},
+            {"index-stats", '\x9', "", "", false, "Enable collection of index statistics"},
             {"profile", 'p', "FILE", "", false, "Enable profiling, and write profile data to <FILE>."},
             {"profile-use", 'u', "FILE", "", false,
                     "Use profile log-file <FILE> for profile-guided optimization."},
-            {"profile-frequency", '\2', "", "", false, "Enable the frequency counter in the profiler."},
+            {"profile-frequency", '\x2', "", "", false, "Enable the frequency counter in the profiler."},
             {"debug-report", 'r', "FILE", "", false, "Write HTML debug report to <FILE>."},
             {"pragma", 'P', "OPTIONS", "", true, "Set pragma options."},
             {"provenance", 't', "[ none | explain | explore ]", "", false,
                     "Enable provenance instrumentation and interaction."},
-            {"verbose", 'v', "", "", false, "Verbose output."}, {"version", '\3', "", "", false, "Version."},
-            {"show", '\4', "[ <see-list> ]", "", true,
+            {"verbose", 'v', "", "", false, "Verbose output."}, {"version", '\x3', "", "", false, "Version."},
+            {"show", '\x4', "[ <see-list> ]", "", true,
                     "Print selected program information.\n"
                     "Modes:\n"
                     "\tinitial-ast\n"
@@ -414,9 +429,10 @@ std::vector<MainOption> getMainOptions() {
                     "\ttransformed-ast\n"
                     "\ttransformed-ram\n"
                     "\ttype-analysis"},
-            {"parse-errors", '\5', "", "", false, "Show parsing errors, if any, then exit."},
+            {"parse-errors", '\x5', "", "", false, "Show parsing errors, if any, then exit."},
             {"help", 'h', "", "", false, "Display this help message."},
-            {"legacy", '\6', "", "", false, "Enable legacy support."}};
+            {"legacy", '\x6', "", "", false, "Enable legacy support."},
+            {"preprocessor", '\xA', "CMD", "", false, "C preprocessor to use."}};
     return options;
 }
 
@@ -444,7 +460,7 @@ int main(Global& glb, const char* souffle_executable) {
 
         /* for the version option, if given print the version text then exit */
         if (glb.config().has("version")) {
-            std::cout << versionFooter << std::endl;
+            std::cout << versionFooter() << std::endl;
             return 0;
         }
         glb.config().set("version", PACKAGE_VERSION);
