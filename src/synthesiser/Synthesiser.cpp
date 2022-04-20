@@ -2775,7 +2775,7 @@ void Synthesiser::generateCode(std::ostream& sos, const std::string& id, bool& w
         os << "  std::size_t reads[" << numRead << "]{};\n";
     }
 
-    emitTypes(os, prog);
+    emitTypeRegistryDecl(os);
 
     // print relation definitions
     std::stringstream initCons;     // initialization of constructor
@@ -3157,6 +3157,8 @@ void runFunction(std::string  inputDirectoryArg,
     }
     os << "};\n";  // end of class declaration
 
+    emitTypeRegistryDef(os, classname, prog);
+
     // hidden hooks
     os << "SouffleProgram *newInstance_" << id << "(){return new " << classname << ";}\n";
     os << "SymbolTable *getST_" << id << "(SouffleProgram *p){return &reinterpret_cast<" << classname
@@ -3310,16 +3312,28 @@ void emitType(std::ostream& out, const TypeRegistry& TR, std::set<const TypeDesc
     }
 }
 
-void Synthesiser::emitTypes(std::ostream& out, const Program& prog) {
-    const TypeRegistry& TR = prog.getTypeRegistry();
+void Synthesiser::emitTypeRegistryDecl(std::ostream& out) {
+    out << "private:\n";
+    out << "class SpecializedTypeRegistry : public TypeRegistry {\n";
+    out << "public:\n";
+    out << "SpecializedTypeRegistry();\n";
+    out << "};\n";
 
     out << "private:\n";
+    out << "const SpecializedTypeRegistry typeRegistry;\n";
+
+    out << "public:\n";
+    out << "/** types */\n";
+    out << "const TypeRegistry& getTypeRegistry() const override;\n";
+}
+
+void Synthesiser::emitTypeRegistryDef(std::ostream& out, const std::string& classname, const Program& prog) {
+    const TypeRegistry& TR = prog.getTypeRegistry();
+
     out << "/*\n";
     TR.printAll(out);
     out << "*/\n";
-    out << "class SpecializedTypeRegistry : public TypeRegistry {\n";
-    out << "public:\n";
-    out << "SpecializedTypeRegistry() : TypeRegistry() {\n";
+    out << classname << "::SpecializedTypeRegistry::SpecializedTypeRegistry() : TypeRegistry() {\n";
 
     std::set<const TypeDesc*> done;
     for (std::size_t i = 0; i < TR.numCanonicalTypes(); ++i) {
@@ -3333,12 +3347,7 @@ void Synthesiser::emitTypes(std::ostream& out, const Program& prog) {
     }
 
     out << "}\n";
-    out << "};\n";
-    out << "const SpecializedTypeRegistry typeRegistry;\n";
-
-    out << "public:\n";
-    out << "/** types */\n";
-    out << "const TypeRegistry& getTypeRegistry() const override {\n";
+    out << "const TypeRegistry& " << classname << "::getTypeRegistry() const {\n";
     out << "return typeRegistry;\n";
     out << "}\n";
 }

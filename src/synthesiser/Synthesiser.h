@@ -95,8 +95,11 @@ protected:
     /** Generate code */
     void emitCode(std::ostream& out, const ram::Statement& stmt);
 
-    /** Generate type registry code */
-    void emitTypes(std::ostream& out, const ram::Program& prog);
+    /** Generate type registry declarations */
+    void emitTypeRegistryDecl(std::ostream& out);
+
+    /** Generate type registry definitions */
+    void emitTypeRegistryDef(std::ostream& out, const std::string& classname, const ram::Program& prog);
 
     /** Lookup frequency counter */
     unsigned lookupFreqIdx(const std::string& txt);
