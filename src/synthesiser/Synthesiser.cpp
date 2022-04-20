@@ -3074,11 +3074,13 @@ void runFunction(std::string  inputDirectoryArg,
 
     os << "void setSymbolTable(std::shared_ptr<SymbolTable> ptr) override {\n";
     os << "symTable = ptr;\n";
+    os << "symTable->setNumThreads(getNumThreads());\n";
     os << "initSymbols();\n";
     os << "}\n";
 
     os << "void setRecordTable(std::shared_ptr<RecordTable> ptr) override {\n";
     os << "recordTable = ptr;\n";
+    os << "recordTable->setNumThreads(getNumThreads());\n";
     os << "}\n";
 
     os << "void setNumThreads(std::size_t numThreadsValue) override {\n";

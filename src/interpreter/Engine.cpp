@@ -280,10 +280,12 @@ Engine::Engine(ram::TranslationUnit& tUnit, const std::size_t numberOfThreads,
     if (!symbolTable) {
         symbolTable = std::make_shared<SymbolTableImpl>(numOfThreads);
     }
+    symbolTable->setNumThreads(numOfThreads);
 
     if (!recordTable) {
         recordTable = std::make_shared<SpecializedRecordTable<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>>(numOfThreads);
     }
+    recordTable->setNumThreads(numOfThreads);
 }
 
 Engine::RelationHandle& Engine::getRelationHandle(const std::size_t idx) {
@@ -2086,10 +2088,12 @@ RamDomain Engine::evalGuardedInsert(Rel& rel, const GuardedInsert& shadow, Conte
 
 void Engine::setSymbolTable(std::shared_ptr<SymbolTable> ptr) {
     symbolTable = ptr;
+    symbolTable->setNumThreads(numOfThreads);
 }
 
 void Engine::setRecordTable(std::shared_ptr<RecordTable> ptr) {
     recordTable = ptr;
+    recordTable->setNumThreads(numOfThreads);
 }
 
 }  // namespace souffle::interpreter
