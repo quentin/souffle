@@ -193,8 +193,9 @@ private:
     const TypeKind Kind;
 
     /// auxiliary type, usage depends on the kind of this type:
-    /// Branch -> aux is the ADT type
-    /// Subset -> aux is the super type
+    /// Branch -> Aux is the ADT type
+    /// Subset -> Aux is the super type
+    /// Union -> Aux is the common primitive type
     const TypeDesc* const Aux;
 
     /// identifier.
@@ -213,7 +214,7 @@ private:
 
     TypeDesc(const TypeKind K, const TypeDesc& B, const std::string& Id)
             : Kind(K), Aux(&B), CanonicalIdentifier(Id) {
-        assert(K == TypeKind::Subset || K == TypeKind::Branch);
+        assert(K == TypeKind::Subset || K == TypeKind::Branch || K == TypeKind::Union);
     }
 
     TypeDesc(const TypeKind K, const std::string& Id) : Kind(K), Aux(nullptr), CanonicalIdentifier(Id) {}
@@ -381,12 +382,12 @@ struct TypeRegistry {
         return T.get();
     }
 
-    const TypeDesc* newUnion(const std::string& Id) {
+    const TypeDesc* newUnion(const std::string& Id, const TypeDesc* Primitive) {
         if (TypeDescriptors.count(Id) != 0) {
             return nullptr;
         }
 
-        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Union, Id));
+        std::shared_ptr<TypeDesc> T(new TypeDesc(TypeKind::Union, *Primitive, Id));
         TypeDescriptors.emplace(Id, T);
         CanonicalTypeDescriptors.emplace(Id, T);
         return T.get();

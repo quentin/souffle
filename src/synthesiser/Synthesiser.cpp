@@ -3262,7 +3262,8 @@ void emitType(std::ostream& out, const TypeRegistry& TR, std::set<const TypeDesc
         out << "const auto U = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
         out << "const auto T = newSubset(\"" << T->canonicalIdentifier() << "\",U);\n";
     } else if (T->isUnion()) {
-        out << "const auto T = newUnion(\"" << T->canonicalIdentifier() << "\");\n";
+        out << "const auto U = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
+        out << "const auto T = newUnion(\"" << T->canonicalIdentifier() << "\",U);\n";
         for (const auto& Pair : T->elements()) {
             const auto* E = Pair.second;
             out << "{\n";

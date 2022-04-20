@@ -642,8 +642,8 @@ Own<ram::Statement> UnitTranslator::generateStoreRelation(const ast::Relation* r
     return mk<ram::Sequence>(std::move(storeStmts));
 }
 
-Own<ram::Relation> UnitTranslator::createRamRelation(TypeRegistry& typeRegistry,
-        const ast::Relation* baseRelation, std::string ramRelationName) const {
+Own<ram::Relation> UnitTranslator::createRamRelation(
+        TypeRegistry& typeRegistry, const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
     auto representation = baseRelation->getRepresentation();
     if (representation == RelationRepresentation::BTREE_DELETE && ramRelationName[0] == '@') {
@@ -704,14 +704,19 @@ VecOwn<ram::Relation> UnitTranslator::createRamRelations(
     return ramRelations;
 }
 
-Own<TypeRegistry> UnitTranslator::createTypeRegistry(const ast::Program& prog) const {
+Own<TypeRegistry> UnitTranslator::createTypeRegistry(
+        const ast::Program& prog, const ast::analysis::TypeEnvironmentAnalysis& typeAnalysis) const {
     Own<TypeRegistry> TR = mk<TypeRegistry>();
 
     for (const auto* Ty : prog.getTypes()) {
         if (isA<ast::RecordType>(Ty)) {
             TR->newRecord(Ty->getQualifiedName().toString());
         } else if (isA<ast::UnionType>(Ty)) {
-            TR->newUnion(Ty->getQualifiedName().toString());
+            const auto& PrimitiveTypesInUnion = typeAnalysis.getPrimitiveTypesInUnion(Ty->getQualifiedName());
+            assert(PrimitiveTypesInUnion.size() == 1);
+            const TypeDesc* Primitive = TR->get(PrimitiveTypesInUnion.begin()->toString());
+            assert(Primitive != nullptr);
+            TR->newUnion(Ty->getQualifiedName().toString(), Primitive);
         } else if (isA<ast::AlgebraicDataType>(Ty)) {
             TR->newADT(Ty->getQualifiedName().toString());
         }
@@ -845,7 +850,8 @@ Own<ram::TranslationUnit> UnitTranslator::translateUnit(ast::TranslationUnit& tu
     // Generate the RAM program code
     auto ramMain = generateProgram(tu);
 
-    auto typeRegistry = createTypeRegistry(tu.getProgram());
+    auto typeRegistry =
+            createTypeRegistry(tu.getProgram(), tu.getAnalysis<ast::analysis::TypeEnvironmentAnalysis>());
 
     // Create the relevant RAM relations
     const auto& sccOrdering = tu.getAnalysis<ast::analysis::TopologicallySortedSCCGraphAnalysis>().order();
