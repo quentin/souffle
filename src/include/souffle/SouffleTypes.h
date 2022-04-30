@@ -249,7 +249,8 @@ private:
     }
 };
 
-struct TypeRegistry {
+class TypeRegistry {
+public:
     TypeRegistry() {
         auto Number = newPrimitive("number");
         newEquivalent("__numberConstant", Number);
