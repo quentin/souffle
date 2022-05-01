@@ -54,7 +54,8 @@ Own<ast::TranslationUnit> ParserDriver::parse(
     translationUnit = mk<ast::TranslationUnit>(mk<ast::Program>(), errorReport, debugReport);
     yyscan_t scanner;
     ScannerInfo data;
-    data.yyfilename = filename;
+    SrcLocation emptyLoc;
+    data.push(std::filesystem::weakly_canonical(filename).string(), emptyLoc);
     yylex_init_extra(&data, &scanner);
     yyset_debug(0, scanner);
     yyset_in(in, scanner);
@@ -72,7 +73,8 @@ Own<ast::TranslationUnit> ParserDriver::parse(
     translationUnit = mk<ast::TranslationUnit>(mk<ast::Program>(), errorReport, debugReport);
 
     ScannerInfo data;
-    data.yyfilename = "<in-memory>";
+    SrcLocation emptyLoc;
+    data.push("<in-memory>", emptyLoc);
     yyscan_t scanner;
     yylex_init_extra(&data, &scanner);
     yyset_debug(0, scanner);
@@ -256,6 +258,38 @@ void ParserDriver::error(const SrcLocation& loc, const std::string& msg) {
 void ParserDriver::error(const std::string& msg) {
     translationUnit->getErrorReport().addDiagnostic(
             Diagnostic(Diagnostic::Type::ERROR, DiagnosticMessage(msg)));
+}
+
+std::optional<std::filesystem::path> ParserDriver::searchIncludePath(
+        const std::string& IncludeString, const SrcLocation& Loc) {
+    std::filesystem::path Candidate(IncludeString);
+
+    if (Candidate.is_absolute()) {
+        if (std::filesystem::exists(Candidate)) {
+            return std::filesystem::canonical(Candidate);
+        } else {
+            return std::nullopt;
+        }
+    }
+
+    // search relative from current input file
+    Candidate = std::filesystem::path(Loc.file->Physical).parent_path() / IncludeString;
+    if (std::filesystem::exists(Candidate)) {
+        return std::filesystem::canonical(Candidate);
+    } else if (Candidate.is_absolute()) {
+        return std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+bool ParserDriver::canEnterOnce(const SrcLocation& onceLoc) {
+    const auto Inserted = VisitedLocations.emplace(onceLoc.file->Physical, onceLoc.start.line);
+    return Inserted.second;
+}
+
+void ParserDriver::addComment(const SrcLocation& Loc, const std::stringstream& Content) {
+    ScannedComments.emplace_back(Loc, Content.str());
 }
 
 }  // end of namespace souffle
