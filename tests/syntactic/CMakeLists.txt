@@ -69,3 +69,19 @@ if (NOT MSVC)
 # does not pass with Visual Studio pre-processor because it preserves all whitespaces
 positive_test(whitespaces)
 endif ()
+souffle_run_test(
+  TEST_NAME include_directive1
+  CATEGORY syntactic
+  NO_PREPROCESSOR
+  )
+souffle_run_test(
+  TEST_NAME include_directive2
+  CATEGORY syntactic
+  NO_PREPROCESSOR
+  NEGATIVE
+  )
+souffle_run_test(
+  TEST_NAME include_directive3
+  CATEGORY syntactic
+  NO_PREPROCESSOR
+  )

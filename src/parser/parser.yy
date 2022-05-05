@@ -96,17 +96,17 @@
     #define YY_NULLPTR nullptr
 
     /* Macro to update locations as parsing proceeds */
-    #define YYLLOC_DEFAULT(Cur, Rhs, N)                         \
-    do {                                                        \
-        if (N) {                                                \
-            (Cur).start         = YYRHSLOC(Rhs, 1).start;       \
-            (Cur).end           = YYRHSLOC(Rhs, N).end;         \
-            (Cur).filenames     = YYRHSLOC(Rhs, N).filenames;   \
-        } else {                                                \
-            (Cur).start         = YYRHSLOC(Rhs, 0).end;         \
-            (Cur).end           = YYRHSLOC(Rhs, 0).end;         \
-            (Cur).filenames     = YYRHSLOC(Rhs, 0).filenames;   \
-        }                                                       \
+#define YYLLOC_DEFAULT(Cur, Rhs, N)               \
+    do {                                          \
+        if (N) {                                  \
+            (Cur).start = YYRHSLOC(Rhs, 1).start; \
+            (Cur).end = YYRHSLOC(Rhs, N).end;     \
+            (Cur).file = YYRHSLOC(Rhs, N).file;   \
+        } else {                                  \
+            (Cur).start = YYRHSLOC(Rhs, 0).end;   \
+            (Cur).end = YYRHSLOC(Rhs, 0).end;     \
+            (Cur).file = YYRHSLOC(Rhs, 0).file;   \
+        }                                         \
     } while (0)
 }
 

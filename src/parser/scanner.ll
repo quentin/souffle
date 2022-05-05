@@ -70,17 +70,57 @@
 
 #define yyfilename yyget_extra(yyscanner)->yyfilename
 
+#define yyinfo (*yyget_extra(yyscanner))
+
     /* Execute when matching */
 #define YY_USER_ACTION  { \
-    yylloc.start = SrcLocation::Point({ yylineno, yycolumn }); \
+    yylloc.start = Point({ yylineno, yycolumn }); \
     yycolumn += yyleng;             \
-    yylloc.end   = SrcLocation::Point({ yylineno, yycolumn }); \
-    yylloc.setFilename(yyfilename); \
+    yylloc.end   = Point({ yylineno, yycolumn }); \
+    yylloc.setFile(yyfilename); \
 }
+
+    // scan a string with escape sequences, skipping surrounding double-quotes if any.
+    std::string lexString(souffle::ParserDriver& driver, const SrcLocation& loc, const char* text) {
+      std::string result;
+      const size_t start = (text[0] == '"' ? 1 : 0);
+      const size_t end = strlen(text) - (text[0] == '"' ? 1 : 0);
+      bool error = false;
+      char error_char;
+      for (size_t i = start; i < end; i++) {
+        if (text[i] == '\\' && i + 1 < end) {
+          switch (text[i+1]) {
+            case '"':  result += '"'; break;
+            case '\'': result += '\''; break;
+            case '\\': result += '\\'; break;
+            case 'a':  result += '\a'; break;
+            case 'b':  result += '\b'; break;
+            case 'f':  result += '\f'; break;
+            case 'n':  result += '\n'; break;
+            case 'r':  result += '\r'; break;
+            case 't':  result += '\t'; break;
+            case 'v':  result += '\v'; break;
+            default:
+              error_char = text[i+1];
+              error = true;
+              break;
+          }
+          i++;
+        } else {
+          result += text[i];
+        }
+        if (error) {
+          break;
+        }
+      }
+      if (error) driver.error(loc, std::string("Unknown escape sequence \\") + error_char);
+      return result;
+    }
 
 %}
 
 %x COMMENT
+%x INCLUDE
 
 WS [ \t\r\v\f]
 
@@ -102,6 +142,19 @@ WS [ \t\r\v\f]
 ".override"/{WS}                      { return yy::parser::make_OVERRIDE(yylloc); }
 ".pragma"/{WS}                        { return yy::parser::make_PRAGMA(yylloc); }
 ".plan"/{WS}                          { return yy::parser::make_PLAN(yylloc); }
+".include"                            {
+                                        yyinfo.LastIncludeDirectiveLoc = yylloc;
+                                        BEGIN(INCLUDE);
+                                      }
+".once"                               {
+                                        if (!driver.canEnterOnce(yylloc)) {
+                                          yypop_buffer_state(yyscanner);
+                                          yyinfo.pop();
+                                          if (!YY_CURRENT_BUFFER) {
+                                            return yy::parser::make_END(yylloc);
+                                          }
+                                        }
+                                      }
 "autoinc"                             { return yy::parser::make_AUTOINC(yylloc); }
 "band"                                { return yy::parser::make_BW_AND(yylloc); }
 "bor"                                 { return yy::parser::make_BW_OR(yylloc); }
@@ -149,6 +202,30 @@ WS [ \t\r\v\f]
 "to_string"                           { return yy::parser::make_TOSTRING(yylloc); }
 "to_unsigned"                         { return yy::parser::make_TOUNSIGNED(yylloc); }
 "choice-domain"                       { return yy::parser::make_CHOICEDOMAIN(yylloc); }
+"__FILE__"                            {
+                                        return yy::parser::make_STRING(yylloc.file->Reported, yylloc);
+                                      }
+"__LINE__"                            { return yy::parser::make_NUMBER(std::to_string(yylineno), yylloc); }
+"__INCL__"                            {
+                                          std::string result;
+                                          const IncludeStack* incl = yylloc.file.get();
+                                          const Point* pos = &incl->IncludePos;
+                                          // skip top
+                                          if (incl) incl = incl->ParentStack.get();
+
+                                          bool first = true;
+                                          while(incl) {
+                                            std::stringstream concat;
+                                            concat << incl->Reported << ":" << *pos;
+                                            if (!first) concat << ';';
+                                            concat << result;
+                                            result = concat.str();
+                                            first = false;
+                                            pos = &incl->IncludePos;
+                                            incl = incl->ParentStack.get();
+                                          }
+                                          return yy::parser::make_STRING(result, yylloc);
+                                      }
 "|"                                   { return yy::parser::make_PIPE(yylloc); }
 "["                                   { return yy::parser::make_LBRACKET(yylloc); }
 "]"                                   { return yy::parser::make_RBRACKET(yylloc); }
@@ -209,90 +286,110 @@ WS [ \t\r\v\f]
                                         return yy::parser::make_IDENT(yytext, yylloc);
                                       }
 \"(\\.|[^"\\])*\"                     {
-                                        std::string result;
-                                        size_t end = strlen(yytext) - 1;
-                                        bool error = false;
-                                        char error_char;
-                                        for (size_t i = 1; i < end; i++) {
-                                            if (yytext[i] == '\\' && i + 1 < end) {
-                                                switch (yytext[i+1]) {
-                                                    case '"':  result += '"'; break;
-                                                    case '\'': result += '\''; break;
-                                                    case '\\': result += '\\'; break;
-                                                    case 'a':  result += '\a'; break;
-                                                    case 'b':  result += '\b'; break;
-                                                    case 'f':  result += '\f'; break;
-                                                    case 'n':  result += '\n'; break;
-                                                    case 'r':  result += '\r'; break;
-                                                    case 't':  result += '\t'; break;
-                                                    case 'v':  result += '\v'; break;
-                                                    default:
-                                                        error_char = yytext[i+1];
-                                                        error = true;
-                                                        break;
-                                                }
-                                                i++;
-                                            } else {
-                                                result += yytext[i];
-                                            }
-                                            if (error) {
-                                                break;
-                                            }
-                                        }
-                                        if (error) driver.error(yylloc, std::string("Unknown escape sequence \\") + error_char);
-                                        return yy::parser::make_STRING(result, yylloc);
+                                        return yy::parser::make_STRING(lexString(driver, yylloc, yytext), yylloc);
                                       }
 \#.*$                                 {
+                                        /* formats:
+                                          "#" linenum filename
+                                          "#" linenum filename 1
+                                          "#" linenum filename 2
+                                          "#line" linenum
+                                          "#line" linenum filename
+                                        */
                                         std::unique_ptr<char[]> fname_ptr = std::make_unique<char[]>(yyleng+1);
                                         char* fname = fname_ptr.get();
-                                        int lineno;
-                                        if ((sscanf(yytext,"# %d \"%[^\"]",&lineno,fname)>=2) || 
-                                            (sscanf(yytext,"#line %d \"%[^\"]",&lineno,fname)>=2)) {
-                                          std::size_t fnamelen = strlen(fname);
-                                          assert(fnamelen > 0 && "failed conversion");
-                                          fname[fnamelen]='\0';
+                                        fname[0] = 0;
+                                        int lineno = 0;
+                                        int flag = 0;
 
-                                          // fname is a literal string with escape sequences
-                                          if (strchr(fname,'\\')) {
-                                            std::string filename;
-                                            std::size_t i;
-                                            for (i = 0; i < fnamelen; ++i) {
-                                              if (fname[i] == '\\' && (i + 1) < fnamelen) {
-                                                switch(fname[i+1]) {
-                                                    case '"':  filename += '"'; break;
-                                                    case '\'': filename += '\''; break;
-                                                    case '\\': filename += '\\'; break;
-                                                    case 'a':  filename += '\a'; break;
-                                                    case 'b':  filename += '\b'; break;
-                                                    case 'f':  filename += '\f'; break;
-                                                    case 'n':  filename += '\n'; break;
-                                                    case 'r':  filename += '\r'; break;
-                                                    case 't':  filename += '\t'; break;
-                                                    case 'v':  filename += '\v'; break;
-                                                }
-                                                ++i;
-                                              } else {
-                                                filename += fname[i];
-                                              }
+                                        if ((sscanf(yytext,"# %d \"%[^\"]\" %d",&lineno,fname,&flag)>=2) ||
+                                            (sscanf(yytext,"#line %d \"%[^\"]\" %d",&lineno,fname,&flag)>=1)) {
+
+                                          if (fname[0] != 0) {
+                                            std::string filename = lexString(driver, yylloc, fname);
+                                            /* recognized C preprocessor flags:
+                                             * 0 (or no flag) => update location
+                                             * 1 => enter file (include push)
+                                             * 2 => return to file (include pop)
+                                             */
+
+                                            if (flag == 0) {
+                                              // update
+                                              yyinfo.pop();
+                                              yyinfo.push(filename, yylloc);
+                                              yycolumn = 1;
+                                              yylineno = lineno-1;
+                                            } else if (flag == 1) {
+                                              yyinfo.push(filename, yylloc);
+                                              yycolumn = 1;
+                                              yylineno = lineno-1;
+                                            } else if (flag == 2) {
+                                              yyinfo.pop(); // leave
+                                              // update
+                                              yyinfo.setReported(filename);
+                                              yycolumn = 1;
+                                              yylineno = lineno-1;
                                             }
-                                            std::copy(filename.begin(), filename.end(), fname);
-                                            fname[filename.size()] = '\0';
+                                          } else {
+                                            yycolumn = 1;
+                                            yylineno = lineno-1;
                                           }
-
-                                          yycolumn = 1; yylineno = lineno-1;
-                                          yyfilename = fname;
                                         }
                                       }
-"//".*$                               { }
-"/*"                                  { BEGIN(COMMENT); }
+"//".*$                               {
+                                        yyinfo.CommentExtent = yylloc;
+                                        yyinfo.CommentContent.str(yytext);
+                                        driver.addComment(yyinfo.CommentExtent, yyinfo.CommentContent);
+                                        yyinfo.CommentContent.str("");
+                                      }
+"/*"                                  {
+                                        yyinfo.CommentContent.str("");
+                                        yyinfo.CommentExtent = yylloc;
+                                        yyinfo.CommentContent << yytext;
+                                        BEGIN(COMMENT);
+                                      }
 <COMMENT>{
-"*/"                                  { BEGIN(INITIAL); }
-[^*\n]+                               { }
-"*"                                   { }
-\n                                    { }
+"*/"                                  {
+                                        yyinfo.CommentExtent += yylloc;
+                                        std::string X(yytext);
+                                        yyinfo.CommentContent << X;
+                                        driver.addComment(yyinfo.CommentExtent, yyinfo.CommentContent);
+                                        yyinfo.CommentContent.str("");
+                                        BEGIN(INITIAL);
+                                      }
+[^*\n]+                               { yyinfo.CommentExtent += yylloc; yyinfo.CommentContent << yytext; }
+"*"                                   { yyinfo.CommentExtent += yylloc; yyinfo.CommentContent << yytext; }
+\n                                    { yyinfo.CommentExtent += yylloc; yyinfo.CommentContent << yytext; }
+}
+<INCLUDE>{
+{WS}+                                 { }
+\"(\\.|[^"\\])*\"                     { /* include file name */
+                                        std::string path = lexString(driver, yylloc, yytext);
+                                        std::optional<std::filesystem::path> maybePath = driver.searchIncludePath(path, yylloc);
+                                        yyin = nullptr;
+                                        if (maybePath) {
+                                          yyin = fopen(maybePath->string().c_str(), "r");
+                                        }
+                                        if (!yyin) {
+                                          driver.error(yylloc, std::string("cannot find include file ") + yytext);
+                                          return yy::parser::make_END(yylloc);
+                                        } else {
+                                          yyinfo.push(maybePath->string(), yyinfo.LastIncludeDirectiveLoc);
+                                          yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE, yyscanner), yyscanner);
+                                        }
+                                        BEGIN(INITIAL);
+                                      }
+.                                     { driver.error(yylloc, std::string("unexpected ") + yytext); }
 }
 \n                                    { yycolumn = 1; }
 {WS}+                                 { }
-<<EOF>>                               { return yy::parser::make_END(yylloc); }
+<<EOF>>                               {
+                                        yypop_buffer_state(yyscanner);
+                                        yyinfo.pop();
+                                        if (!YY_CURRENT_BUFFER) {
+                                          return yy::parser::make_END(yylloc);
+                                        }
+                                      }
 .                                     { driver.error(yylloc, std::string("unexpected ") + yytext); }
 %%
+// vim: filetype=lex

@@ -31,7 +31,9 @@
 #include "ast/Type.h"
 #include "parser/SrcLocation.h"
 #include "reports/DebugReport.h"
+
 #include <cstdio>
+#include <filesystem>
 #include <memory>
 #include <set>
 #include <string>
@@ -43,8 +45,6 @@ class ParserDriver {
 public:
     ParserDriver(Global& g) : glb(g) {}
     virtual ~ParserDriver() = default;
-
-    Own<ast::TranslationUnit> translationUnit;
 
     void addRelation(Own<ast::Relation> r);
     void addFunctorDeclaration(Own<ast::FunctorDeclaration> f);
@@ -67,8 +67,6 @@ public:
 
     Own<ast::Counter> addDeprecatedCounter(SrcLocation tagLoc);
 
-    bool trace_scanning = false;
-
     Own<ast::TranslationUnit> parse(
             const std::string& filename, FILE* in, ErrorReport& errorReport, DebugReport& debugReport);
     Own<ast::TranslationUnit> parse(
@@ -81,6 +79,21 @@ public:
     void warning(const SrcLocation& loc, const std::string& msg);
     void error(const SrcLocation& loc, const std::string& msg);
     void error(const std::string& msg);
+
+    std::optional<std::filesystem::path> searchIncludePath(
+            const std::string& IncludeString, const SrcLocation& IncludeLoc);
+
+    bool canEnterOnce(const SrcLocation& onceLoc);
+
+    void addComment(const SrcLocation& Loc, const std::stringstream& Content);
+
+    Own<ast::TranslationUnit> translationUnit;
+
+    bool trace_scanning = false;
+
+    std::set<std::pair<std::filesystem::path, int>> VisitedLocations;
+
+    std::deque<std::pair<SrcLocation, std::string>> ScannedComments;
 
 private:
     Global& glb;

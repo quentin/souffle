@@ -218,6 +218,154 @@ void compileToBinary(Global& glb, const std::string& command, std::string_view s
         throw std::invalid_argument(tfm::format("failed to compile C++ source <%s>", sourceFilename));
 }
 
+class InputProvider {
+public:
+    virtual ~InputProvider() {}
+    virtual FILE* getInputStream() = 0;
+    virtual bool endInput() = 0;
+};
+
+class FileInput : public InputProvider {
+public:
+    FileInput(const std::filesystem::path& path) : Path(path) {}
+
+    ~FileInput() {
+        if (Stream) {
+            fclose(Stream);
+        }
+    }
+
+    FILE* getInputStream() override {
+        if (std::filesystem::exists(Path)) {
+            Stream = fopen(Path.string().c_str(), "rb");
+            return Stream;
+        } else {
+            return nullptr;
+        }
+    }
+
+    bool endInput() override {
+        if (Stream == nullptr) {
+            return false;
+        } else {
+            fclose(Stream);
+            Stream = nullptr;
+            return true;
+        }
+    }
+
+private:
+    const std::filesystem::path Path;
+    FILE* Stream = nullptr;
+};
+
+class PreprocInput : public InputProvider {
+public:
+    PreprocInput(const std::filesystem::path& path, MainConfig& conf, const std::string& exec,
+            const std::string& options)
+            : Exec(which(exec)), Options(options), InitCmd(), Path(path), Conf(conf) {}
+
+    PreprocInput(const std::filesystem::path& path, MainConfig& conf, const std::string& cmd)
+            : Exec(), Options(), InitCmd(cmd), Path(path), Conf(conf) {}
+
+    virtual ~PreprocInput() {
+        if (Stream) {
+            pclose(Stream);
+        }
+    }
+
+    FILE* getInputStream() override {
+        Cmd.str("");
+
+        if (Exec) {
+            if (Exec->empty()) {
+                return nullptr;
+            }
+            Cmd << *Exec;
+        } else if (InitCmd) {
+            Cmd << *InitCmd;
+        } else {
+            return nullptr;
+        }
+
+        if (Options && !Options->empty()) {
+            Cmd << " ";
+            Cmd << *Options;
+        }
+
+        Cmd << " ";
+        Cmd << toString(join(Conf.getMany("include-dir"), " ",
+                [&](auto&& os, auto&& dir) { tfm::format(os, "-I \"%s\"", dir); }));
+
+        if (Conf.has("macro")) {
+            Cmd << " " << Conf.get("macro");
+        }
+        // Add RamDomain size as a macro
+        Cmd << " -DRAM_DOMAIN_SIZE=" << std::to_string(RAM_DOMAIN_SIZE);
+        Cmd << " \"" + Path.string() + "\"";
+
+#if defined(_MSC_VER)
+        // cl.exe prints the input file name on the standard error stream,
+        // we must silent it in order to preserve an empty error output
+        // because Souffle test-suite is sensible to error outputs.
+        Cmd << " 2> nul";
+#endif
+
+        Stream = popen(Cmd.str().c_str(), "r");
+        return Stream;
+    }
+
+    bool endInput() {
+        const int Status = pclose(Stream);
+        Stream = nullptr;
+        if (Status == -1) {
+            perror(nullptr);
+            throw std::runtime_error("failed to close pre-processor pipe");
+        } else if (Status != 0) {
+            std::cerr << "Pre-processors command failed with code " << Status << ": '" << Cmd.str() << "'\n";
+            throw std::runtime_error("Pre-processor command failed");
+        }
+        return true;
+    }
+
+    static bool available(const std::string& Exec) {
+        return !which(Exec).empty();
+    }
+
+private:
+    std::optional<std::string> Exec;
+    std::optional<std::string> Options;
+    std::optional<std::string> InitCmd;
+    std::filesystem::path Path;
+    MainConfig& Conf;
+    std::stringstream Cmd;
+    FILE* Stream = nullptr;
+};
+
+class GCCPreprocInput : public PreprocInput {
+public:
+    GCCPreprocInput(const std::filesystem::path& mainSource, MainConfig& conf)
+            : PreprocInput(mainSource, conf, "gcc", "-x c -E") {}
+
+    virtual ~GCCPreprocInput() {}
+
+    static bool available() {
+        return PreprocInput::available("gcc");
+    }
+};
+
+class MCPPPreprocInput : public PreprocInput {
+public:
+    MCPPPreprocInput(const std::filesystem::path& mainSource, MainConfig& conf)
+            : PreprocInput(mainSource, conf, "mcpp", "-e utf8 -W0") {}
+
+    virtual ~MCPPPreprocInput() {}
+
+    static bool available() {
+        return PreprocInput::available("mcpp");
+    }
+};
+
 Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb) {
     // Equivalence pipeline
     auto equivalencePipeline =
@@ -432,7 +580,8 @@ std::vector<MainOption> getMainOptions() {
             {"parse-errors", '\x5', "", "", false, "Show parsing errors, if any, then exit."},
             {"help", 'h', "", "", false, "Display this help message."},
             {"legacy", '\x6', "", "", false, "Enable legacy support."},
-            {"preprocessor", '\xA', "CMD", "", false, "C preprocessor to use."}};
+            {"preprocessor", '\xA', "CMD", "", false, "C preprocessor to use."},
+            {"no-preprocessor", '\xB', "", "", false, "Do not use a C preprocessor."}};
     return options;
 }
 
@@ -562,53 +711,28 @@ int main(Global& glb, const char* souffle_executable) {
         throw std::runtime_error("failed to determine souffle executable path");
     }
 
-    FILE* in;
-    std::string ppCmd;
-    const bool using_preprocessor = !glb.config().has("no-preprocess");
-
-    if (!using_preprocessor) {
-        in = fopen(glb.config().get("").c_str(), "r");
-        if (in == nullptr) {
-            perror(nullptr);
-            throw std::runtime_error("failed to open input file");
+    const std::filesystem::path InputPath(glb.config().get(""));
+    std::unique_ptr<InputProvider> Input;
+    const bool use_preprocessor = !glb.config().has("no-preprocessor");
+    if (use_preprocessor) {
+        if (glb.config().has("preprocessor")) {
+            auto cmd = glb.config().get("preprocessor");
+            if (cmd == "gcc") {
+                Input = std::make_unique<GCCPreprocInput>(InputPath, glb.config());
+            } else if (cmd == "mcpp") {
+                Input = std::make_unique<MCPPPreprocInput>(InputPath, glb.config());
+            } else {
+                Input = std::make_unique<PreprocInput>(InputPath, glb.config(), cmd);
+            }
+        } else if (MCPPPreprocInput::available()) {  // mcpp fallback
+            Input = std::make_unique<MCPPPreprocInput>(InputPath, glb.config());
+        } else if (GCCPreprocInput::available()) {  // gcc fallback
+            Input = std::make_unique<GCCPreprocInput>(InputPath, glb.config());
+        } else {
+            throw std::runtime_error("failed to locate mcpp or gcc pre-processors");
         }
     } else {
-        /* Create the pipe to establish a communication between cpp and souffle */
-
-        if (glb.config().has("preprocessor")) {
-            ppCmd = glb.config().get("preprocessor");
-        } else {
-            ppCmd = which("mcpp");
-            if (isExecutable(ppCmd)) {
-                ppCmd += " -e utf8 -W0";
-            } else {
-                ppCmd = which("gcc");
-                if (isExecutable(ppCmd)) {
-                    ppCmd += " -x c -E";
-                } else {
-                    std::cerr << "failed to locate mcpp or gcc pre-processors\n";
-                    throw std::runtime_error("failed to locate mcpp or gcc pre-processors");
-                }
-            }
-        }
-
-        ppCmd += " " + toString(join(glb.config().getMany("include-dir"), " ",
-                               [&](auto&& os, auto&& dir) { tfm::format(os, "-I \"%s\"", dir); }));
-
-        if (glb.config().has("macro")) {
-            ppCmd += " " + glb.config().get("macro");
-        }
-        // Add RamDomain size as a macro
-        ppCmd += " -DRAM_DOMAIN_SIZE=" + std::to_string(RAM_DOMAIN_SIZE);
-        ppCmd += " \"" + glb.config().get("") + "\"";
-#if defined(_MSC_VER)
-        // cl.exe prints the input file name on the standard error stream,
-        // we must silent it in order to preserve an empty error output
-        // because Souffle test-suite is sensible to error outputs.
-        ppCmd += " 2> nul";
-#endif
-
-        in = popen(ppCmd.c_str(), "r");
+        Input = std::make_unique<FileInput>(glb.config().get(""));
     }
 
     /* Time taking for parsing */
@@ -619,23 +743,9 @@ int main(Global& glb, const char* souffle_executable) {
     // parse file
     ErrorReport errReport(glb.config().has("no-warn"));
     DebugReport debugReport(glb);
-    Own<ast::TranslationUnit> astTranslationUnit =
-            ParserDriver::parseTranslationUnit(glb, "<stdin>", in, errReport, debugReport);
-
-    if (using_preprocessor) {
-        // close input pipe
-        int preprocessor_status = pclose(in);
-        if (preprocessor_status == -1) {
-            perror(nullptr);
-            throw std::runtime_error("failed to close pre-processor pipe");
-        } else if (preprocessor_status != 0) {
-            std::cerr << "Pre-processors command failed with code " << preprocessor_status << ": '" << ppCmd
-                      << "'\n";
-            throw std::runtime_error("Pre-processor command failed");
-        }
-    } else {
-        fclose(in);
-    }
+    Own<ast::TranslationUnit> astTranslationUnit = ParserDriver::parseTranslationUnit(
+            glb, InputPath.string(), Input->getInputStream(), errReport, debugReport);
+    Input->endInput();
 
     /* Report run-time of the parser if verbose flag is set */
     if (glb.config().has("verbose")) {

@@ -31,31 +31,27 @@
 
 namespace souffle {
 
-std::string getCurrentFilename(const std::vector<std::string>& filenames) {
-    if (filenames.empty()) {
-        return "";
+std::string SrcLocation::getReportedFilename() const {
+    static const std::string emptyFilename("");
+    if (file) {
+        return std::filesystem::path(file->Reported).filename().string();
+    } else {
+        return emptyFilename;
     }
+}
 
-    std::string path = ".";
-    for (const std::string& filename : filenames) {
-        if (!filename.empty() && isAbsolute(filename)) {
-            path = dirName(filename);
-        } else if (existFile(path + pathSeparator + filename)) {
-            path = dirName(path + pathSeparator + filename);
-        } else if (existFile(filename)) {
-            path = dirName(filename);
-        } else {
-            path = ".";
-        }
+const std::string& SrcLocation::getReportedPath() const {
+    static const std::string emptyFilename("");
+    if (file) {
+        return file->Reported;
+    } else {
+        return emptyFilename;
     }
-
-    return path + pathSeparator + baseName(filenames.back());
 }
 
 bool SrcLocation::operator<(const SrcLocation& other) const {
-    // Translate filename stack into current files
-    std::string filename = getCurrentFilename(filenames);
-    std::string otherFilename = getCurrentFilename(other.filenames);
+    const std::string& filename = getReportedPath();
+    const std::string& otherFilename = other.getReportedPath();
 
     if (filename < otherFilename) {
         return true;
@@ -76,28 +72,26 @@ bool SrcLocation::operator<(const SrcLocation& other) const {
     return false;
 }
 
-void SrcLocation::setFilename(std::string filename) {
-    makePreferred(filename);
-    if (filenames.empty()) {
-        filenames.emplace_back(filename);
-        return;
+SrcLocation& SrcLocation::operator+=(const SrcLocation& other) {
+    if (file.get() == other.file.get()) {
+        if (*this < other) {
+            end = other.end;
+        } else {
+            start = other.start;
+        }
     }
-    if (filenames.back() == filename) {
-        return;
-    }
-    if (filenames.size() > 1 && filenames.at(filenames.size() - 2) == filename) {
-        filenames.pop_back();
-        return;
-    }
-    filenames.emplace_back(filename);
+    return *this;
+}
+
+void SrcLocation::setFile(const std::shared_ptr<IncludeStack>& f) {
+    file = f;
 }
 
 std::string SrcLocation::extloc() const {
-    std::string filename = getCurrentFilename(filenames);
-    std::ifstream in(filename);
+    std::ifstream in(file->Reported);
     std::stringstream s;
     if (in.is_open()) {
-        s << "file " << baseName(filename) << " at line " << start.line << "\n";
+        s << "file " << getReportedFilename() << " at line " << start.line << "\n";
         for (int i = 0; i < start.line - 1; ++i) {
             in.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         }
@@ -131,12 +125,30 @@ std::string SrcLocation::extloc() const {
         }
         in.close();
     } else {
-        s << filename << ":" << start.line << ":" << start.column;
+        s << getReportedFilename() << ":" << start.line << ":" << start.column;
     }
     return s.str();
 }
 
 void SrcLocation::print(std::ostream& out) const {
-    out << getCurrentFilename(filenames) << " [" << start << "-" << end << "]";
+    out << getReportedFilename() << " [" << start << "-" << end << "]";
 }
+
+void ScannerInfo::push(const std::string& Physical, const SrcLocation& IncludeLoc) {
+    yyfilename = std::make_shared<IncludeStack>(yyfilename, IncludeLoc.start, Physical, Physical);
+}
+
+void ScannerInfo::pop() {
+    if (yyfilename) {
+        yyfilename = yyfilename->ParentStack;
+    }
+}
+
+void ScannerInfo::setReported(const std::string& Reported) {
+    if (yyfilename && yyfilename->Reported != Reported) {
+        yyfilename = std::make_shared<IncludeStack>(
+                yyfilename->ParentStack, yyfilename->IncludePos, yyfilename->Physical, Reported);
+    }
+}
+
 }  // end of namespace souffle

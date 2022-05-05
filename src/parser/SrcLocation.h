@@ -16,45 +16,65 @@
 
 #pragma once
 
+#include <memory>
 #include <ostream>
+#include <sstream>
 #include <string>
-#include <vector>
 
 namespace souffle {
+
+/** A class locating a single point in an input file */
+struct Point {
+    /** The line in the source file */
+    int line;
+
+    /** The column in the source file */
+    int column;
+
+    /** A comparison for points */
+    bool operator<(const Point& other) const {
+        return line < other.line || (line == other.line && column < other.column);
+    }
+
+    bool operator>(const Point& other) const {
+        return other < *this;
+    }
+
+    void print(std::ostream& out) const {
+        out << line << ":" << column;
+    }
+
+    /** Enables locations to be printed */
+    friend std::ostream& operator<<(std::ostream& out, const Point& loc) {
+        loc.print(out);
+        return out;
+    }
+};
+
+/** A recursive include stack. */
+struct IncludeStack {
+    explicit IncludeStack(std::shared_ptr<IncludeStack> parent, Point includePos, const std::string& physical,
+            const std::string& reported)
+            : ParentStack(parent), IncludePos(includePos), Physical(physical), Reported(reported) {}
+
+    /** The parent file. */
+    const std::shared_ptr<IncludeStack> ParentStack;
+
+    /** The position of the include directive in the parent file. */
+    const Point IncludePos;
+
+    /** This file. */
+    const std::string Physical;
+
+    /** The reported path for this file. */
+    const std::string Reported;
+};
 
 /** A class describing a range in an input file */
 class SrcLocation {
 public:
-    /** A class locating a single point in an input file */
-    struct Point {
-        /** The line in the source file */
-        int line;
-
-        /** The column in the source file */
-        int column;
-
-        /** A comparison for points */
-        bool operator<(const Point& other) const {
-            return line < other.line || (line == other.line && column < other.column);
-        }
-
-        bool operator>(const Point& other) const {
-            return other < *this;
-        }
-
-        void print(std::ostream& out) const {
-            out << line << ":" << column;
-        }
-
-        /** Enables locations to be printed */
-        friend std::ostream& operator<<(std::ostream& out, const Point& loc) {
-            loc.print(out);
-            return out;
-        }
-    };
-
     /** The file referred to */
-    std::vector<std::string> filenames;
+    std::shared_ptr<IncludeStack> file;
 
     /** The start location */
     Point start = {};
@@ -62,10 +82,21 @@ public:
     /** The End location */
     Point end = {};
 
+    /** Return the shortened reported file name */
+    std::string getReportedFilename() const;
+
+    /** Return the full reported file path */
+    const std::string& getReportedPath() const;
+
     /** A comparison for source locations */
     bool operator<(const SrcLocation& other) const;
 
-    void setFilename(std::string filename);
+    /** Extend the current source location with the other, only if both have
+     * the same include stack */
+    SrcLocation& operator+=(const SrcLocation& other);
+
+    /** Set the source location's file (hence include stack) */
+    void setFile(const std::shared_ptr<IncludeStack>& file);
 
     /** An extended string describing this location in a end-user friendly way */
     std::string extloc() const;
@@ -81,10 +112,29 @@ public:
 
 /** Information struct for scanner */
 struct ScannerInfo {
+    /** Scanner's current location */
     SrcLocation yylloc;
 
-    /* Stack of parsed files */
-    std::string yyfilename;
+    /** Include stack of scanned files, top is the current scanned file */
+    std::shared_ptr<IncludeStack> yyfilename;
+
+    /** Location of last .include directive */
+    SrcLocation LastIncludeDirectiveLoc;
+
+    /** Extent of the current comment */
+    SrcLocation CommentExtent;
+
+    /** Content of the current comment */
+    std::stringstream CommentContent;
+
+    /** Push a file on the include stack */
+    void push(const std::string& NewFile, const SrcLocation& IncludeLoc);
+
+    /** Pop a file from the include stack */
+    void pop();
+
+    /** Set the reported path for the current file */
+    void setReported(const std::string& Reported);
 };
 
 }  // end of namespace souffle
