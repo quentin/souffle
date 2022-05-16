@@ -1,3 +1,14 @@
+souffle (2.3) stable; urgency=low
+ * Auto-scheduler for rules (SamArch27)
+ * Better scheduling heuristic (julienhenry)
+ * Improved component system (quentin)
+ * Improved type-system for record alias (quentin)
+ * Introducing include directives (quentin)
+ * Optional use of libffi (quentin)
+ * New packaging mechanism using souffle-lang.github.io (XiaowenHu96, mmcgr)
+ * Misc fixes and refactoring (langston-barrett, aeflores, pnwamk, quentin, b-scholz, XiaowenHu96, OlivierHamel, cwarden, mbid, davidwzhao, cmuellner, luc-tielen)
+
+ -- Bernhard Scholz <Bernhard.Scholz@sydney.edu.au>  Sat, 14 May 2022 22:24:08 +1000 
 souffle (2.2-1) stable; urgency=low
 
   * Subsumption clauses, e.g., A(x1) <= A(x2) :- x1 <= x2 (@julienhenry, @b-scholz)
@@ -241,7 +252,7 @@ souffle (1.1.0); urgency=low
   * Adding ternary functors (b-scholz)
   * JNI interface (psubotic)
   * Memory optimisations (lyndonhenry)
-  * Numerous bug fixes. 
+  * Numerous bug fixes.
 
  -- Kostyantyn Vorobyov <k.a.vorobyov@gmail.com>  Wed, 29 Mar 2017 12:00:23 +1100
 
