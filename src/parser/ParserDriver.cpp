@@ -279,7 +279,7 @@ std::optional<std::filesystem::path> ParserDriver::searchIncludePath(
     }
 
     // search relative from include directories
-    for (auto&& includeDir : Global::config().getMany("include-dir")) {
+    for (auto&& includeDir : glb.config().getMany("include-dir")) {
         auto dir = std::filesystem::path(includeDir);
         if (dir.is_relative()) {
             dir = (std::filesystem::current_path() / includeDir);
