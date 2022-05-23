@@ -134,6 +134,8 @@ function(SOUFFLE_RUN_TEST_HELPER)
 #PARAM_FUNCTORS - with -L for finding functor library in the testsuite
 #PARAM_NEGATIVE - should it fail or not
 #PARAM_MULTI_TEST - used to distinguish "multi-tests", sort of left over from automake
+#PARAM_NO_PROCESSOR - should the C preprocessor be disabled or not
+#PARAM_INCLUDE_DIRS - list of include directory paths, relative to the test input directory
 #Basically, the same test dir has multiple sets of facts / outputs
 #We should just get rid of this and make multiple tests
 #It also means we need to use slightly different naming for tests
@@ -144,7 +146,7 @@ function(SOUFFLE_RUN_TEST_HELPER)
         PARAM
         "COMPILED;FUNCTORS;NEGATIVE;MULTI_TEST;NO_PREPROCESSOR" # Options
         "TEST_NAME;CATEGORY;FACTS_DIR_NAME;EXTRA_DATA" #Single valued options
-        ""
+        "INCLUDE_DIRS" # Multi-valued options
         ${ARGV}
     )
 
@@ -181,6 +183,13 @@ function(SOUFFLE_RUN_TEST_HELPER)
 
     set(INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${PARAM_TEST_NAME}")
     set(FACTS_DIR "${INPUT_DIR}/${PARAM_FACTS_DIR_NAME}")
+
+    if (PARAM_INCLUDE_DIRS)
+      ## generate -I include directory options
+      list(TRANSFORM PARAM_INCLUDE_DIRS PREPEND "${INPUT_DIR}/")
+      list(TRANSFORM PARAM_INCLUDE_DIRS PREPEND "-I")
+      list(APPEND EXTRA_FLAGS ${PARAM_INCLUDE_DIRS})
+    endif()
 
     if (PARAM_MULTI_TEST)
         set(DATA_CHECK_DIR "${INPUT_DIR}/${PARAM_FACTS_DIR_NAME}")

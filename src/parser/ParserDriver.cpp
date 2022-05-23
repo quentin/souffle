@@ -262,22 +262,34 @@ void ParserDriver::error(const std::string& msg) {
 
 std::optional<std::filesystem::path> ParserDriver::searchIncludePath(
         const std::string& IncludeString, const SrcLocation& Loc) {
-    std::filesystem::path Candidate(IncludeString);
+    std::filesystem::path Request(IncludeString);
 
-    if (Candidate.is_absolute()) {
-        if (std::filesystem::exists(Candidate)) {
-            return std::filesystem::canonical(Candidate);
+    if (Request.is_absolute()) {
+        if (std::filesystem::exists(Request)) {
+            return std::filesystem::canonical(Request);
         } else {
             return std::nullopt;
         }
     }
 
     // search relative from current input file
-    Candidate = std::filesystem::path(Loc.file->Physical).parent_path() / IncludeString;
+    std::filesystem::path Candidate = std::filesystem::path(Loc.file->Physical).parent_path() / Request;
     if (std::filesystem::exists(Candidate)) {
         return std::filesystem::canonical(Candidate);
-    } else if (Candidate.is_absolute()) {
-        return std::nullopt;
+    }
+
+    // search relative from include directories
+    for (auto&& includeDir : Global::config().getMany("include-dir")) {
+        auto dir = std::filesystem::path(includeDir);
+        if (dir.is_relative()) {
+            dir = (std::filesystem::current_path() / includeDir);
+        }
+        if (std::filesystem::exists(dir)) {
+            Candidate = std::filesystem::path(dir) / Request;
+            if (std::filesystem::exists(Candidate)) {
+                return std::filesystem::canonical(Candidate);
+            }
+        }
     }
 
     return std::nullopt;

@@ -3,6 +3,6 @@
 set -e
 set -x
 
-envsubst '${RELEASE_TAG}' < PKGBUILD.in  > PKGBUILD
+envsubst '${RELEASE_TAG},${REPO_OWNER}' < PKGBUILD.in  > PKGBUILD
 makepkg
 makepkg --printsrcinfo > .SRCINFO

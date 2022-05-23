@@ -85,3 +85,9 @@ souffle_run_test(
   CATEGORY syntactic
   NO_PREPROCESSOR
   )
+souffle_run_test(
+  TEST_NAME include_directive4
+  CATEGORY syntactic
+  INCLUDE_DIRS q1 q2
+  NO_PREPROCESSOR
+  )
