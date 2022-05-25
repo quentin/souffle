@@ -209,8 +209,14 @@ public:
     /** Return component instantiation */
     std::vector<ComponentInit*> getComponentInstantiations() const;
 
-    /** Remove components and components' instantiations */
+    /** Clear components and components' instantiations */
     void clearComponents();
+
+    /** Return cleared components */
+    std::vector<const Component*> getClearedComponents() const;
+
+    /** Return cleared component instantiation */
+    std::vector<const ComponentInit*> getClearedComponentInstantiations() const;
 
     void apply(const NodeMapper& map) override;
 
@@ -254,6 +260,12 @@ private:
 
     /** Pragmas */
     VecOwn<Pragma> pragmas;
+
+    /** Cleared component definitions */
+    VecOwn<const Component> clearedComponents;
+
+    /** Cleared component instantiations */
+    VecOwn<const ComponentInit> clearedInstantiations;
 
 #ifndef NDEBUG
     // SANCHECK - used to assert that the set of clauses isn't mutated mid visit

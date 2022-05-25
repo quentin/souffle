@@ -249,8 +249,22 @@ std::vector<ComponentInit*> Program::getComponentInstantiations() const {
 }
 
 void Program::clearComponents() {
+    std::move(
+            components.begin(), components.end(), std::inserter(clearedComponents, clearedComponents.end()));
     components.clear();
+    std::move(instantiations.begin(), instantiations.end(),
+            std::inserter(clearedInstantiations, clearedInstantiations.end()));
     instantiations.clear();
+}
+
+std::vector<const Component*> Program::getClearedComponents() const {
+  return toConstPtrVector(clearedComponents);
+}
+
+
+/** Return cleared component instantiation */
+std::vector<const ComponentInit*> Program::getClearedComponentInstantiations() const {
+  return toConstPtrVector(clearedInstantiations);
 }
 
 void Program::apply(const NodeMapper& map) {
