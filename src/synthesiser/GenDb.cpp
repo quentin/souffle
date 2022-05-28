@@ -64,17 +64,27 @@ void GenFunction::declaration(const GenDb*, std::ostream& o) const {
         if (defaultValue) {
             out << " = " << *defaultValue;
         }
-    }) << ");";
+    }) << ")";
+    if (isConst) {
+        o << " const";
+    }
+    if (isOverride) {
+        o << " override";
+    }
+    o << ";";
 }
 
 void GenFunction::definition(const GenDb*, std::ostream& o) const {
     o << retType << " ";
     if (cl) {
-        o << cl->getName() << "::";
+        o << cl->getQualifiedName() << "::";
     }
     o << name << "(" << join(args, ",", [&](auto& out, const auto arg) {
         out << std::get<0>(arg) << " " << std::get<1>(arg);
     }) << ")";
+    if (isConst) {
+        o << " const";
+    }
     if (isConstructor && initializer.size() > 0) {
         o << ":\n";
         o << join(initializer, ",\n",
@@ -85,36 +95,62 @@ void GenFunction::definition(const GenDb*, std::ostream& o) const {
     o << "}\n";
 }
 
-GenFunction& GenClass::addFunction(std::string name, Visibility v) {
+GenFunction& GenClassBase::addFunction(std::string name, Visibility v) {
     methods.push_back(mk<GenFunction>(name, this, v));
     return *methods.back();
 }
 
-void GenClass::addField(std::string type, std::string name, Visibility v, std::optional<std::string> init) {
+void GenClassBase::addField(
+        std::string type, std::string name, Visibility v, std::optional<std::string> init) {
     fields.push_back(std::make_tuple(name, type, v, init));
 }
 
-GenFunction& GenClass::addConstructor(Visibility v) {
+GenFunction& GenClassBase::addConstructor(Visibility v) {
     methods.push_back(mk<GenFunction>(getName(), this, v));
     GenFunction& m = *methods.back();
     m.setIsConstructor();
     return m;
 }
 
-void GenClass::declaration(const GenDb* db, std::ostream& o) const {
-    o << "namespace " << db->getNS() << " {\n";
+GenInnerClass& GenClassBase::addInnerClass(std::string name, Visibility v) {
+    auto& [cl, _] = innerClasses.emplace_back(mk<GenInnerClass>(this, name), v);
+    return *cl;
+}
 
-    o << "using namespace souffle;\n";
+std::string GenClassBase::getQualifiedName() const {
+    if (parent) {
+        return parent->getQualifiedName() + "::" + getName();
+    } else {
+        return getName();
+    }
+}
 
+void GenClassBase::inherits(std::string base) {
+    inheritance.push_back(base);
+}
+
+void GenClassBase::declaration(const GenDb* db, std::ostream& o) const {
     o << "class " << name;
     if (inheritance.size() > 0) {
         o << ": " << join(inheritance, ", ", [&](auto& out, const auto arg) { out << arg; });
     }
+
     o << " {\n";
+
     std::stringstream public_o;
     std::stringstream private_o;
     public_o << "public:\n";
     private_o << "private:\n";
+
+    for (auto& [cl, v] : innerClasses) {
+        if (v == Public) {
+            o << "public:\n";
+        } else {
+            o << "private:\n";
+        }
+
+        cl->declaration(db, o);
+    }
 
     for (auto& fn : methods) {
         auto& o = (fn->getVisibility() == Public) ? public_o : private_o;
@@ -132,6 +168,23 @@ void GenClass::declaration(const GenDb* db, std::ostream& o) const {
     o << public_o.str();
     o << private_o.str();
     o << "};\n";
+}
+
+void GenClassBase::definition(const GenDb* db, std::ostream& o) const {
+    for (auto& fn : methods) {
+        fn->definition(db, o);
+        o << "\n";
+    }
+    for (auto& [cl, _] : innerClasses) {
+        cl->definition(db, o);
+    }
+}
+
+void GenClass::declaration(const GenDb* db, std::ostream& o) const {
+    o << "namespace " << db->getNS() << " {\n";
+
+    o << "using namespace souffle;\n";
+    GenClassBase::declaration(db, o);
     o << "} // namespace " << db->getNS() << "\n";
 }
 
@@ -143,10 +196,7 @@ void GenClass::definition(const GenDb* db, std::ostream& o) const {
     }
     o << "namespace " << db->getNS() << " {\n";
     o << "using namespace souffle;\n";
-    for (auto& fn : methods) {
-        fn->definition(db, o);
-        o << "\n";
-    }
+    GenClassBase::definition(db, o);
     o << "} // namespace " << db->getNS() << "\n";
 
     if (ignoreUnusedArgumentWarning) {

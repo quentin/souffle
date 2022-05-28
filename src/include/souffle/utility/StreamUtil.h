@@ -228,6 +228,14 @@ auto joinMap(const C& c, std::string sep, F&& map) {
     return join(c.begin(), c.end(), std::move(sep), [&](auto&& os, auto&& x) { return os << map(x); });
 }
 
+namespace detail {
+template <typename... Ts, size_t... Is>
+std::ostream& print_tuple_impl(std::ostream& os, const std::tuple<Ts...>& tuple, std::index_sequence<Is...>) {
+    auto last = sizeof...(Ts);
+    return ((os << std::get<Is>(tuple) << (Is != last ? " " : "")), ...);
+}
+}  // namespace detail
+
 }  // end namespace souffle
 
 #ifndef __EMBEDDED_SOUFFLE__
@@ -249,6 +257,17 @@ ostream& operator<<(ostream& out, const array<T, E>& v) {
 template <typename A, typename B>
 ostream& operator<<(ostream& out, const pair<A, B>& p) {
     return out << "(" << p.first << "," << p.second << ")";
+}
+
+/**
+ * Introduces support for printing tuples as long as their components can be printed.
+ */
+template <typename... Args>
+ostream& operator<<(ostream& out, const tuple<Args...>& t) {
+    out << "(";
+    souffle::detail::print_tuple_impl(out, t, std::index_sequence_for<Args...>{});
+    out << ")";
+    return out;
 }
 
 /**

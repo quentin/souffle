@@ -62,8 +62,8 @@ const std::string testInterpreterStore(
     const std::size_t arity = attribs.size();
 
     VecOwn<ram::Relation> rels;
-    Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", arity, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+    Own<ram::Relation> myrel = mk<ram::Relation>(
+            "test", arity, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(arity)},
@@ -79,7 +79,8 @@ const std::string testInterpreterStore(
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<ram::Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<ram::Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);
@@ -252,7 +253,7 @@ TEST(IO_store, SignedChangedDelimiter) {
     std::vector<std::string> attribsTypes(len, "i");
 
     Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", len, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+            mk<ram::Relation>("test", len, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(attribsTypes.size())},
@@ -274,7 +275,8 @@ TEST(IO_store, SignedChangedDelimiter) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);
@@ -322,7 +324,7 @@ TEST(IO_store, MixedTypes) {
     std::vector<std::string> attribsTypes{"i", "u", "f", "f", "s"};
 
     Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", 5, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+            mk<ram::Relation>("test", 5, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(attribsTypes.size())},
@@ -348,7 +350,8 @@ TEST(IO_store, MixedTypes) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
@@ -393,7 +396,7 @@ TEST(IO_load, Signed) {
     std::vector<std::string> attribs = {"a", "b"};
     std::vector<std::string> attribsTypes = {"i", "i"};
     Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", 2, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+            mk<ram::Relation>("test", 2, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(attribsTypes.size())},
@@ -412,7 +415,8 @@ TEST(IO_load, Signed) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);
@@ -454,7 +458,7 @@ TEST(IO_load, Float) {
     std::vector<std::string> attribs = {"a", "b"};
     std::vector<std::string> attribsTypes = {"f", "f"};
     Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", 2, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+            mk<ram::Relation>("test", 2, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(attribsTypes.size())},
@@ -473,7 +477,8 @@ TEST(IO_load, Float) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);
@@ -515,7 +520,7 @@ TEST(IO_load, Unsigned) {
     std::vector<std::string> attribs = {"a", "b"};
     std::vector<std::string> attribsTypes = {"u", "u"};
     Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", 2, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+            mk<ram::Relation>("test", 2, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(attribsTypes.size())},
@@ -534,7 +539,8 @@ TEST(IO_load, Unsigned) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);
@@ -576,7 +582,7 @@ TEST(IO_load, MixedTypesLoad) {
     std::vector<std::string> attribs = {"l", "u", "b", "a"};
     std::vector<std::string> attribsTypes = {"s", "i", "u", "f"};
     Own<ram::Relation> myrel =
-            mk<ram::Relation>("test", 4, 0, attribs, attribsTypes, RelationRepresentation::BTREE);
+            mk<ram::Relation>("test", 4, 0, attribs, attribsTypes, RelationRepresentation::BTREE, nullptr);
 
     Json types = Json::object{
             {"relation", Json::object{{"arity", static_cast<long long>(attribsTypes.size())},
@@ -595,7 +601,8 @@ TEST(IO_load, MixedTypesLoad) {
 
     rels.push_back(std::move(myrel));
     std::map<std::string, Own<Statement>> subs;
-    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
+    Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);

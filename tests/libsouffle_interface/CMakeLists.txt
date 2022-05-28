@@ -7,3 +7,4 @@
 include(SouffleTests)
 
 souffle_add_binary_test(vfs_overlay_test vfs_overlay)
+souffle_add_binary_test(type_reflection_test type_reflection)

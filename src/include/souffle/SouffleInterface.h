@@ -18,6 +18,7 @@
 
 #include "souffle/RamTypes.h"
 #include "souffle/RecordTable.h"
+#include "souffle/SouffleTypes.h"
 #include "souffle/SymbolTable.h"
 #include "souffle/datastructure/ConcurrentCache.h"
 #include "souffle/utility/MiscUtil.h"
@@ -418,6 +419,14 @@ public:
         signature += ">";
         return signature;
     }
+
+    /**
+     * Get the type descriptor of a tuple of the relation.
+     * The type descriptor is a tuple-type.
+     *
+     * @return Pointer to the constant TypeDesc of a relation's tuple.
+     */
+    virtual const TypeDesc* getTypeDescriptor() const = 0;
 
     /**
      * Delete all the tuples in relation.
@@ -827,6 +836,11 @@ public:
     virtual void setNumThreads(std::size_t numThreadsValue) {
         this->numThreads = numThreadsValue;
     }
+
+    /**
+     * Get the types registry.
+     */
+    virtual const TypeRegistry& getTypeRegistry() const = 0;
 
     /**
      * Get the number of threads to be used

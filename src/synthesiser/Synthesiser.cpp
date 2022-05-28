@@ -20,6 +20,7 @@
 #include "GenDb.h"
 #include "Global.h"
 #include "RelationTag.h"
+#include "ast/analysis/typesystem/TypeEnvironment.h"
 #include "config.h"
 #include "ram/AbstractParallel.h"
 #include "ram/Aggregate.h"
@@ -2807,6 +2808,9 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     mainClass.addField("ConcurrentCache<std::string,std::regex>", "regexCache", Visibility::Private);
     constructor.setNextInitializer("regexCache", "");
 
+    emitTypeRegistry(mainClass, prog);
+    constructor.setNextInitializer("typeRegistry", "");
+
     if (glb.config().has("profile")) {
         std::size_t numFreq = 0;
         visit(prog, [&](const Statement&) { numFreq++; });
@@ -2856,7 +2860,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
             init << relCtr++ << ", *" << cppName << ", *this, \"" << datalogName << "\", "
                  << strLitAry(rel->getAttributeTypes()) << ", " << strLitAry(rel->getAttributeNames()) << ", "
-                 << rel->getAuxiliaryArity();
+                 << rel->getAuxiliaryArity() << ", typeRegistry.getTuple(\"" << datalogName << "\")";
             constructor.body() << "addRelation(\"" << datalogName << "\", wrapper_" << cppName << ", "
                                << foundIn(loadRelations) << ", " << foundIn(storeRelations) << ");\n";
 
@@ -3231,6 +3235,122 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     hook << "} catch(std::exception &e) { souffle::SignalHandler::instance()->error(e.what());}\n";
     hook << "}\n";
     hook << "#endif\n";
+}
+
+void emitType(std::ostream& out, const TypeRegistry& TR, std::set<const TypeDesc*>& done, const TypeDesc* T) {
+    if (!done.insert(T).second) {
+        return;
+    }
+
+    if (T->isADT()) {
+        out << "{\n";
+        out << "const auto T = newADT(\"" << T->canonicalIdentifier() << "\");\n";
+        out << "}\n";
+    }
+
+    if (T->aux()) {
+        emitType(out, TR, done, T->aux());
+    }
+
+    for (const auto& Pair : T->elements()) {
+        const auto* E = Pair.second;
+        emitType(out, TR, done, E);
+    }
+
+    out << "{\n";
+
+    if (T->isSubset()) {
+        out << "const auto U = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
+        out << "const auto T = newSubset(\"" << T->canonicalIdentifier() << "\",U);\n";
+    } else if (T->isUnion()) {
+        out << "const auto U = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
+        out << "const auto T = newUnion(\"" << T->canonicalIdentifier() << "\",U);\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    } else if (T->isRecord()) {
+        out << "const auto T = newRecord(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    } else if (T->isBranch()) {
+        out << "const auto B = get(\"" << T->aux()->canonicalIdentifier() << "\");\n";
+        out << "const auto T = newBranch(\"" << T->canonicalIdentifier() << "\", B);\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    } else if (T->isTuple()) {
+        out << "const auto T = newTuple(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Pair : T->elements()) {
+            const auto* E = Pair.second;
+            out << "{\n";
+            out << "const auto E = get(\"" << E->canonicalIdentifier() << "\");\n";
+            out << "addElement(T,\"" << Pair.first << "\", E);\n";
+            out << "}\n";
+        }
+    }
+
+    out << "}\n";
+
+    if (!T->identifiers().empty()) {
+        out << "{\n";
+        out << "const auto T = get(\"" << T->canonicalIdentifier() << "\");\n";
+        for (const auto& Id : T->identifiers()) {
+            out << "newEquivalent(\"" << Id << "\", T);\n";
+        }
+        out << "}\n";
+    }
+}
+
+void Synthesiser::emitTypeRegistry(GenClass& mainClass, const Program& prog) {
+    // out << "private:\n";
+    // out << "class SpecializedTypeRegistry : public TypeRegistry {\n";
+    // out << "public:\n";
+    // out << "SpecializedTypeRegistry();\n";
+    // out << "};\n";
+    GenInnerClass& str = mainClass.addInnerClass("SpecializedTypeRegistry", Visibility::Private);
+    str.inherits("public TypeRegistry");
+    auto& ctor = str.addConstructor(Visibility::Public);
+
+    // out << "private:\n";
+    // out << "const SpecializedTypeRegistry typeRegistry;\n";
+    mainClass.addField("const SpecializedTypeRegistry", "typeRegistry", Visibility::Private, "{}");
+
+    // out << "public:\n";
+    // out << "/** types */\n";
+    // out << "const TypeRegistry& getTypeRegistry() const override;\n";
+    GenFunction& gtr = mainClass.addFunction("getTypeRegistry", Visibility::Public);
+    gtr.setRetType("const TypeRegistry&");
+    gtr.setConst();
+    gtr.setOverride();
+    gtr.body() << "return typeRegistry;\n";
+
+    auto& body = ctor.body();
+
+    const TypeRegistry& TR = prog.getTypeRegistry();
+
+    std::set<const TypeDesc*> done;
+    for (std::size_t i = 0; i < TR.numCanonicalTypes(); ++i) {
+        const TypeDesc* T = TR.getCanonicalType(i);
+        emitType(body, TR, done, T);
+    }
+
+    for (const auto& rel : prog.getRelations()) {
+        const TypeDesc* T = rel->getTypeDescriptor();
+        emitType(body, TR, done, T);
+    }
 }
 
 }  // namespace souffle::synthesiser

@@ -81,4 +81,37 @@ private:
     FSlist FSs;
 };
 
+/// A virtual file system containing a single file.
+struct SingleFileFS : public FileSystem {
+    /// Construct a virtual file system containing a single file with the specified path and content.
+    explicit SingleFileFS(std::filesystem::path FilePath, std::string FileContent)
+            : FilePath(FilePath), FileContent(FileContent) {}
+
+    bool exists(const std::filesystem::path& Path) override {
+        return (Path == FilePath);
+    }
+
+    std::filesystem::path canonical(const std::filesystem::path& Path, std::error_code& EC) override {
+        if (exists(Path)) {
+            EC = std::error_code{};
+            return Path;
+        } else {
+            EC = std::make_error_code(std::errc::no_such_file_or_directory);
+            return "";
+        }
+    }
+
+    std::string readFile(const std::filesystem::path& Path, std::error_code& EC) override {
+        if (canonical(Path, EC) == Path && EC == std::error_code{}) {
+            return FileContent;
+        } else {
+            return std::string{};
+        }
+    }
+
+private:
+    const std::filesystem::path FilePath;
+    const std::string FileContent;
+};
+
 }  // namespace souffle

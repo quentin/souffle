@@ -25,8 +25,10 @@ namespace souffle::ram {
 namespace test {
 
 TEST(Relation, CloneAndEquals) {
-    Relation a("A", 4, 1, {"a", "b", "c", "d"}, {"i", "i", "i", "i"}, RelationRepresentation::DEFAULT);
-    Relation b("A", 4, 1, {"a", "b", "c", "d"}, {"i", "i", "i", "i"}, RelationRepresentation::DEFAULT);
+    Relation a(
+            "A", 4, 1, {"a", "b", "c", "d"}, {"i", "i", "i", "i"}, RelationRepresentation::DEFAULT, nullptr);
+    Relation b(
+            "A", 4, 1, {"a", "b", "c", "d"}, {"i", "i", "i", "i"}, RelationRepresentation::DEFAULT, nullptr);
     EXPECT_EQ(a, b);
     EXPECT_NE(&a, &b);
 

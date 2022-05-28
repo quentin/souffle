@@ -16,38 +16,6 @@
 
 using namespace souffle;
 
-/// A virtual file system containing a single file.
-struct SingleFileFS : public FileSystem {
-    explicit SingleFileFS(std::filesystem::path FilePath, std::string FileContent)
-            : FilePath(FilePath), FileContent(FileContent) {}
-
-    bool exists(const std::filesystem::path& Path) override {
-        return (Path == FilePath);
-    }
-
-    std::filesystem::path canonical(const std::filesystem::path& Path, std::error_code& EC) override {
-        if (exists(Path)) {
-            EC = std::error_code{};
-            return Path;
-        } else {
-            EC = std::make_error_code(std::errc::no_such_file_or_directory);
-            return "";
-        }
-    }
-
-    std::string readFile(const std::filesystem::path& Path, std::error_code& EC) override {
-        if (canonical(Path, EC) == Path && EC == std::error_code{}) {
-            return FileContent;
-        } else {
-            return std::string{};
-        }
-    }
-
-private:
-    const std::filesystem::path FilePath;
-    const std::string FileContent;
-};
-
 /// A custom output write stream
 struct TestWriteStream : public WriteStream {
     explicit TestWriteStream(const std::map<std::string, std::string>& rwOperation,
@@ -91,14 +59,14 @@ struct TestWriteStreamFactory : public WriteStreamFactory {
 };
 
 int main(int, char**) {
-    auto InputDl = std::make_shared<SingleFileFS>("input.dl",
+    auto InputDl = std::make_shared<souffle::SingleFileFS>("input.dl",
             R"datalog(
       .decl query(v:number)
       .output query(IO=test)
       .include "include/data.dl"
     )datalog");
 
-    auto IncludeDl = std::make_shared<SingleFileFS>("include/data.dl",
+    auto IncludeDl = std::make_shared<souffle::SingleFileFS>("include/data.dl",
             R"datalog(
       query(1).
       query(2).

@@ -62,6 +62,7 @@
     #include "ast/Literal.h"
     #include "ast/NilConstant.h"
     #include "ast/NumericConstant.h"
+    #include "ast/Program.h"
     #include "ast/Pragma.h"
     #include "ast/QualifiedName.h"
     #include "ast/RecordInit.h"

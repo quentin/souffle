@@ -67,19 +67,23 @@ Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& t
     return ramProgram;
 }
 
-Own<ram::Relation> UnitTranslator::createRamRelation(
+Own<ram::Relation> UnitTranslator::createRamRelation(TypeRegistry& typeRegistry,
         const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
 
     // All relations in a provenance program should have a provenance data structure
     auto representation = RelationRepresentation::PROVENANCE;
 
+    auto typeDesc = typeRegistry.newTuple(ramRelationName);
+    
     // Add in base relation information
     std::vector<std::string> attributeNames;
     std::vector<std::string> attributeTypeQualifiers;
     for (const auto& attribute : baseRelation->getAttributes()) {
         attributeNames.push_back(attribute->getName());
         attributeTypeQualifiers.push_back(context->getAttributeTypeQualifier(attribute->getTypeName()));
+        auto T = typeRegistry.get(attribute->getTypeName().toString());
+        typeRegistry.addElement(typeDesc, attribute->getName(), T);
     }
 
     // Add in provenance information
@@ -90,7 +94,7 @@ Own<ram::Relation> UnitTranslator::createRamRelation(
     attributeTypeQualifiers.push_back("i:number");
 
     return mk<ram::Relation>(
-            ramRelationName, arity + 2, 2, attributeNames, attributeTypeQualifiers, representation);
+            ramRelationName, arity + 2, 2, attributeNames, attributeTypeQualifiers, representation, typeDesc);
 }
 
 std::string UnitTranslator::getInfoRelationName(const ast::Clause* clause) const {
@@ -101,9 +105,10 @@ std::string UnitTranslator::getInfoRelationName(const ast::Clause* clause) const
     return getConcreteRelationName(infoRelQualifiedName);
 }
 
-VecOwn<ram::Relation> UnitTranslator::createRamRelations(const std::vector<std::size_t>& sccOrdering) const {
+VecOwn<ram::Relation> UnitTranslator::createRamRelations(
+        TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
     // Regular relations
-    auto ramRelations = seminaive::UnitTranslator::createRamRelations(sccOrdering);
+    auto ramRelations = seminaive::UnitTranslator::createRamRelations(typeRegistry, sccOrdering);
 
     // Info relations
     for (const auto* clause : context->getProgram()->getClauses()) {
@@ -113,14 +118,18 @@ VecOwn<ram::Relation> UnitTranslator::createRamRelations(const std::vector<std::
 
         std::vector<std::string> attributeNames;
         std::vector<std::string> attributeTypeQualifiers;
+        const std::string infoRelName = getInfoRelationName(clause);
+        auto typeDesc = typeRegistry.newTuple(infoRelName);
 
         // (1) Clause ID
         attributeNames.push_back("clause_num");
         attributeTypeQualifiers.push_back("i:number");
+        typeRegistry.addElement(typeDesc, "clause_num", typeRegistry.get("number"));
 
         // (2) Head variable string
         attributeNames.push_back("head_vars");
         attributeTypeQualifiers.push_back("s:symbol");
+        typeRegistry.addElement(typeDesc, "head_vars", typeRegistry.get("symbol"));
 
         // (3) For all atoms + negs + bcs: rel_<i>:symbol
         auto bodyLiterals = clause->getBodyLiterals();
@@ -128,18 +137,21 @@ VecOwn<ram::Relation> UnitTranslator::createRamRelations(const std::vector<std::
             const auto* literal = bodyLiterals.at(i);
             if (isA<ast::Atom>(literal) || isA<ast::Negation>(literal) ||
                     isA<ast::BinaryConstraint>(literal)) {
-                attributeNames.push_back("rel_" + std::to_string(i));
+                const std::string attName = "rel_" + std::to_string(i);
+                attributeNames.push_back(attName);
                 attributeTypeQualifiers.push_back("s:symbol");
+                typeRegistry.addElement(typeDesc, attName, typeRegistry.get("symbol"));
             }
         }
 
         // (4) Clause representation
         attributeNames.push_back("clause_repr");
         attributeTypeQualifiers.push_back("s:symbol");
+        typeRegistry.addElement(typeDesc, "clause_repr", typeRegistry.get("symbol"));
 
         // Create the info relation
-        ramRelations.push_back(mk<ram::Relation>(getInfoRelationName(clause), attributeNames.size(), 0,
-                attributeNames, attributeTypeQualifiers, RelationRepresentation::INFO));
+        ramRelations.push_back(mk<ram::Relation>(infoRelName, attributeNames.size(), 0, attributeNames,
+                attributeTypeQualifiers, RelationRepresentation::INFO, typeDesc));
     }
 
     return ramRelations;

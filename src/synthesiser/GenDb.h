@@ -135,7 +135,7 @@ public:
      */
     virtual void definition(const GenDb* db, std::ostream& o) const = 0;
 
-    std::string& getName() {
+    const std::string& getName() const {
         return name;
     }
 
@@ -143,7 +143,9 @@ protected:
     std::string name;
 };
 
+class GenClassBase;
 class GenClass;
+class GenInnerClass;
 class GenDb;
 
 /**
@@ -157,10 +159,7 @@ enum Visibility { Public = 0, Private };
  */
 class GenFunction : public Gen {
 public:
-    GenFunction(std::string name, GenClass* cl, Visibility v)
-            : Gen(name), cl(cl), visibility(v), override(false) {}
-
-    virtual ~GenFunction() = default;
+    GenFunction(std::string name, GenClassBase* cl, Visibility v) : Gen(name), cl(cl), visibility(v) {}
 
     void setRetType(std::string ty);
     void setNextArg(std::string ty, std::string name, std::optional<std::string> defaultValue = std::nullopt);
@@ -170,8 +169,11 @@ public:
         isConstructor = true;
     };
     void setOverride() {
-        override = true;
+        isOverride = true;
     };
+    void setConst() {
+        isConst = true;
+    }
 
     void declaration(const GenDb* db, std::ostream& o) const override;
 
@@ -186,10 +188,11 @@ public:
     }
 
 private:
-    GenClass* cl;
+    GenClassBase* cl;
     Visibility visibility;
     bool isConstructor = false;
-    bool override;
+    bool isOverride = false;
+    bool isConst = false;
     std::string retType;
     std::vector<std::tuple<std::string, std::string, std::optional<std::string>>> args;
     std::vector<std::pair<std::string, std::string>> initializer;
@@ -200,10 +203,10 @@ private:
  * Class helper to manipulate/build a class to be emitted
  * by the C++ Synthesizer.
  */
-class GenClass : public Gen, public GenFile {
+class GenClassBase : public Gen {
 public:
-    GenClass(std::string name, fs::path basename) : Gen(name), GenFile(basename) {}
-    virtual ~GenClass() = default;
+    GenClassBase(GenClassBase* parent, std::string name) : Gen(name), parent(parent) {}
+    virtual ~GenClassBase() = default;
 
     GenFunction& addFunction(std::string name, Visibility);
     GenFunction& addConstructor(Visibility);
@@ -211,13 +214,39 @@ public:
     void addField(
             std::string type, std::string name, Visibility, std::optional<std::string> init = std::nullopt);
 
+    GenInnerClass& addInnerClass(std::string name, Visibility);
+
     void declaration(const GenDb* db, std::ostream& o) const override;
 
     void definition(const GenDb* db, std::ostream& o) const override;
 
-    void inherits(std::string parent) {
-        inheritance.push_back(parent);
-    }
+    void inherits(std::string base);
+
+    std::string getQualifiedName() const;
+
+private:
+    std::vector<Own<GenFunction>> methods;
+    using Field = std::tuple<std::string /*name*/, std::string /*type*/, Visibility,
+            std::optional<std::string> /* initializer value */>;
+    std::vector<Field> fields;
+    std::vector<std::tuple<Own<GenInnerClass>, Visibility>> innerClasses;
+    std::vector<std::string> inheritance;
+    GenClassBase* parent;
+};
+
+/** An inner class */
+class GenInnerClass : public GenClassBase {
+public:
+    GenInnerClass(GenClassBase* parent, std::string name) : GenClassBase(parent, name) {}
+};
+
+class GenClass : public GenClassBase, public GenFile {
+public:
+    GenClass(std::string name, fs::path basename) : GenClassBase(nullptr, name), GenFile(basename) {}
+
+    void declaration(const GenDb* db, std::ostream& o) const override;
+
+    void definition(const GenDb* db, std::ostream& o) const override;
 
     bool ignoreUnusedArgumentWarning = false;
     bool isMain = false;
@@ -227,12 +256,6 @@ public:
     }
 
 private:
-    std::vector<Own<GenFunction>> methods;
-    std::vector<std::tuple<std::string /*name*/, std::string /*type*/, Visibility,
-            std::optional<std::string> /* initializer value */
-            >>
-            fields;
-    std::vector<std::string> inheritance;
     std::stringstream hiddenHooksStream;
 };
 
@@ -245,7 +268,6 @@ class GenDatastructure : public Gen, public GenFile {
 public:
     GenDatastructure(std::string name, fs::path basename, std::optional<std::string> namespace_opt)
             : Gen(name), GenFile(basename), namespace_name(namespace_opt) {}
-    virtual ~GenDatastructure() = default;
 
     std::ostream& decl() {
         return declarationStream;
