@@ -23,7 +23,7 @@ namespace souffle::interpreter {
 Own<RelationWrapper> createEqrelRelation(
         const ram::Relation& id, const ram::analysis::IndexCluster& indexSelection) {
     assert(id.getArity() == 2 && "Eqivalence relation must have arity size 2.");
-    return mk<EqrelRelation>(id.getAuxiliaryArity(), id.getName(), indexSelection);
+    return mk<EqrelRelation>(id.getAuxiliaryArity(), id.getName(), indexSelection, id.getTypeDescriptor());
 }
 
 }  // namespace souffle::interpreter

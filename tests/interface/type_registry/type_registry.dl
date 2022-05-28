@@ -1,0 +1,27 @@
+
+.type unused <: number
+
+.type Opt = Some { root: number} | None {}
+
+.decl in(n:number)
+.input in()
+
+.decl squareroot(n:number, root:Opt)
+.output squareroot()
+
+.decl integer(i:number)
+integer(i) :- i = range(-10,11).
+
+.decl square(root:number, result:number)
+square(root, result) :-
+  integer(root),
+  result = root * root.
+
+squareroot(n, $None()) :-
+  in(n),
+  !square(_,n).
+
+squareroot(n, $Some(root)) :-
+  in(n),
+  square(root, n).
+

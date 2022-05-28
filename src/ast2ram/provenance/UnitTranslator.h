@@ -43,18 +43,23 @@ public:
 
 protected:
     Own<ram::Sequence> generateProgram(const ast::TranslationUnit& translationUnit) override;
+
+private:
     Own<ram::Statement> generateClearExpiredRelations(
             const ast::RelationSet& expiredRelations) const override;
-    Own<ram::Relation> createRamRelation(
-            const ast::Relation* baseRelation, std::string ramRelationName) const override;
-    VecOwn<ram::Relation> createRamRelations(const std::vector<std::size_t>& sccOrdering) const override;
+
+    Own<ram::Relation> createRamRelation(TypeRegistry&, const ast::Relation* baseRelation,
+            std::string ramRelationName) const override;
+
+    VecOwn<ram::Relation> createRamRelations(
+            TypeRegistry&, const std::vector<std::size_t>& sccOrdering) const override;
+
     void addAuxiliaryArity(
             const ast::Relation* relation, std::map<std::string, std::string>& directives) const override;
 
     Own<ram::Statement> generateMergeRelations(const ast::Relation* rel, const std::string& destRelation,
             const std::string& srcRelation) const override;
 
-private:
     /** Translate RAM code for subroutine to get subproofs */
     Own<ram::Statement> makeSubproofSubroutine(const ast::Clause& clause);
 

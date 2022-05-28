@@ -44,8 +44,9 @@ struct RelationWrapper {
     using arity_type = souffle::Relation::arity_type;
 
 public:
-    RelationWrapper(arity_type arity, arity_type auxiliaryArity, std::string relName)
-            : relName(std::move(relName)), arity(arity), auxiliaryArity(auxiliaryArity) {}
+    RelationWrapper(arity_type arity, arity_type auxiliaryArity, std::string relName,
+            const TypeDesc* typeDesc)
+            : relName(std::move(relName)), arity(arity), auxiliaryArity(auxiliaryArity), typeDesc(typeDesc) {}
 
     virtual ~RelationWrapper() = default;
 
@@ -125,6 +126,10 @@ public:
         return auxiliaryArity;
     }
 
+    const TypeDesc* getTypeDescriptor() const {
+        return typeDesc;
+    }
+
     // -- Defines methods and interfaces for Interpreter execution. --
 public:
     using IndexViewPtr = Own<ViewWrapper>;
@@ -146,6 +151,7 @@ protected:
 
     arity_type arity;
     arity_type auxiliaryArity;
+    const TypeDesc* typeDesc;
 };
 
 /**
@@ -182,8 +188,8 @@ public:
      * Creates a relation, build all necessary indexes.
      */
     Relation(std::size_t auxiliaryArity, const std::string& name,
-            const ram::analysis::IndexCluster& indexSelection)
-            : RelationWrapper(Arity, auxiliaryArity, name) {
+            const ram::analysis::IndexCluster& indexSelection, const TypeDesc* typeDesc)
+            : RelationWrapper(Arity, auxiliaryArity, name, typeDesc) {
         for (const auto& order : indexSelection.getAllOrders()) {
             ram::analysis::LexOrder fullOrder = order;
             // Expand the order to a total order

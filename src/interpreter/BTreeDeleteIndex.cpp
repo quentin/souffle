@@ -21,9 +21,10 @@
 
 namespace souffle::interpreter {
 
-#define CREATE_BTREE_DELETE_REL(Structure, Arity, ...)                                               \
-    case (Arity): {                                                                                  \
-        return mk<BtreeDeleteRelation<Arity>>(id.getAuxiliaryArity(), id.getName(), indexSelection); \
+#define CREATE_BTREE_DELETE_REL(Structure, Arity, ...)                                         \
+    case (Arity): {                                                                            \
+        return mk<BtreeDeleteRelation<Arity>>(                                                 \
+                id.getAuxiliaryArity(), id.getName(), indexSelection, id.getTypeDescriptor()); \
     }
 
 Own<RelationWrapper> createBTreeDeleteRelation(

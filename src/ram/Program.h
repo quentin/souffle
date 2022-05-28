@@ -19,6 +19,7 @@
 #include "ram/Node.h"
 #include "ram/Relation.h"
 #include "ram/Statement.h"
+#include "souffle/SouffleTypes.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/MiscUtil.h"
 #include <cassert>
@@ -52,8 +53,10 @@ private:
     Program() = default;
 
 public:
-    Program(VecOwn<Relation> rels, Own<Statement> main, std::map<std::string, Own<Statement>> subs)
-            : relations(std::move(rels)), main(std::move(main)), subroutines(std::move(subs)) {
+    Program(VecOwn<Relation> rels, Own<Statement> main, std::map<std::string, Own<Statement>> subs,
+            Own<TypeRegistry> tyReg)
+            : relations(std::move(rels)), main(std::move(main)), subroutines(std::move(subs)),
+              typeRegistry(std::move(tyReg)) {
         assert(this->main != nullptr && "Main program is a null-pointer");
         assert(allValidPtrs(relations));
         assert(allValidPtrs(makeTransformRange(subroutines, [](auto&& kv) { return kv.second.get(); })));
@@ -81,6 +84,10 @@ public:
     /** @brief Get a specific subroutine */
     const Statement& getSubroutine(const std::string& name) const {
         return *subroutines.at(name);
+    }
+
+    const TypeRegistry& getTypeRegistry() const {
+        return *typeRegistry;
     }
 
     Program* cloning() const override {
@@ -149,6 +156,9 @@ protected:
 
     /** Subroutines for provenance system */
     std::map<std::string, Own<Statement>> subroutines;
+
+    /** Types */
+    Own<TypeRegistry> typeRegistry;
 };
 
 }  // namespace souffle::ram

@@ -640,61 +640,161 @@ Own<ram::Statement> UnitTranslator::generateStoreRelation(const ast::Relation* r
 }
 
 Own<ram::Relation> UnitTranslator::createRamRelation(
-        const ast::Relation* baseRelation, std::string ramRelationName) const {
+        TypeRegistry& typeRegistry, const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
     auto representation = baseRelation->getRepresentation();
     if (representation == RelationRepresentation::BTREE_DELETE && ramRelationName[0] == '@') {
         representation = RelationRepresentation::DEFAULT;
     }
+    auto typeDesc = typeRegistry.newTuple(ramRelationName);
 
     std::vector<std::string> attributeNames;
     std::vector<std::string> attributeTypeQualifiers;
     for (const auto& attribute : baseRelation->getAttributes()) {
         attributeNames.push_back(attribute->getName());
         attributeTypeQualifiers.push_back(context->getAttributeTypeQualifier(attribute->getTypeName()));
+        auto T = typeRegistry.get(attribute->getTypeName().toString());
+        typeRegistry.addElement(typeDesc, attribute->getName(), T);
     }
 
     return mk<ram::Relation>(
-            ramRelationName, arity, 0, attributeNames, attributeTypeQualifiers, representation);
+            ramRelationName, arity, 0, attributeNames, attributeTypeQualifiers, representation, typeDesc);
 }
 
-VecOwn<ram::Relation> UnitTranslator::createRamRelations(const std::vector<std::size_t>& sccOrdering) const {
+VecOwn<ram::Relation> UnitTranslator::createRamRelations(
+        TypeRegistry& typeRegistry, const std::vector<std::size_t>& sccOrdering) const {
     VecOwn<ram::Relation> ramRelations;
     for (const auto& scc : sccOrdering) {
         bool isRecursive = context->isRecursiveSCC(scc);
         for (const auto& rel : context->getRelationsInSCC(scc)) {
             // Add main relation
             std::string mainName = getConcreteRelationName(rel->getQualifiedName());
-            ramRelations.push_back(createRamRelation(rel, mainName));
+            ramRelations.push_back(createRamRelation(typeRegistry, rel, mainName));
 
             // Recursive relations also require @delta and @new variants, with the same signature
             if (isRecursive) {
                 // Add delta relation
                 std::string deltaName = getDeltaRelationName(rel->getQualifiedName());
-                ramRelations.push_back(createRamRelation(rel, deltaName));
+                ramRelations.push_back(createRamRelation(typeRegistry, rel, deltaName));
 
                 // Add new relation
                 std::string newName = getNewRelationName(rel->getQualifiedName());
-                ramRelations.push_back(createRamRelation(rel, newName));
+                ramRelations.push_back(createRamRelation(typeRegistry, rel, newName));
 
                 // Add auxiliary relation for subsumption
                 if (context->hasSubsumptiveClause(rel->getQualifiedName())) {
                     // Add reject relation
                     std::string rejectName = getRejectRelationName(rel->getQualifiedName());
-                    ramRelations.push_back(createRamRelation(rel, rejectName));
+                    ramRelations.push_back(createRamRelation(typeRegistry, rel, rejectName));
 
                     // Add deletion relation
                     std::string toEraseName = getDeleteRelationName(rel->getQualifiedName());
-                    ramRelations.push_back(createRamRelation(rel, toEraseName));
+                    ramRelations.push_back(createRamRelation(typeRegistry, rel, toEraseName));
                 }
             } else if (context->hasSubsumptiveClause(rel->getQualifiedName())) {
                 // Add deletion relation for non recursive subsumptive relations
                 std::string toEraseName = getDeleteRelationName(rel->getQualifiedName());
-                ramRelations.push_back(createRamRelation(rel, toEraseName));
+                ramRelations.push_back(createRamRelation(typeRegistry, rel, toEraseName));
             }
         }
     }
     return ramRelations;
+}
+
+Own<TypeRegistry> UnitTranslator::createTypeRegistry(
+        const ast::Program& prog, const ast::analysis::TypeEnvironmentAnalysis& typeAnalysis) const {
+    Own<TypeRegistry> TR = mk<TypeRegistry>();
+
+    for (const auto* Ty : prog.getTypes()) {
+        if (isA<ast::RecordType>(Ty)) {
+            TR->newRecord(Ty->getQualifiedName().toString());
+        } else if (isA<ast::UnionType>(Ty)) {
+            const auto& PrimitiveTypesInUnion = typeAnalysis.getPrimitiveTypesInUnion(Ty->getQualifiedName());
+            assert(PrimitiveTypesInUnion.size() == 1);
+            const TypeDesc* Primitive = TR->get(PrimitiveTypesInUnion.begin()->toString());
+            assert(Primitive != nullptr);
+            TR->newUnion(Ty->getQualifiedName().toString(), Primitive);
+        } else if (isA<ast::AlgebraicDataType>(Ty)) {
+            TR->newADT(Ty->getQualifiedName().toString());
+        }
+    }
+
+    // finally create all aliases and subtypes
+    while (true) {
+        bool Created = false;
+        for (const auto* Ty : prog.getTypes()) {
+            if (!TR->get(Ty->getQualifiedName().toString())) {
+                if (isA<ast::AliasType>(Ty)) {
+                    const auto* AliasTy = as<ast::AliasType>(Ty);
+                    const auto& Aliased = AliasTy->getAliasType();
+                    const auto* AliasedType = TR->get(Aliased.toString());
+                    if (AliasedType) {
+                        TR->newEquivalent(Ty->getQualifiedName().toString(), AliasedType);
+                        Created = true;
+                    }
+                } else if (isA<ast::SubsetType>(Ty)) {
+                    const auto* SubsetTy = as<ast::SubsetType>(Ty);
+                    const auto& BaseTy = SubsetTy->getBaseType();
+                    const auto* BaseType = TR->get(BaseTy.toString());
+                    if (BaseType) {
+                        TR->newSubset(Ty->getQualifiedName().toString(), BaseType);
+                        Created = true;
+                    }
+                }
+            }
+        }
+        if (!Created) {
+            break;
+        }
+    }
+
+    // create union elements
+    for (const auto* Ty : prog.getTypes()) {
+        if (isA<ast::UnionType>(Ty)) {
+            const auto* Uni = as<ast::UnionType>(Ty);
+            const auto* UniType = TR->get(Uni->getQualifiedName().toString());
+            int I = 0;
+            for (const auto& Elem : Uni->getTypes()) {
+                const auto* ElemType = TR->get(Elem.toString());
+                TR->addElement(UniType, std::to_string(I), ElemType);
+                ++I;
+            }
+        }
+    }
+
+    // create record elements
+    for (const auto* Ty : prog.getTypes()) {
+        if (isA<ast::RecordType>(Ty)) {
+            const auto* Rec = as<ast::RecordType>(Ty);
+            const auto* RecType = TR->get(Rec->getQualifiedName().toString());
+            for (const auto& Field : Rec->getFields()) {
+                const auto* FieldType = TR->get(Field->getTypeName().toString());
+                TR->addElement(RecType, Field->getName(), FieldType);
+            }
+        }
+    }
+
+    // create adt branches
+    for (const auto* Ty : prog.getTypes()) {
+        if (isA<ast::AlgebraicDataType>(Ty)) {
+            const auto* Adt = as<ast::AlgebraicDataType>(Ty);
+            const auto* ADTType = TR->get(Ty->getQualifiedName().toString());
+            for (const auto& Br : Adt->getBranches()) {
+                const auto* BranchType = TR->newBranch(Br->getBranchName().toString(), ADTType);
+                for (const auto& Elem : Br->getFields()) {
+                    const auto* ElemType = TR->get(Elem->getTypeName().toString());
+                    TR->addElement(BranchType, Elem->getName(), ElemType);
+                }
+            }
+        }
+    }
+
+    // create relation types
+    for (const auto* Rel : prog.getRelations()) {
+        Rel->getQualifiedName();
+    }
+
+    return TR;
 }
 
 Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& translationUnit) {
@@ -747,15 +847,18 @@ Own<ram::TranslationUnit> UnitTranslator::translateUnit(ast::TranslationUnit& tu
     // Generate the RAM program code
     auto ramMain = generateProgram(tu);
 
+    auto typeRegistry =
+            createTypeRegistry(tu.getProgram(), tu.getAnalysis<ast::analysis::TypeEnvironmentAnalysis>());
+
     // Create the relevant RAM relations
     const auto& sccOrdering = tu.getAnalysis<ast::analysis::TopologicallySortedSCCGraphAnalysis>().order();
-    auto ramRelations = createRamRelations(sccOrdering);
+    auto ramRelations = createRamRelations(*typeRegistry, sccOrdering);
 
     // Combine all parts into the final RAM program
     ErrorReport& errReport = tu.getErrorReport();
     DebugReport& debugReport = tu.getDebugReport();
-    auto ramProgram =
-            mk<ram::Program>(std::move(ramRelations), std::move(ramMain), std::move(ramSubroutines));
+    auto ramProgram = mk<ram::Program>(
+            std::move(ramRelations), std::move(ramMain), std::move(ramSubroutines), std::move(typeRegistry));
 
     // Add the translated program to the debug report
     if (glb->config().has("debug-report")) {

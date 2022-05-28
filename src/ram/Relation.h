@@ -17,6 +17,7 @@
 
 #include "RelationTag.h"
 #include "ram/Node.h"
+#include "souffle/SouffleTypes.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/MiscUtil.h"
 #include <cassert>
@@ -37,10 +38,10 @@ class Relation : public Node {
 public:
     Relation(std::string name, std::size_t arity, std::size_t auxiliaryArity,
             std::vector<std::string> attributeNames, std::vector<std::string> attributeTypes,
-            RelationRepresentation representation)
+            RelationRepresentation representation, const TypeDesc* typeDesc)
             : representation(representation), name(std::move(name)), arity(arity),
               auxiliaryArity(auxiliaryArity), attributeNames(std::move(attributeNames)),
-              attributeTypes(std::move(attributeTypes)) {
+              attributeTypes(std::move(attributeTypes)), typeDesc(typeDesc) {
         assert(this->attributeNames.size() == arity && "arity mismatch for attributes");
         assert(this->attributeTypes.size() == arity && "arity mismatch for types");
         for (std::size_t i = 0; i < arity; i++) {
@@ -89,13 +90,18 @@ public:
         return auxiliaryArity;
     }
 
+    const TypeDesc* getTypeDescriptor() const {
+        return typeDesc;
+    }
+
     /** @brief Compare two relations via their name */
     bool operator<(const Relation& other) const {
         return name < other.name;
     }
 
     Relation* cloning() const override {
-        return new Relation(name, arity, auxiliaryArity, attributeNames, attributeTypes, representation);
+        return new Relation(
+                name, arity, auxiliaryArity, attributeNames, attributeTypes, representation, typeDesc);
     }
 
 protected:
@@ -142,6 +148,8 @@ protected:
 
     /** Type of attributes */
     const std::vector<std::string> attributeTypes;
+
+    const TypeDesc* typeDesc;
 };
 
 /**

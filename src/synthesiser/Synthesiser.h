@@ -22,6 +22,7 @@
 #include "ram/TranslationUnit.h"
 #include "ram/utility/Visitor.h"
 #include "souffle/RecordTable.h"
+#include "souffle/SouffleTypes.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "synthesiser/GenDb.h"
 #include "synthesiser/Relation.h"
@@ -113,6 +114,12 @@ protected:
 
     /** Generate code */
     void emitCode(std::ostream& out, const ram::Statement& stmt);
+
+    /** Generate type registry declarations */
+    void emitTypeRegistryDecl(std::ostream& out);
+
+    /** Generate type registry definitions */
+    void emitTypeRegistryDef(std::ostream& out, const std::string& classname, const ram::Program& prog);
 
     /** Lookup frequency counter */
     unsigned lookupFreqIdx(const std::string& txt);

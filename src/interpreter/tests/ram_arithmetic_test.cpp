@@ -61,8 +61,9 @@ RamDomain evalExpression(Own<Expression> expression) {
     std::map<std::string, Own<Statement>> subs;
     subs.insert(std::make_pair("test", std::move(query)));
     VecOwn<ram::Relation> rels;
+    Own<TypeRegistry> tyreg = mk<TypeRegistry>();
 
-    Own<Program> prog = mk<Program>(std::move(rels), mk<ram::Sequence>(), std::move(subs));
+    Own<Program> prog = mk<Program>(std::move(rels), mk<ram::Sequence>(), std::move(subs), std::move(tyreg));
 
     ErrorReport errReport;
     DebugReport debugReport(glb);
