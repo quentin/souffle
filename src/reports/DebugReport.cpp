@@ -59,6 +59,19 @@ std::string replaceAll(std::string_view text, std::string_view key, std::string_
 }
 }  // namespace
 
+DebugReport::DebugReport() : enabled(false), reportPath(), programName() {}
+
+DebugReport::DebugReport(Global& glb) {
+    enabled = !glb.config().get("debug-report").empty();
+    if (enabled) {
+        reportPath = glb.config().get("debug-report");
+        programName = glb.config().get("");
+    }
+}
+
+DebugReport::DebugReport(const std::string& report_path, const std::string& program_name)
+        : enabled(true), reportPath(report_path), programName(program_name) {}
+
 void DebugReportSection::printIndex(std::ostream& out) const {
     out << "<a href=\"#" << id << "\">" << title << "</a>\n";
     out << "<ul>\n";
@@ -108,10 +121,18 @@ DebugReport::~DebugReport() {
 }
 
 void DebugReport::flush() {
-    auto&& dst = Global::config().get("debug-report");
-    if (dst.empty() || empty()) return;
+    if (!enabled || empty()) return;
 
-    std::ofstream(dst) << *this;
+    std::ofstream(*reportPath) << *this;
+}
+
+bool DebugReport::empty() const {
+    return sections.empty();
+}
+
+void DebugReport::addSection(DebugReportSection section) {
+    auto& buf = currentSubsections.empty() ? sections : currentSubsections.top();
+    buf.emplace_back(std::move(section));
 }
 
 static std::string CDATA(const std::string_view code) {
@@ -151,7 +172,7 @@ void DebugReport::print(std::ostream& out) const {
 <head>
 <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=utf-8" />
 <title>Souffle Debug Report ()--html--";
-    out << Global::config().get("") << R"--html--()</title>
+    out << *programName << R"--html--()</title>
 <style>
     ul { list-style-type: none; }
     ul > li.leaf { display: inline-block; padding: 0em 1em; }
@@ -371,7 +392,7 @@ void DebugReport::print(std::ostream& out) const {
 </head>
 <body>
 <div class='headerdiv'><h1>Souffle Debug Report ()--html--";
-    out << Global::config().get("") << ")</h1></div>\n";
+    out << *programName << ")</h1></div>\n";
     for (const DebugReportSection& section : sections) {
         section.printIndex(out);
     }

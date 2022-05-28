@@ -21,6 +21,10 @@
 #include <string>
 #include <vector>
 
+namespace souffle {
+class Global;
+}
+
 namespace souffle::ast {
 class Clause;
 class Relation;
@@ -95,6 +99,8 @@ protected:
 
 private:
     std::map<std::string, Own<ram::Statement>> ramSubroutines;
+
+    Global* glb;
 };
 
 }  // namespace souffle::ast2ram::seminaive

@@ -68,6 +68,7 @@ private:
     bool setDefaults(TranslationUnit& translationUnit) {
         bool changed = false;
         Program& program = translationUnit.getProgram();
+        const Global& glb = translationUnit.global();
         for (Directive* io : program.getDirectives()) {
             // Don't do anything for a directive which
             // is not an I/O directive
@@ -91,19 +92,19 @@ private:
                     io->addParameter("operation", "input");
                     changed = true;
                     // Configure input directory
-                    if (Global::config().has("fact-dir")) {
-                        io->addParameter("fact-dir", Global::config().get("fact-dir"));
+                    if (glb.config().has("fact-dir")) {
+                        io->addParameter("fact-dir", glb.config().get("fact-dir"));
                     }
                 } else if (io->getType() == ast::DirectiveType::output) {
                     io->addParameter("operation", "output");
                     changed = true;
                     // Configure output directory
-                    if (Global::config().has("output-dir")) {
-                        if (Global::config().has("output-dir", "-")) {
+                    if (glb.config().has("output-dir")) {
+                        if (glb.config().has("output-dir", "-")) {
                             io->addParameter("IO", "stdout");
                             io->addParameter("headers", "true");
                         } else {
-                            io->addParameter("output-dir", Global::config().get("output-dir"));
+                            io->addParameter("output-dir", glb.config().get("output-dir"));
                         }
                     }
                 } else if (io->getType() == ast::DirectiveType::printsize) {

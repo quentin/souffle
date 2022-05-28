@@ -50,6 +50,8 @@
 namespace souffle::ast2ram::provenance {
 
 Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& translationUnit) {
+    glb = &translationUnit.global();
+
     // Do the regular translation
     auto ramProgram = seminaive::UnitTranslator::generateProgram(translationUnit);
 
@@ -287,7 +289,7 @@ Own<ram::Sequence> UnitTranslator::generateInfoClauses(const ast::Program* progr
         auto infoClause = mk<ram::Statement, ram::Query>(std::move(factInsertion));
 
         // Add logging
-        if (Global::config().has("profile")) {
+        if (glb->config().has("profile")) {
             std::stringstream clauseText;
             clauseText << "@info.clause[" << stringify(toString(*clause)) << "]";
             const std::string logTimerStatement =

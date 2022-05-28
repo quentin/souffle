@@ -8,12 +8,13 @@
 
 #include "TranslationUnit.h"
 #include "Global.h"
+#include "ram/Program.h"
 #include "souffle/utility/StringUtil.h"
 
 namespace souffle::ram {
 
 void TranslationUnit::logAnalysis(Analysis& analysis) const {
-    if (!Global::config().has("debug-report")) return;
+    if (!global().config().has("debug-report")) return;
 
     auto ss = toString(analysis);
     debugReport.addSection(

@@ -44,9 +44,10 @@
 namespace souffle::ast::test {
 
 inline Own<TranslationUnit> makeATU(std::string program = ".decl A,B,C(x:number)") {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
-    return ParserDriver::parseTranslationUnit(program, e, d);
+    DebugReport d(glb);
+    return ParserDriver::parseTranslationUnit(glb, program, e, d);
 }
 
 inline Own<TranslationUnit> makePrintedATU(Own<TranslationUnit>& tu) {
@@ -83,11 +84,12 @@ TEST(AstPrint, NumberConstant) {
 }
 
 TEST(AstPrint, StringConstant) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
+    DebugReport d(glb);
     auto testArgument = mk<StringConstant>("test string");
 
-    auto tu1 = ParserDriver::parseTranslationUnit(".decl A,B,C(x:number)", e, d);
+    auto tu1 = ParserDriver::parseTranslationUnit(glb, ".decl A,B,C(x:number)", e, d);
     tu1->getProgram().addClause(makeClauseA(std::move(testArgument)));
     auto tu2 = makePrintedATU(tu1);
     EXPECT_EQ(tu1->getProgram(), tu2->getProgram());

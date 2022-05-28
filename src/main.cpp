@@ -128,14 +128,14 @@ namespace souffle {
 /**
  * Executes a binary file.
  */
-[[noreturn]] void executeBinaryAndExit(const std::string& binaryFilename) {
+[[noreturn]] void executeBinaryAndExit(Global& glb, const std::string& binaryFilename) {
     assert(!binaryFilename.empty() && "binary filename cannot be blank");
 
     std::map<char const*, std::string> env;
-    if (Global::config().has("library-dir")) {
+    if (glb.config().has("library-dir")) {
         auto escapeLdPath = [](auto&& xs) { return escape(xs, {':', ' '}, "\\"); };
-        auto ld_path = toString(join(
-                map(Global::config().getMany("library-dir"), escapeLdPath), std::string(1, PATHdelimiter)));
+        auto ld_path = toString(
+                join(map(glb.config().getMany("library-dir"), escapeLdPath), std::string(1, PATHdelimiter)));
 #if defined(_MSC_VER)
         std::size_t l;
         std::wstring env_path(ld_path.length() + 1, L' ');
@@ -161,7 +161,7 @@ namespace souffle {
     auto exit = execute(binaryFilename, {}, env);
     if (!exit) throw std::invalid_argument("failed to execute `" + binaryFilename + "`");
 
-    if (!Global::config().has("dl-program")) {
+    if (!glb.config().has("dl-program")) {
         remove(binaryFilename.c_str());
         remove((binaryFilename + ".cpp").c_str());
     }
@@ -172,24 +172,25 @@ namespace souffle {
 /**
  * Compiles the given source file to a binary file.
  */
-void compileToBinary(const std::string& command, std::vector<fs::path>& sourceFilenames, fs::path binary) {
+void compileToBinary(
+        Global& glb, const std::string& command, std::vector<fs::path>& sourceFilenames, fs::path binary) {
     std::vector<std::string> argv;
 
     argv.push_back(command);
 
-    if (Global::config().has("swig")) {
+    if (glb.config().has("swig")) {
         argv.push_back("-s");
-        argv.push_back(Global::config().get("swig"));
+        argv.push_back(glb.config().get("swig"));
     }
 
-    for (auto&& path : Global::config().getMany("library-dir")) {
+    for (auto&& path : glb.config().getMany("library-dir")) {
         // The first entry may be blank
         if (path.empty()) {
             continue;
         }
         argv.push_back(tfm::format("-L%s", path));
     }
-    for (auto&& library : Global::config().getMany("libraries")) {
+    for (auto&& library : glb.config().getMany("libraries")) {
         // The first entry may be blank
         if (library.empty()) {
             continue;
@@ -362,7 +363,7 @@ public:
     }
 };
 
-int main(int argc, char** argv) {
+int main(Global& glb, int argc, char** argv) {
     /* Time taking for overall runtime */
     auto souffle_start = std::chrono::high_resolution_clock::now();
 
@@ -464,15 +465,15 @@ int main(int argc, char** argv) {
                 {"legacy", '\6', "", "", false, "Enable legacy support."},
                 {"preprocessor", '\7', "CMD", "", false, "C preprocessor to use."},
                 {"no-preprocessor", 10, "", "", false, "Do not use a C preprocessor."}};
-        Global::config().processArgs(argc, argv, header.str(), versionFooter, options);
+        glb.config().processArgs(argc, argv, header.str(), versionFooter, options);
 
         // ------ command line arguments -------------
 
         // Take in pragma options from the command line
-        if (Global::config().has("pragma")) {
-            ast::transform::PragmaChecker::Merger merger;
+        if (glb.config().has("pragma")) {
+            ast::transform::PragmaChecker::Merger merger(glb);
 
-            for (auto&& option : Global::config().getMany("pragma")) {
+            for (auto&& option : glb.config().getMany("pragma")) {
                 // TODO: escape sequences for `:` to allow `:` in a pragma key?
                 std::size_t splitPoint = option.find(':');
 
@@ -486,67 +487,67 @@ int main(int argc, char** argv) {
         }
 
         /* for the version option, if given print the version text then exit */
-        if (Global::config().has("version")) {
+        if (glb.config().has("version")) {
             std::cout << versionFooter << std::endl;
             return 0;
         }
-        Global::config().set("version", PACKAGE_VERSION);
+        glb.config().set("version", PACKAGE_VERSION);
 
         /* for the help option, if given simply print the help text then exit */
-        if (Global::config().has("help")) {
-            std::cout << Global::config().help();
+        if (glb.config().has("help")) {
+            std::cout << glb.config().help();
             return 0;
         }
 
-        if (!Global::config().has("")) {
+        if (!glb.config().has("")) {
             std::cerr << "No datalog file specified.\n";
             return 0;
         }
 
         /* check that datalog program exists */
-        if (!existFile(Global::config().get(""))) {
-            throw std::runtime_error("cannot open file " + std::string(Global::config().get("")));
+        if (!existFile(glb.config().get(""))) {
+            throw std::runtime_error("cannot open file " + std::string(glb.config().get("")));
         }
 
         /* for the jobs option, to determine the number of threads used */
 #ifdef _OPENMP
-        if (isNumber(Global::config().get("jobs").c_str())) {
-            if (std::stoi(Global::config().get("jobs")) < 1) {
+        if (isNumber(glb.config().get("jobs").c_str())) {
+            if (std::stoi(glb.config().get("jobs")) < 1) {
                 throw std::runtime_error("-j/--jobs may only be set to 'auto' or an integer greater than 0.");
             }
         } else {
-            if (!Global::config().has("jobs", "auto")) {
+            if (!glb.config().has("jobs", "auto")) {
                 throw std::runtime_error("-j/--jobs may only be set to 'auto' or an integer greater than 0.");
             }
             // set jobs to zero to indicate the synthesiser and interpreter to use the system default.
-            Global::config().set("jobs", "0");
+            glb.config().set("jobs", "0");
         }
 #else
         // Check that -j option has not been changed from the default
-        if (Global::config().get("jobs") != "1" && !Global::config().has("no-warn")) {
+        if (glb.config().get("jobs") != "1" && !glb.config().has("no-warn")) {
             std::cerr << "\nThis installation of Souffle does not support concurrent jobs.\n";
         }
 #endif
 
         /* if an output directory is given, check it exists */
-        if (Global::config().has("output-dir") && !Global::config().has("output-dir", "-") &&
-                !existDir(Global::config().get("output-dir")) &&
-                !(Global::config().has("generate") ||
-                        (Global::config().has("dl-program") && !Global::config().has("compile")))) {
+        if (glb.config().has("output-dir") && !glb.config().has("output-dir", "-") &&
+                !existDir(glb.config().get("output-dir")) &&
+                !(glb.config().has("generate") ||
+                        (glb.config().has("dl-program") && !glb.config().has("compile")))) {
             throw std::runtime_error(
-                    "output directory " + Global::config().get("output-dir") + " does not exists");
+                    "output directory " + glb.config().get("output-dir") + " does not exists");
         }
 
         /* verify all input directories exist (racey, but gives nicer error messages for common mistakes) */
-        for (auto&& dir : Global::config().getMany("include-dir")) {
+        for (auto&& dir : glb.config().getMany("include-dir")) {
             if (!existDir(dir)) throw std::runtime_error("include directory `" + dir + "` does not exist");
         }
 
         /* collect all macro definitions for the pre-processor */
-        if (Global::config().has("macro")) {
+        if (glb.config().has("macro")) {
             std::string currentMacro = "";
             std::string allMacros = "";
-            for (const char& ch : Global::config().get("macro")) {
+            for (const char& ch : glb.config().get("macro")) {
                 if (ch == ' ') {
                     allMacros += " -D";
                     allMacros += currentMacro;
@@ -556,16 +557,16 @@ int main(int argc, char** argv) {
                 }
             }
             allMacros += " -D" + currentMacro;
-            Global::config().set("macro", allMacros);
+            glb.config().set("macro", allMacros);
         }
 
-        if (Global::config().has("live-profile") && !Global::config().has("profile")) {
-            Global::config().set("profile");
+        if (glb.config().has("live-profile") && !glb.config().has("profile")) {
+            glb.config().set("profile");
         }
 
         /* if emit-statistics is set then check that the profiler is also set */
-        if (Global::config().has("emit-statistics")) {
-            if (!Global::config().has("profile"))
+        if (glb.config().has("emit-statistics")) {
+            if (!glb.config().has("profile"))
                 throw std::runtime_error("must be profiling to use emit-statistics");
         }
 
@@ -577,8 +578,8 @@ int main(int argc, char** argv) {
     /**
      * Ensure that code generation is enabled if using SWIG interface option.
      */
-    if (Global::config().has("swig") && !Global::config().has("generate")) {
-        Global::config().set("generate", simpleName(Global::config().get("")));
+    if (glb.config().has("swig") && !glb.config().has("generate")) {
+        glb.config().set("generate", simpleName(glb.config().get("")));
     }
 
     // ------ start souffle -------------
@@ -589,28 +590,28 @@ int main(int argc, char** argv) {
         throw std::runtime_error("failed to determine souffle executable path");
     }
 
-    const std::filesystem::path InputPath(Global::config().get(""));
+    const std::filesystem::path InputPath(glb.config().get(""));
     std::unique_ptr<InputProvider> Input;
-    const bool use_preprocessor = !Global::config().has("no-preprocessor");
+    const bool use_preprocessor = !glb.config().has("no-preprocessor");
     if (use_preprocessor) {
-        if (Global::config().has("preprocessor")) {
-            auto cmd = Global::config().get("preprocessor");
+        if (glb.config().has("preprocessor")) {
+            auto cmd = glb.config().get("preprocessor");
             if (cmd == "gcc") {
-                Input = std::make_unique<GCCPreprocInput>(InputPath, Global::config());
+                Input = std::make_unique<GCCPreprocInput>(InputPath, glb.config());
             } else if (cmd == "mcpp") {
-                Input = std::make_unique<MCPPPreprocInput>(InputPath, Global::config());
+                Input = std::make_unique<MCPPPreprocInput>(InputPath, glb.config());
             } else {
-                Input = std::make_unique<PreprocInput>(InputPath, Global::config(), cmd);
+                Input = std::make_unique<PreprocInput>(InputPath, glb.config(), cmd);
             }
         } else if (MCPPPreprocInput::available()) {  // mcpp fallback
-            Input = std::make_unique<MCPPPreprocInput>(InputPath, Global::config());
+            Input = std::make_unique<MCPPPreprocInput>(InputPath, glb.config());
         } else if (GCCPreprocInput::available()) {  // gcc fallback
-            Input = std::make_unique<GCCPreprocInput>(InputPath, Global::config());
+            Input = std::make_unique<GCCPreprocInput>(InputPath, glb.config());
         } else {
             throw std::runtime_error("failed to locate mcpp or gcc pre-processors");
         }
     } else {
-        Input = std::make_unique<FileInput>(Global::config().get(""));
+        Input = std::make_unique<FileInput>(glb.config().get(""));
     }
 
     /* Time taking for parsing */
@@ -619,25 +620,25 @@ int main(int argc, char** argv) {
     // ------- parse program -------------
 
     // parse file
-    ErrorReport errReport(Global::config().has("no-warn"));
+    ErrorReport errReport(glb.config().has("no-warn"));
     DebugReport debugReport;
     Own<ast::TranslationUnit> astTranslationUnit = ParserDriver::parseTranslationUnit(
-            InputPath.string(), Input->getInputStream(), errReport, debugReport);
+            glb, InputPath.string(), Input->getInputStream(), errReport, debugReport);
     Input->endInput();
 
     /* Report run-time of the parser if verbose flag is set */
-    if (Global::config().has("verbose")) {
+    if (glb.config().has("verbose")) {
         auto parser_end = std::chrono::high_resolution_clock::now();
         std::cout << "Parse time: " << std::chrono::duration<double>(parser_end - parser_start).count()
                   << "sec\n";
     }
 
-    auto hasShowOpt = [&](auto&&... kind) { return (Global::config().has("show", kind) || ...); };
+    auto hasShowOpt = [&](auto&&... kind) { return (glb.config().has("show", kind) || ...); };
 
     // `--show parse-errors` is special in that it (ab?)used the return code to specify the # of errors.
     //  Other `--show` modes can be used in conjunction with each other.
     if (hasShowOpt("parse-errors")) {
-        if (1 < Global::config().getMany("show").size()) {
+        if (1 < glb.config().getMany("show").size()) {
             std::cerr << "WARNING: `--show parse-errors` inhibits other `--show` actions.\n";
         }
 
@@ -656,7 +657,7 @@ int main(int argc, char** argv) {
     if (hasShowOpt("initial-ast", "initial-datalog")) {
         std::cout << astTranslationUnit->getProgram() << std::endl;
         // no other show options specified -> bail, we're done.
-        if (Global::config().getMany("show").size() == 1) return 0;
+        if (glb.config().getMany("show").size() == 1) return 0;
     }
 
     /* construct the transformation pipeline */
@@ -673,7 +674,7 @@ int main(int argc, char** argv) {
     // Magic-Set pipeline
     auto magicPipeline = mk<ast::transform::PipelineTransformer>(
             mk<ast::transform::ConditionalTransformer>(
-                    Global::config().has("magic-transform"), mk<ast::transform::ExpandEqrelsTransformer>()),
+                    glb.config().has("magic-transform"), mk<ast::transform::ExpandEqrelsTransformer>()),
             mk<ast::transform::MagicSetTransformer>(), mk<ast::transform::ResolveAliasesTransformer>(),
             mk<ast::transform::RemoveRelationCopiesTransformer>(),
             mk<ast::transform::RemoveEmptyRelationsTransformer>(),
@@ -686,7 +687,7 @@ int main(int argc, char** argv) {
                     mk<ast::transform::ReplaceSingletonVariablesTransformer>());
 
     // Provenance pipeline
-    auto provenancePipeline = mk<ast::transform::ConditionalTransformer>(Global::config().has("provenance"),
+    auto provenancePipeline = mk<ast::transform::ConditionalTransformer>(glb.config().has("provenance"),
             mk<ast::transform::PipelineTransformer>(mk<ast::transform::ExpandEqrelsTransformer>(),
                     mk<ast::transform::NameUnnamedVariablesTransformer>()));
 
@@ -728,15 +729,15 @@ int main(int argc, char** argv) {
             mk<ast::transform::IOAttributesTransformer>());
 
     // Disable unwanted transformations
-    if (Global::config().has("disable-transformers")) {
+    if (glb.config().has("disable-transformers")) {
         std::vector<std::string> givenTransformers =
-                splitString(Global::config().get("disable-transformers"), ',');
+                splitString(glb.config().get("disable-transformers"), ',');
         pipeline->disableTransformers(
                 std::set<std::string>(givenTransformers.begin(), givenTransformers.end()));
     }
 
     // Set up the debug report if necessary
-    if (Global::config().has("debug-report")) {
+    if (glb.config().has("debug-report")) {
         auto parser_end = std::chrono::high_resolution_clock::now();
         std::stringstream ss;
 
@@ -747,7 +748,7 @@ int main(int argc, char** argv) {
 
         // Add config
         ss << "(\n";
-        ss << join(Global::config().data(), ",\n", [](std::ostream& out, const auto& arg) {
+        ss << join(glb.config().data(), ",\n", [](std::ostream& out, const auto& arg) {
             out << "  \"" << arg.first << "\" -> \"" << arg.second << '"';
         });
         ss << "\n)";
@@ -763,7 +764,7 @@ int main(int argc, char** argv) {
     }
 
     // Toggle pipeline verbosity
-    pipeline->setVerbosity(Global::config().has("verbose"));
+    pipeline->setVerbosity(glb.config().has("verbose"));
 
     // Apply all the transformations
     pipeline->apply(*astTranslationUnit);
@@ -804,13 +805,13 @@ int main(int argc, char** argv) {
     }
 
     // bail if we've nothing else left to show
-    if (Global::config().has("show") && !hasShowOpt("initial-ram", "transformed-ram")) return 0;
+    if (glb.config().has("show") && !hasShowOpt("initial-ram", "transformed-ram")) return 0;
 
     // ------- execution -------------
     /* translate AST to RAM */
     debugReport.startSection();
     auto translationStrategy =
-            Global::config().has("provenance")
+            glb.config().has("provenance")
                     ? mk<ast2ram::TranslationStrategy, ast2ram::provenance::TranslationStrategy>()
                     : mk<ast2ram::TranslationStrategy, ast2ram::seminaive::TranslationStrategy>();
     auto unitTranslator = Own<ast2ram::UnitTranslator>(translationStrategy->createUnitTranslator());
@@ -838,7 +839,7 @@ int main(int argc, char** argv) {
                 mk<ReorderConditionsTransformer>(), mk<LoopTransformer>(mk<ReorderFilterBreak>()),
                 mk<ConditionalTransformer>(
                         // job count of 0 means all cores are used.
-                        []() -> bool { return std::stoi(Global::config().get("jobs")) != 1; },
+                        [&]() -> bool { return std::stoi(glb.config().get("jobs")) != 1; },
                         mk<ParallelTransformer>()),
                 mk<ReportIndexTransformer>());
 
@@ -863,7 +864,7 @@ int main(int argc, char** argv) {
     const bool must_interpret = !execute_mode && !compile_mode && !generate_mode && !generate_many_mode &&
                                 !Global::config().has("swig");
     const bool must_execute = execute_mode;
-    const bool must_compile = must_execute || compile_mode || Global::config().has("swig");
+    const bool must_compile = must_execute || compile_mode || glb.config().has("swig");
 
     try {
         if (must_interpret) {
@@ -871,7 +872,7 @@ int main(int argc, char** argv) {
 
             std::thread profiler;
             // Start up profiler if needed
-            if (Global::config().has("live-profile")) {
+            if (glb.config().has("live-profile")) {
 #ifdef _MSC_VER
                 throw("No live-profile on Windows\n.");
 #else
@@ -880,28 +881,30 @@ int main(int argc, char** argv) {
             }
 
             // configure and execute interpreter
-            Own<interpreter::Engine> interpreter(mk<interpreter::Engine>(*ramTranslationUnit));
+            const std::size_t numThreadsOrZero = std::stoi(glb.config().get("jobs"));
+            Own<interpreter::Engine> interpreter(
+                    mk<interpreter::Engine>(*ramTranslationUnit, numThreadsOrZero));
             interpreter->executeMain();
             // If the profiler was started, join back here once it exits.
             if (profiler.joinable()) {
                 profiler.join();
             }
-            if (Global::config().has("provenance")) {
+            if (glb.config().has("provenance")) {
 #ifdef _MSC_VER
                 throw("No explain/explore provenance on Windows\n.");
 #else
                 // only run explain interface if interpreted
                 interpreter::ProgInterface interface(*interpreter);
-                if (Global::config().get("provenance") == "explain") {
+                if (glb.config().get("provenance") == "explain") {
                     explain(interface, false);
-                } else if (Global::config().get("provenance") == "explore") {
+                } else if (glb.config().get("provenance") == "explore") {
                     explain(interface, true);
                 }
 #endif
             }
         } else {
             // ------- compiler -------------
-            // int jobs = std::stoi(Global::config().get("jobs"));
+            // int jobs = std::stoi(glb.config().get("jobs"));
             // jobs = (jobs <= 0 ? MAX_THREADS : jobs);
             auto synthesiser =
                     mk<synthesiser::Synthesiser>(/*static_cast<std::size_t>(jobs),*/ *ramTranslationUnit);
@@ -909,9 +912,9 @@ int main(int argc, char** argv) {
             // Find the base filename for code generation and execution
             std::string baseFilename;
             if (compile_mode) {
-                baseFilename = Global::config().get("dl-program");
+                baseFilename = glb.config().get("dl-program");
             } else if (generate_mode) {
-                baseFilename = Global::config().get("generate");
+                baseFilename = glb.config().get("generate");
 
                 // trim .cpp extension if it exists
                 if (baseFilename.size() >= 4 && baseFilename.substr(baseFilename.size() - 4) == ".cpp") {
@@ -933,16 +936,17 @@ int main(int argc, char** argv) {
 
             bool withSharedLibrary;
             auto synthesisStart = std::chrono::high_resolution_clock::now();
-            const bool emitToStdOut = Global::config().has("generate", "-");
+            const bool emitToStdOut = glb.config().has("generate", "-");
             const bool emitMultipleFiles =
                     Global::config().has("generate-many") || Global::config().has("compile-many");
 
             synthesiser::GenDb db;
             synthesiser->generateCode(db, baseIdentifier, withSharedLibrary);
             std::vector<fs::path> srcFiles;
-            if (emitToStdOut)
+
+            if (emitToStdOut) {
                 db.emitSingleFile(std::cout);
-            else if (emitMultipleFiles) {
+            } else if (emitMultipleFiles) {
                 fs::path directory = Global::config().has("generate-many")
                                              ? fs::path(Global::config().get("generate-many"))
                                              : fs::temp_directory_path() / baseIdentifier;
@@ -955,18 +959,18 @@ int main(int argc, char** argv) {
                 os.close();
                 srcFiles.push_back(fs::path(sourceFilename));
             }
-            if (Global::config().has("verbose")) {
+            if (glb.config().has("verbose")) {
                 auto synthesisEnd = std::chrono::high_resolution_clock::now();
                 std::cout << "Synthesis time: "
                           << std::chrono::duration<double>(synthesisEnd - synthesisStart).count() << "sec\n";
             }
 
             if (withSharedLibrary) {
-                if (!Global::config().has("libraries")) {
-                    Global::config().set("libraries", "functors");
+                if (!glb.config().has("libraries")) {
+                    glb.config().set("libraries", "functors");
                 }
-                if (!Global::config().has("library-dir")) {
-                    Global::config().set("library-dir", ".");
+                if (!glb.config().has("library-dir")) {
+                    glb.config().set("library-dir", ".");
                 }
             }
 
@@ -977,10 +981,10 @@ int main(int argc, char** argv) {
 
                 auto t_bgn = std::chrono::high_resolution_clock::now();
                 fs::path output(binaryFilename);
-                compileToBinary(*souffle_compile, srcFiles, output);
+                compileToBinary(glb, *souffle_compile, srcFiles, output);
                 auto t_end = std::chrono::high_resolution_clock::now();
 
-                if (Global::config().has("verbose")) {
+                if (glb.config().has("verbose")) {
                     std::cout << "Compilation time: " << std::chrono::duration<double>(t_end - t_bgn).count()
                               << "sec\n";
                 }
@@ -991,7 +995,7 @@ int main(int argc, char** argv) {
 #if defined(_MSC_VER)
                 binaryFilename += ".exe";
 #endif
-                executeBinaryAndExit(binaryFilename);
+                executeBinaryAndExit(glb, binaryFilename);
             }
         }
     } catch (std::exception& e) {
@@ -1000,7 +1004,7 @@ int main(int argc, char** argv) {
     }
 
     /* Report overall run-time in verbose mode */
-    if (Global::config().has("verbose")) {
+    if (glb.config().has("verbose")) {
         auto souffle_end = std::chrono::high_resolution_clock::now();
         std::cout << "Total time: " << std::chrono::duration<double>(souffle_end - souffle_start).count()
                   << "sec\n";
@@ -1012,5 +1016,6 @@ int main(int argc, char** argv) {
 }  // end of namespace souffle
 
 int main(int argc, char** argv) {
-    return souffle::main(argc, argv);
+    souffle::Global glb;
+    return souffle::main(glb, argc, argv);
 }

@@ -549,12 +549,12 @@ public:
         return out;
     }
 
-    TypeSet getTypes() const {
-        TypeSet types;
-        for (auto& type : types) {
-            types.insert(type);
+    std::vector<const Type*> getTypes() const {
+        std::vector<const Type*> result;
+        for (const auto& Pair : types) {
+            result.emplace_back(Pair.second.get());
         }
-        return types;
+        return result;
     }
 
 private:

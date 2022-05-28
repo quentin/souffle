@@ -56,7 +56,8 @@ using json11::Json;
 
 const std::string testInterpreterStore(
         std::vector<std::string> attribs, std::vector<std::string> attribsTypes, VecOwn<Expression> exprs) {
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     const std::size_t arity = attribs.size();
 
@@ -81,12 +82,12 @@ const std::string testInterpreterStore(
     Own<ram::Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -237,7 +238,8 @@ TEST(IO_store, SignedChangedDelimiter) {
     const std::size_t len = randomNumbers.size();
     const std::string delimiter{", "};
 
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     VecOwn<ram::Relation> rels;
 
@@ -275,12 +277,12 @@ TEST(IO_store, SignedChangedDelimiter) {
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -310,7 +312,8 @@ TEST(IO_store, SignedChangedDelimiter) {
 }
 
 TEST(IO_store, MixedTypes) {
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     VecOwn<ram::Relation> rels;
 
@@ -330,7 +333,7 @@ TEST(IO_store, MixedTypes) {
     std::map<std::string, std::string> ioDirs = std::map<std::string, std::string>(dirs);
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
     VecOwn<Expression> exprs;
     RamFloat floatValue = 27.75;
@@ -347,10 +350,10 @@ TEST(IO_store, MixedTypes) {
     std::map<std::string, Own<Statement>> subs;
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -382,7 +385,8 @@ TEST(IO_load, Signed) {
     std::istringstream testInput("5	3");
     std::cin.rdbuf(testInput.rdbuf());
 
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     VecOwn<ram::Relation> rels;
 
@@ -411,12 +415,12 @@ TEST(IO_load, Signed) {
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -442,7 +446,8 @@ TEST(IO_load, Float) {
     std::istringstream testInput("0.5	0.5");
     std::cin.rdbuf(testInput.rdbuf());
 
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     VecOwn<ram::Relation> rels;
 
@@ -471,12 +476,12 @@ TEST(IO_load, Float) {
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -502,7 +507,8 @@ TEST(IO_load, Unsigned) {
     std::istringstream testInput("6	6");
     std::cin.rdbuf(testInput.rdbuf());
 
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     VecOwn<ram::Relation> rels;
 
@@ -531,12 +537,12 @@ TEST(IO_load, Unsigned) {
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;
@@ -562,7 +568,8 @@ TEST(IO_load, MixedTypesLoad) {
     std::istringstream testInput("meow	-3	3	0.5");
     std::cin.rdbuf(testInput.rdbuf());
 
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
 
     VecOwn<ram::Relation> rels;
 
@@ -591,12 +598,12 @@ TEST(IO_load, MixedTypesLoad) {
     Own<Program> prog = mk<Program>(std::move(rels), std::move(main), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
     std::ostringstream sout;

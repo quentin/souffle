@@ -126,7 +126,7 @@ public:
      * @param RAM program that is transformed
      * @result Flag that indicates whether the input program has changed
      */
-    bool makeIndex(Program& program);
+    bool makeIndex(Global&, Program& program);
 
 protected:
     analysis::LevelAnalysis* rla{nullptr};
@@ -134,10 +134,12 @@ protected:
     bool transform(TranslationUnit& translationUnit) override {
         rla = &translationUnit.getAnalysis<analysis::LevelAnalysis>();
         relAnalysis = &translationUnit.getAnalysis<analysis::RelationAnalysis>();
-        return makeIndex(translationUnit.getProgram());
+        return makeIndex(translationUnit.global(), translationUnit.getProgram());
     }
 
     analysis::RelationAnalysis* relAnalysis{nullptr};
+
+    Global* glb;
 };
 
 }  // namespace souffle::ram::transform

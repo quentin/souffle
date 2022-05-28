@@ -228,6 +228,8 @@ private:
 
     IOTypeAnalysis* ioType = nullptr;
 
+    std::string programName;
+
     /** Print the SCC graph to a string. */
     void printRaw(std::stringstream& ss) const;
 };

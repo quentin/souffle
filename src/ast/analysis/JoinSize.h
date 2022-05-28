@@ -67,10 +67,10 @@ private:
     RecursiveClausesAnalysis* recursiveClauses = nullptr;
     PolymorphicObjectsAnalysis* polyAnalysis = nullptr;
 
-    // for each stratum compute the EstimateJoinSize nodes to emit
-    std::vector<StratumJoinSizeEstimates> computeJoinSizeStatements();
-    StratumJoinSizeEstimates computeRuleVersionStatements(const RelationSet& sccRelations,
-            const ast::Clause& clause, std::size_t version,
+    // for each stratum compute the CountUniqueKeys nodes to emit
+    std::vector<StratumUniqueKeys> computeUniqueKeyStatements(bool hasIndexStats);
+    StratumUniqueKeys computeRuleVersionStatements(const std::set<const ast::Relation*>& sccRelations,
+            const ast::Clause& clause, std::optional<std::size_t> version,
             ast2ram::TranslationMode mode = ast2ram::TranslationMode::DEFAULT);
 };
 

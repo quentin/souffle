@@ -44,10 +44,11 @@ namespace souffle::ast::transform::test {
 using namespace analysis;
 
 TEST(Transformers, GroundTermPropagation) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
     // load some test program
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .type D <: symbol
                 .decl p(a:D,b:D)
@@ -75,10 +76,11 @@ TEST(Transformers, GroundTermPropagation) {
 }
 
 TEST(Transformers, GroundTermPropagation2) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
     // load some test program
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                .type D <: symbol
                .decl p(a:D,b:D)
@@ -103,9 +105,10 @@ TEST(Transformers, GroundTermPropagation2) {
 
 TEST(Transformers, ResolveGroundedAliases) {
     // load some test program
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    DebugReport debugReport(glb);
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .type D <: symbol
                 .decl p(a:D,b:D)
@@ -126,9 +129,10 @@ TEST(Transformers, ResolveGroundedAliases) {
 
 TEST(Transformers, ResolveAliasesWithTermsInAtoms) {
     // load some test program
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    DebugReport debugReport(glb);
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .type D <: symbol
                 .decl p(a:D,b:D)
@@ -163,10 +167,11 @@ TEST(Transformers, ResolveAliasesWithTermsInAtoms) {
  */
 
 TEST(Transformers, RemoveRelationCopies) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
     // load some test program
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .type D = number
                 .decl a(a:D,b:D)
@@ -208,10 +213,11 @@ TEST(Transformers, RemoveRelationCopies) {
  *
  */
 TEST(Transformers, RemoveRelationCopiesOutput) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
     // load some test program
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .type D = number
                 .decl a(a:D,b:D)
@@ -242,10 +248,11 @@ TEST(Transformers, RemoveRelationCopiesOutput) {
  * Test the equivalence (or lack of equivalence) of clauses using the MinimiseProgramTransfomer.
  */
 TEST(Transformers, CheckClausalEquivalence) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .decl A(x:number, y:number)
                 .decl B(x:number)
@@ -333,10 +340,11 @@ TEST(Transformers, CheckClausalEquivalence) {
  * Test the equivalence (or lack of equivalence) of aggregators using the MinimiseProgramTransfomer.
  */
 TEST(Transformers, CheckAggregatorEquivalence) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .decl A,B,C,D(X:number) input
                 // first and second are equivalent
@@ -396,10 +404,11 @@ TEST(Transformers, CheckAggregatorEquivalence) {
  *          e.g. a(x) :- a(x), x != 0. is only true if a(x) is already true
  */
 TEST(Transformers, RemoveClauseRedundancies) {
+    Global glb;
     ErrorReport errorReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .decl a,b,c(X:number)
                 a(0).
@@ -453,10 +462,11 @@ TEST(Transformers, RemoveClauseRedundancies) {
  *      (4) MagicSetTransformer
  */
 TEST(Transformers, MagicSetComprehensive) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
+    DebugReport d(glb);
 
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 // Stratum 0 - Base Relations
                 .decl BaseOne(X:number) magic

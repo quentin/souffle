@@ -112,7 +112,7 @@ Own<ram::Statement> UnitTranslator::generateNonRecursiveRelation(const ast::Rela
         Own<ram::Statement> rule = context->translateNonRecursiveClause(*clause);
 
         // Add logging
-        if (Global::config().has("profile")) {
+        if (glb->config().has("profile")) {
             const std::string& relationName = toString(rel.getQualifiedName());
             const auto& srcLocation = clause->getSrcLoc();
             const std::string clauseText = stringify(toString(*clause));
@@ -132,7 +132,7 @@ Own<ram::Statement> UnitTranslator::generateNonRecursiveRelation(const ast::Rela
     }
 
     // Add logging for entire relation
-    if (Global::config().has("profile")) {
+    if (glb->config().has("profile")) {
         const std::string& relationName = toString(rel.getQualifiedName());
         const auto& srcLocation = rel.getSrcLoc();
         const std::string logSizeStatement = LogStatement::nNonrecursiveRelation(relationName, srcLocation);
@@ -403,7 +403,7 @@ Own<ram::Statement> UnitTranslator::generateNonRecursiveDelete(const ast::Relati
                     context->translateNonRecursiveClause(*clause, SubsumeDeleteCurrentCurrent);
 
             // Add logging for subsumptive clause
-            if (Global::config().has("profile")) {
+            if (glb->config().has("profile")) {
                 const std::string& relationName = toString(rel->getQualifiedName());
                 const auto& srcLocation = clause->getSrcLoc();
                 const std::string clauseText = stringify(toString(*clause));
@@ -478,7 +478,7 @@ Own<ram::Statement> UnitTranslator::generateStratumTableUpdates(const ast::Relat
         }
 
         // Measure update time
-        if (Global::config().has("profile")) {
+        if (glb->config().has("profile")) {
             updateRelTable = mk<ram::LogRelationTimer>(std::move(updateRelTable),
                     LogStatement::cRecursiveRelation(toString(rel->getQualifiedName()), rel->getSrcLoc()),
                     newRelation);
@@ -492,8 +492,11 @@ Own<ram::Statement> UnitTranslator::generateStratumTableUpdates(const ast::Relat
 Own<ram::Statement> UnitTranslator::generateStratumLoopBody(const ast::RelationSet& scc) const {
     VecOwn<ram::Statement> loopBody;
 
-    auto addProfiling = [](const ast::Relation* rel, Own<ram::Statement> stmt) -> Own<ram::Statement> {
-        if (Global::config().has("profile")) {
+    const bool hasProfile = glb->config().has("profile");
+
+    auto addProfiling = [hasProfile](
+                                const ast::Relation* rel, Own<ram::Statement> stmt) -> Own<ram::Statement> {
+        if (hasProfile) {
             const std::string& relationName = toString(rel->getQualifiedName());
             const auto& srcLocation = rel->getSrcLoc();
             const std::string logTimerStatement = LogStatement::tRecursiveRelation(relationName, srcLocation);
@@ -595,7 +598,7 @@ Own<ram::Statement> UnitTranslator::generateLoadRelation(const ast::Relation* re
         for (const auto& [key, value] : load->getParameters()) {
             directives.insert(std::make_pair(key, unescape(value)));
         }
-        if (Global::config().has("no-warn")) {
+        if (glb->config().has("no-warn")) {
             directives.insert(std::make_pair("no-warn", "true"));
         }
         addAuxiliaryArity(relation, directives);
@@ -603,7 +606,7 @@ Own<ram::Statement> UnitTranslator::generateLoadRelation(const ast::Relation* re
         // Create the resultant load statement, with profile information
         std::string ramRelationName = getConcreteRelationName(relation->getQualifiedName());
         Own<ram::Statement> loadStmt = mk<ram::IO>(ramRelationName, directives);
-        if (Global::config().has("profile")) {
+        if (glb->config().has("profile")) {
             const std::string logTimerStatement =
                     LogStatement::tRelationLoadTime(ramRelationName, relation->getSrcLoc());
             loadStmt = mk<ram::LogRelationTimer>(std::move(loadStmt), logTimerStatement, ramRelationName);
@@ -626,7 +629,7 @@ Own<ram::Statement> UnitTranslator::generateStoreRelation(const ast::Relation* r
         // Create the resultant store statement, with profile information
         std::string ramRelationName = getConcreteRelationName(relation->getQualifiedName());
         Own<ram::Statement> storeStmt = mk<ram::IO>(ramRelationName, directives);
-        if (Global::config().has("profile")) {
+        if (glb->config().has("profile")) {
             const std::string logTimerStatement =
                     LogStatement::tRelationSaveTime(ramRelationName, relation->getSrcLoc());
             storeStmt = mk<ram::LogRelationTimer>(std::move(storeStmt), logTimerStatement, ramRelationName);
@@ -723,7 +726,7 @@ Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& t
     }
 
     // Add main timer if profiling
-    if (!res.empty() && Global::config().has("profile")) {
+    if (!res.empty() && glb->config().has("profile")) {
         auto newStmt = mk<ram::LogTimer>(mk<ram::Sequence>(std::move(res)), LogStatement::runtime());
         res.clear();
         appendStmt(res, std::move(newStmt));
@@ -734,6 +737,8 @@ Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& t
 }
 
 Own<ram::TranslationUnit> UnitTranslator::translateUnit(ast::TranslationUnit& tu) {
+    glb = &tu.global();
+
     /* -- Set-up -- */
     auto ram_start = std::chrono::high_resolution_clock::now();
     context = mk<TranslatorContext>(tu);
@@ -753,7 +758,7 @@ Own<ram::TranslationUnit> UnitTranslator::translateUnit(ast::TranslationUnit& tu
             mk<ram::Program>(std::move(ramRelations), std::move(ramMain), std::move(ramSubroutines));
 
     // Add the translated program to the debug report
-    if (Global::config().has("debug-report")) {
+    if (glb->config().has("debug-report")) {
         auto ram_end = std::chrono::high_resolution_clock::now();
         std::string runtimeStr =
                 "(" + std::to_string(std::chrono::duration<double>(ram_end - ram_start).count()) + "s)";
@@ -763,7 +768,7 @@ Own<ram::TranslationUnit> UnitTranslator::translateUnit(ast::TranslationUnit& tu
     }
 
     // Wrap the program into a translation unit
-    return mk<ram::TranslationUnit>(std::move(ramProgram), errReport, debugReport);
+    return mk<ram::TranslationUnit>(tu.global(), std::move(ramProgram), errReport, debugReport);
 }
 
 }  // namespace souffle::ast2ram::seminaive

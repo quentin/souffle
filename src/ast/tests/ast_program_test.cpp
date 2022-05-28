@@ -42,9 +42,10 @@
 namespace souffle::ast::test {
 
 inline Own<TranslationUnit> makeATU(std::string program) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
-    return ParserDriver::parseTranslationUnit(program, e, d);
+    DebugReport d(glb);
+    return ParserDriver::parseTranslationUnit(glb, program, e, d);
 }
 
 inline Own<Clause> makeClause(std::string name, Own<Argument> headArgument) {
@@ -55,16 +56,17 @@ inline Own<Clause> makeClause(std::string name, Own<Argument> headArgument) {
 }
 
 TEST(Program, Parse) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
+    DebugReport d(glb);
     // check the empty program
-    Own<TranslationUnit> empty = ParserDriver::parseTranslationUnit("", e, d);
+    Own<TranslationUnit> empty = ParserDriver::parseTranslationUnit(glb, "", e, d);
 
     EXPECT_TRUE(empty->getProgram().getTypes().empty());
     EXPECT_TRUE(empty->getProgram().getRelations().empty());
 
     // check something simple
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                    .type Node <: symbol
                    .decl e ( a : Node , b : Node )
@@ -86,16 +88,17 @@ TEST(Program, Parse) {
     EXPECT_FALSE(prog.getRelation("n"));
 }
 
-#define TESTASTCLONEANDEQUAL(SUBTYPE, DL)                                       \
-    TEST(Ast, CloneAndEqual##SUBTYPE) {                                         \
-        ErrorReport e;                                                          \
-        DebugReport d;                                                          \
-        Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(DL, e, d); \
-        Program& program = tu->getProgram();                                    \
-        EXPECT_EQ(program, program);                                            \
-        Own<Program> cl(clone(program));                                        \
-        EXPECT_NE(cl.get(), &program);                                          \
-        EXPECT_EQ(*cl, program);                                                \
+#define TESTASTCLONEANDEQUAL(SUBTYPE, DL)                                            \
+    TEST(Ast, CloneAndEqual##SUBTYPE) {                                              \
+        Global glb;                                                                  \
+        ErrorReport e;                                                               \
+        DebugReport d(glb);                                                          \
+        Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb, DL, e, d); \
+        Program& program = tu->getProgram();                                         \
+        EXPECT_EQ(program, program);                                                 \
+        Own<Program> cl(clone(program));                                             \
+        EXPECT_NE(cl.get(), &program);                                               \
+        EXPECT_EQ(*cl, program);                                                     \
     }
 
 TESTASTCLONEANDEQUAL(Program,

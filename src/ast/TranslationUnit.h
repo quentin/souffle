@@ -16,11 +16,10 @@
 
 #pragma once
 
+#include "Program.h"
 #include "TranslationUnitBase.h"
 
 namespace souffle::ast {
-
-class Program;
 
 /**
  * @class TranslationUnit

@@ -53,7 +53,8 @@ RamDomain evalExpression(Own<Expression> expression) {
     VecOwn<Expression> returnValues;
     returnValues.emplace_back(std::move(expression));
 
-    Global::config().set("jobs", "1");
+    Global glb;
+    glb.config().set("jobs", "1");
     Own<Statement> query = mk<ram::Query>(mk<ram::SubroutineReturn>(std::move(returnValues)));
     std::map<std::string, Own<Statement>> subs;
     subs.insert(std::make_pair("test", std::move(query)));
@@ -62,12 +63,12 @@ RamDomain evalExpression(Own<Expression> expression) {
     Own<Program> prog = mk<Program>(std::move(rels), mk<ram::Sequence>(), std::move(subs));
 
     ErrorReport errReport;
-    DebugReport debugReport;
+    DebugReport debugReport(glb);
 
-    TranslationUnit translationUnit(std::move(prog), errReport, debugReport);
+    TranslationUnit translationUnit(glb, std::move(prog), errReport, debugReport);
 
     // configure and execute interpreter
-    Own<Engine> interpreter = mk<Engine>(translationUnit);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
 
     std::string name("test");
     std::vector<RamDomain> ret;

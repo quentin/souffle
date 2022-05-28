@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "Global.h"
 #include "reports/DebugReport.h"
 #include "reports/ErrorReport.h"
 #include "souffle/utility/DynamicCasting.h"
@@ -72,8 +73,8 @@ struct TranslationUnitBase {
         virtual void run(Impl const&) = 0;
     };
 
-    TranslationUnitBase(Own<Program> prog, ErrorReport& e, DebugReport& d)
-            : program(std::move(prog)), errorReport(e), debugReport(d) {
+    TranslationUnitBase(Global& g, Own<Program> prog, ErrorReport& e, DebugReport& d)
+            : glb(g), program(std::move(prog)), errorReport(e), debugReport(d) {
         assert(program != nullptr && "program is a null-pointer");
     }
 
@@ -109,6 +110,11 @@ struct TranslationUnitBase {
         analyses.clear();
     }
 
+    /** @brief Get the global configuration */
+    Global& global() const {
+        return glb;
+    }
+
     /** @brief Get the RAM Program of the translation unit  */
     Program& getProgram() const {
         return *program;
@@ -132,6 +138,8 @@ protected:
     //       Clang is happy. GCC 9.2.0 -O1+ w/o asan is happy. Go figure.
     //       Using `std::string` appears to suppress the issue (bug?).
     mutable std::map<std::string, Own<Analysis>> analyses;
+
+    Global& glb;
 
     /* RAM program */
     Own<Program> program;

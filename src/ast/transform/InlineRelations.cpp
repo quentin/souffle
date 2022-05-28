@@ -1008,10 +1008,10 @@ std::vector<Clause*> getInlinedClause(Program& program, const Clause& clause) {
     }
 }
 
-ExcludedRelations InlineRelationsTransformer::excluded() {
+ExcludedRelations InlineRelationsTransformer::excluded(Global& glb) {
     ExcludedRelations xs;
     auto addAll = [&](const std::string& name) {
-        for (auto&& r : splitString(Global::config().get(name), ','))
+        for (auto&& r : splitString(glb.config().get(name), ','))
             xs.insert(QualifiedName(r));
     };
 
@@ -1073,7 +1073,7 @@ bool InlineUnmarkExcludedTransform::transform(TranslationUnit& translationUnit) 
     bool changed = false;
     Program& program = translationUnit.getProgram();
 
-    auto&& excluded = InlineRelationsTransformer::excluded();
+    auto&& excluded = InlineRelationsTransformer::excluded(translationUnit.global());
 
     for (Relation* rel : program.getRelations()) {
         // no-magic implies no inlining

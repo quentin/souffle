@@ -104,18 +104,21 @@ private:
  * used to isolate all globals. */
 class Global {
 public:
+    Global() = default;
     /* Deleted copy constructor. */
     Global(const Global&) = delete;
     /* Deleted assignment operator. */
     Global& operator=(const Global&) = delete;
     /* Obtain the global configuration. */
-    static MainConfig& config() {
-        static MainConfig _config;
+    MainConfig& config() {
+        return _config;
+    }
+
+    const MainConfig& config() const {
         return _config;
     }
 
 private:
-    /* Private empty constructor, there is only one global instance. */
-    Global() = default;
+    MainConfig _config;
 };
 }  // namespace souffle

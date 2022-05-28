@@ -36,6 +36,7 @@ namespace souffle::ast::analysis {
 void SCCGraphAnalysis::run(const TranslationUnit& translationUnit) {
     precedenceGraph = &translationUnit.getAnalysis<PrecedenceGraphAnalysis>();
     ioType = &translationUnit.getAnalysis<IOTypeAnalysis>();
+    programName = translationUnit.global().config().get("name");
     sccToRelation.clear();
     relationToScc.clear();
     predecessors.clear();
@@ -115,7 +116,7 @@ void SCCGraphAnalysis::scR(const Relation* w, std::map<const Relation*, std::siz
 }
 
 void SCCGraphAnalysis::printRaw(std::stringstream& ss) const {
-    const std::string& name = Global::config().get("name");
+    const std::string& name = programName;
     /* Print SCC graph */
     ss << "digraph {" << std::endl;
     /* Print nodes of SCC graph */

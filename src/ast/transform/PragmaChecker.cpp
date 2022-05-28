@@ -26,8 +26,8 @@
 
 namespace souffle::ast::transform {
 
-PragmaChecker::Merger::Merger() {
-    auto& config = Global::config();
+PragmaChecker::Merger::Merger(Global& g) : glb(g) {
+    auto& config = glb.config();
 
     for (auto&& [k, v] : config.data()) {
         if (config.state(k) == MainConfig::State::set) {
@@ -40,7 +40,7 @@ bool PragmaChecker::Merger::operator()(std::string_view k, std::string_view v) {
     // Command line options take precedence, even if the param allows multiple
     if (contains(locked_keys, k)) return false;
 
-    auto& config = Global::config();
+    auto& config = glb.config();
     if (config.allowsMultiple(k))
         config.append(k, std::string(v));
     else
@@ -50,9 +50,10 @@ bool PragmaChecker::Merger::operator()(std::string_view k, std::string_view v) {
 }
 
 bool PragmaChecker::transform(TranslationUnit& translationUnit) {
-    Merger merger;
+    Merger merger(translationUnit.global());
 
     auto& program = translationUnit.getProgram();
+    auto& glb = translationUnit.global();
     auto& error = translationUnit.getErrorReport();
     bool changed = false;
     std::map<std::string, Pragma const*> previous_pragma;
@@ -62,7 +63,7 @@ bool PragmaChecker::transform(TranslationUnit& translationUnit) {
         auto&& [k, v] = pragma->getkvp();
 
         // warn if subsequent pragmas override one another
-        if (!Global::config().allowsMultiple(k)) {
+        if (!glb.config().allowsMultiple(k)) {
             auto it = previous_pragma.find(k);
             if (it != previous_pragma.end()) {
                 error.addDiagnostic({Diagnostic::Type::WARNING,

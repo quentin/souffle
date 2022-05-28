@@ -213,18 +213,19 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
     private:
         Synthesiser& synthesiser;
+        Global& glb;
         IndexAnalysis* const isa = &synthesiser.getTranslationUnit().getAnalysis<IndexAnalysis>();
 
 // macros to add comments to generated code for debugging
 #ifndef PRINT_BEGIN_COMMENT
-#define PRINT_BEGIN_COMMENT(os)                                                  \
-    if (Global::config().has("debug-report") || Global::config().has("verbose")) \
+#define PRINT_BEGIN_COMMENT(os)                                          \
+    if (glb.config().has("debug-report") || glb.config().has("verbose")) \
     os << "/* BEGIN " << __FUNCTION__ << " @" << __FILE__ << ":" << __LINE__ << " */\n"
 #endif
 
 #ifndef PRINT_END_COMMENT
-#define PRINT_END_COMMENT(os)                                                    \
-    if (Global::config().has("debug-report") || Global::config().has("verbose")) \
+#define PRINT_END_COMMENT(os)                                            \
+    if (glb.config().has("debug-report") || glb.config().has("verbose")) \
     os << "/* END " << __FUNCTION__ << " @" << __FILE__ << ":" << __LINE__ << " */\n"
 #endif
 
@@ -236,7 +237,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
         bool preambleIssued = false;
 
     public:
-        CodeEmitter(Synthesiser& syn) : synthesiser(syn) {
+        CodeEmitter(Synthesiser& syn) : synthesiser(syn), glb(synthesiser.glb) {
             rec = [&](auto& out, const auto* value) {
                 out << "ramBitCast(";
                 dispatch(*value, out);
@@ -343,7 +344,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << R"_(directiveMap["fact-dir"] = inputDirectory;)_";
                 out << "}\n";
                 out << "IOSystem::getInstance().getReader(";
-                out << "directiveMap, symTable, recordTable";
+                out << "directiveMap, getSymbolTable(), getRecordTable()";
                 out << ")->readAll(*" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()));
                 out << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << \"Error loading " << io.getRelation()
@@ -585,7 +586,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             // create local scope for name resolution
             out << "{\n";
 
-            const std::string ext = fileExtension(Global::config().get("profile"));
+            const std::string ext = fileExtension(glb.config().get("profile"));
 
             const auto* rel = synthesiser.lookup(timer.getRelation());
             auto relName = synthesiser.getRelationName(rel);
@@ -605,7 +606,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             // create local scope for name resolution
             out << "{\n";
 
-            const std::string ext = fileExtension(Global::config().get("profile"));
+            const std::string ext = fileExtension(glb.config().get("profile"));
 
             // create local timer
             out << "\tLogger logger(R\"_(" << timer.getMessage() << ")_\",iter);\n";
@@ -633,7 +634,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
         void visit_(
                 type_identity<NestedOperation>, const NestedOperation& nested, std::ostream& out) override {
             dispatch(nested.getOperation(), out);
-            if (Global::config().has("profile") && Global::config().has("profile-frequency") &&
+            if (glb.config().has("profile") && glb.config().has("profile-frequency") &&
                     !nested.getProfileText().empty()) {
                 out << "freqs[" << synthesiser.lookupFreqIdx(nested.getProfileText()) << "]++;\n";
             }
@@ -2027,7 +2028,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             auto arity = rel->getArity();
             assert(arity > 0 && "AstToRamTranslator failed");
             std::string after;
-            if (Global::config().has("profile") && Global::config().has("profile-frequency") &&
+            if (glb.config().has("profile") && glb.config().has("profile-frequency") &&
                     !synthesiser.lookup(exists.getRelation())->isTemp()) {
                 out << R"_((reads[)_" << synthesiser.lookupReadIdx(rel->getName()) << R"_(]++,)_";
                 after = ")";
@@ -2571,22 +2572,22 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
     // generate C++ program
 
-    if (Global::config().has("verbose")) {
+    if (glb.config().has("verbose")) {
         db.addGlobalDefine("_SOUFFLE_STATS");
         db.addGlobalInclude("\"souffle/profile/ProfileEvent.h\"");
     }
 
-    if (Global::config().has("provenance")) {
+    if (glb.config().has("provenance")) {
         db.addGlobalInclude("<mutex>");
         db.addGlobalInclude("\"souffle/provenance/Explain.h\"");
     }
 
-    if (Global::config().has("live-profile")) {
+    if (glb.config().has("live-profile")) {
         db.addGlobalInclude("<thread>");
         db.addGlobalInclude("\"souffle/profile/Tui.h\"");
     }
 
-    if (Global::config().has("profile") || Global::config().has("live-profile")) {
+    if (glb.config().has("profile") || glb.config().has("live-profile")) {
         db.addGlobalInclude("\"souffle/profile/Logger.h\"");
         db.addGlobalInclude("\"souffle/profile/ProfileEvent.h\"");
     }
@@ -2678,6 +2679,76 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         db.usesDatastructure(mainClass, typeName);
     }
 
+    // substring wrapper
+    os << "private:\n";
+    os << "static inline std::string substr_wrapper(const std::string& str, std::size_t idx, "
+          "std::size_t "
+          "len) {\n";
+    os << "   std::string result; \n";
+    os << "   try { result = str.substr(idx,len); } catch(...) { \n";
+    os << "     std::cerr << \"warning: wrong index position provided by substr(\\\"\";\n";
+    os << "     std::cerr << str << \"\\\",\" << (int32_t)idx << \",\" << (int32_t)len << \") "
+          "functor.\\n\";\n";
+    os << "   } return result;\n";
+    os << "}\n";
+
+    if (glb.config().has("profile")) {
+        os << "std::string profiling_fname;\n";
+    }
+
+    os << "public:\n";
+
+    // declare symbol table
+    os << "// -- initialize symbol table --\n";
+
+    // issue symbol table with string constants
+    visit(prog, [&](const StringConstant& sc) { convertSymbol2Idx(sc.getConstant()); });
+    os << "SymbolTableImpl symTable";
+    if (!symbolMap.empty()) {
+        os << "{\n";
+        for (const auto& x : symbolIndex) {
+            os << "\tR\"_(" << x << ")_\",\n";
+        }
+        os << "}";
+    }
+    os << ";";
+
+    // declare record table
+    os << "// -- initialize record table --\n";
+
+    auto recordTable_os = os.delayed();
+
+    if (glb.config().has("profile")) {
+        os << "private:\n";
+        std::size_t numFreq = 0;
+        visit(prog, [&](const Statement&) { numFreq++; });
+        os << "  std::size_t freqs[" << numFreq << "]{};\n";
+        std::size_t numRead = 0;
+        for (auto rel : prog.getRelations()) {
+            if (!rel->isTemp()) {
+                numRead++;
+            }
+        }
+        os << "  std::size_t reads[" << numRead << "]{};\n";
+    }
+
+    // print relation definitions
+    std::stringstream initCons;     // initialization of constructor
+    std::stringstream registerRel;  // registration of relations
+    auto initConsSep = [&, empty = true]() mutable -> std::stringstream& {
+        initCons << (empty ? "\n: " : "\n, ");
+        empty = false;
+        return initCons;
+    };
+
+    // `pf` must be a ctor param (see below)
+    if (glb.config().has("profile")) {
+        initConsSep() << "profiling_fname(std::move(pf))";
+    }
+
+    int relCtr = 0;
+    std::set<std::string> storeRelations;
+    std::set<std::string> loadRelations;
     std::set<const IO*> loadIOs;
     std::set<const IO*> storeIOs;
 
@@ -2808,7 +2879,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     GenFunction& constructor = mainClass.addConstructor(Visibility::Public);
     constructor.setIsConstructor();
 
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         mainClass.addField("std::string", "profiling_fname", Visibility::Public);
         constructor.setNextArg("std::string", "pf", std::make_optional("\"profile.log\""));
         constructor.setNextInitializer("profiling_fname", "std::move(pf)");
@@ -2839,7 +2910,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     mainClass.addField(rt.str(), "recordTable", Visibility::Private);
     constructor.setNextInitializer("recordTable", "");
 
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         std::size_t numFreq = 0;
         visit(prog, [&](const Statement&) { numFreq++; });
         mainClass.addField("std::size_t", "freqs[" + std::to_string(numFreq) + "]", Visibility::Private);
@@ -2896,6 +2967,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
             constructor.setNextInitializer(wrapper_name.str(), init.str());
         }
     }
+
     for (auto [name, value] : subroutineInits) {
         std::string clName = convertStratumIdent("Stratum_" + name);
         std::string fName = convertStratumIdent("stratum_" + name);
@@ -2903,7 +2975,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         constructor.setNextInitializer(fName, value);
     }
 
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         constructor.body() << "ProfileEventSingleton::instance().setOutputFile(profiling_fname);\n";
     }
 
@@ -2948,13 +3020,13 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
     signalHandler->set();
 )_";
-    if (Global::config().has("verbose")) {
+    if (glb.config().has("verbose")) {
         runFunction.body() << "signalHandler->enableLogging();\n";
     }
 
     // add actual program body
     runFunction.body() << "// -- query evaluation --\n";
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         runFunction.body() << "ProfileEventSingleton::instance().startTimer();\n"
                            << R"_(ProfileEventSingleton::instance().makeTimeEvent("@time;starttime");)_"
                            << '\n'
@@ -2977,7 +3049,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     currentClass = &mainClass;
     emitCode(runFunction.body(), prog.getMain());
 
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         runFunction.body() << "}\n"
                            << "ProfileEventSingleton::instance().stopTimer();\n"
                            << "dumpFreqs();\n";
@@ -2986,7 +3058,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     // add code printing hint statistics
     runFunction.body() << "\n// -- relation hint statistics --\n";
 
-    if (Global::config().has("verbose")) {
+    if (glb.config().has("verbose")) {
         for (auto rel : prog.getRelations()) {
             auto name = getRelationName(*rel);
             runFunction.body() << "std::cout << \"Statistics for Relation " << name << ":\\n\";\n"
@@ -3010,11 +3082,11 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     runAll.setNextArg("std::string", "outputDirectoryArg", std::make_optional("\"\""));
     runAll.setNextArg("bool", "performIOArg", std::make_optional("true"));
     runAll.setNextArg("bool", "pruneImdtRelsArg", std::make_optional("true"));
-    if (Global::config().has("live-profile")) {
+    if (glb.config().has("live-profile")) {
         runAll.body() << "std::thread profiler([]() { profile::Tui().runProf(); });\n";
     }
     runAll.body() << "runFunction(inputDirectoryArg, outputDirectoryArg, performIOArg, pruneImdtRelsArg);\n";
-    if (Global::config().has("live-profile")) {
+    if (glb.config().has("live-profile")) {
         runAll.body() << "if (profiler.joinable()) { profiler.join(); }\n";
     }
 
@@ -3153,10 +3225,11 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         }
         executeSubroutine.body() << "fatal((\"unknown subroutine \" + name).c_str());\n";
     }
+
     // dumpFreqs method
     //  Frequency counts must be emitted after subroutines otherwise lookup tables
     //  are not populated.
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         GenFunction& dumpFreqs = mainClass.addFunction("dumpFreqs", Visibility::Private);
         dumpFreqs.setRetType("void");
 
@@ -3207,23 +3280,23 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
     // parse arguments
     hook << "souffle::CmdOptions opt(";
-    hook << "R\"(" << Global::config().get("") << ")\",\n";
+    hook << "R\"(" << glb.config().get("") << ")\",\n";
     hook << "R\"()\",\n";
     hook << "R\"()\",\n";
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         hook << "true,\n";
-        hook << "R\"(" << Global::config().get("profile") << ")\",\n";
+        hook << "R\"(" << glb.config().get("profile") << ")\",\n";
     } else {
         hook << "false,\n";
         hook << "R\"()\",\n";
     }
-    hook << std::stoi(Global::config().get("jobs"));
+    hook << std::stoi(glb.config().get("jobs"));
     hook << ");\n";
 
     hook << "if (!opt.parse(argc,argv)) return 1;\n";
 
     hook << "souffle::";
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         hook << classname + " obj(opt.getProfileName());\n";
     } else {
         hook << classname + " obj;\n";
@@ -3233,7 +3306,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     hook << "obj.setNumThreads(opt.getNumJobs());\n";
     hook << "\n#endif\n";
 
-    if (Global::config().has("profile")) {
+    if (glb.config().has("profile")) {
         hook << R"_(souffle::ProfileEventSingleton::instance().makeConfigRecord("", opt.getSourceFileName());)_"
              << '\n';
         hook << R"_(souffle::ProfileEventSingleton::instance().makeConfigRecord("fact-dir", opt.getInputFileDir());)_"
@@ -3243,13 +3316,13 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         hook << R"_(souffle::ProfileEventSingleton::instance().makeConfigRecord("output-dir", opt.getOutputFileDir());)_"
              << '\n';
         hook << R"_(souffle::ProfileEventSingleton::instance().makeConfigRecord("version", ")_"
-             << Global::config().get("version") << R"_(");)_" << '\n';
+             << glb.config().get("version") << R"_(");)_" << '\n';
     }
     hook << "obj.runAll(opt.getInputFileDir(), opt.getOutputFileDir());\n";
 
-    if (Global::config().get("provenance") == "explain") {
+    if (glb.config().get("provenance") == "explain") {
         hook << "explain(obj, false);\n";
-    } else if (Global::config().get("provenance") == "explore") {
+    } else if (glb.config().get("provenance") == "explore") {
         hook << "explain(obj, true);\n";
     }
     hook << "return 0;\n";

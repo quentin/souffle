@@ -78,11 +78,12 @@ TEST(AstUtils, Grounded) {
     // check construction
     EXPECT_EQ("r(X,Y,Z) :- \n   a(X),\n   X = Y,\n   !b(Z).", toString(*clause));
 
+    Global glb;
     auto program = mk<Program>();
     program->addClause(std::move(clause));
-    DebugReport dbgReport;
+    DebugReport dbgReport(glb);
     ErrorReport errReport;
-    TranslationUnit tu{std::move(program), errReport, dbgReport};
+    TranslationUnit tu{glb, std::move(program), errReport, dbgReport};
 
     // obtain groundness
     auto isGrounded = analysis::getGroundedTerms(tu, *tu.getProgram().getClauses()[0]);
@@ -95,9 +96,10 @@ TEST(AstUtils, Grounded) {
 }
 
 TEST(AstUtils, GroundedRecords) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    DebugReport d(glb);
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                  .type N <: symbol
                  .type R = [ a : N, B : N ]
@@ -132,10 +134,11 @@ TEST(AstUtils, GroundedRecords) {
 }
 
 TEST(AstUtils, ReorderClauseAtoms) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
+    DebugReport d(glb);
 
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .decl a,b,c,d,e(x:number)
                 a(x) :- b(x), c(x), 1 != 2, d(y), !e(z), c(z), e(x).
@@ -168,10 +171,11 @@ TEST(AstUtils, ReorderClauseAtoms) {
 }
 
 TEST(AstUtils, RemoveEquivalentClauses) {
+    Global glb;
     ErrorReport e;
-    DebugReport d;
+    DebugReport d(glb);
 
-    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(
+    Own<TranslationUnit> tu = ParserDriver::parseTranslationUnit(glb,
             R"(
                 .decl a()
                 a(). a(). a(). a(). a(). a(). a(). a(). a(). a(). a(). a(). a(). a(). a().

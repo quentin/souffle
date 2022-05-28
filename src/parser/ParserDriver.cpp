@@ -51,7 +51,7 @@ namespace souffle {
 
 Own<ast::TranslationUnit> ParserDriver::parse(
         const std::string& filename, FILE* in, ErrorReport& errorReport, DebugReport& debugReport) {
-    translationUnit = mk<ast::TranslationUnit>(mk<ast::Program>(), errorReport, debugReport);
+    translationUnit = mk<ast::TranslationUnit>(glb, mk<ast::Program>(), errorReport, debugReport);
     yyscan_t scanner;
     ScannerInfo data;
     SrcLocation emptyLoc;
@@ -70,7 +70,7 @@ Own<ast::TranslationUnit> ParserDriver::parse(
 
 Own<ast::TranslationUnit> ParserDriver::parse(
         const std::string& code, ErrorReport& errorReport, DebugReport& debugReport) {
-    translationUnit = mk<ast::TranslationUnit>(mk<ast::Program>(), errorReport, debugReport);
+    translationUnit = mk<ast::TranslationUnit>(glb, mk<ast::Program>(), errorReport, debugReport);
 
     ScannerInfo data;
     SrcLocation emptyLoc;
@@ -87,15 +87,15 @@ Own<ast::TranslationUnit> ParserDriver::parse(
     return std::move(translationUnit);
 }
 
-Own<ast::TranslationUnit> ParserDriver::parseTranslationUnit(
-        const std::string& filename, FILE* in, ErrorReport& errorReport, DebugReport& debugReport) {
-    ParserDriver parser;
+Own<ast::TranslationUnit> ParserDriver::parseTranslationUnit(Global& glb, const std::string& filename,
+        FILE* in, ErrorReport& errorReport, DebugReport& debugReport) {
+    ParserDriver parser(glb);
     return parser.parse(filename, in, errorReport, debugReport);
 }
 
 Own<ast::TranslationUnit> ParserDriver::parseTranslationUnit(
-        const std::string& code, ErrorReport& errorReport, DebugReport& debugReport) {
-    ParserDriver parser;
+        Global& glb, const std::string& code, ErrorReport& errorReport, DebugReport& debugReport) {
+    ParserDriver parser(glb);
     return parser.parse(code, errorReport, debugReport);
 }
 
@@ -208,14 +208,14 @@ void ParserDriver::addIoFromDeprecatedTag(ast::Relation& rel) {
 
 std::set<RelationTag> ParserDriver::addDeprecatedTag(
         RelationTag tag, SrcLocation tagLoc, std::set<RelationTag> tags) {
-    if (!Global::config().has("legacy")) {
+    if (!translationUnit->global().config().has("legacy")) {
         warning(tagLoc, tfm::format("Deprecated %s qualifier was used", tag));
     }
     return addTag(tag, std::move(tagLoc), std::move(tags));
 }
 
 Own<ast::Counter> ParserDriver::addDeprecatedCounter(SrcLocation tagLoc) {
-    if (!Global::config().has("legacy")) {
+    if (!translationUnit->global().config().has("legacy")) {
         warning(tagLoc, "Deprecated $ symbol was used. Use functor 'autoinc()' instead.");
     }
     return mk<ast::Counter>();
@@ -243,7 +243,7 @@ std::set<RelationTag> ParserDriver::addTag(RelationTag tag, std::vector<Relation
 
 Own<ast::SubsetType> ParserDriver::mkDeprecatedSubType(
         ast::QualifiedName name, ast::QualifiedName baseTypeName, SrcLocation loc) {
-    if (!Global::config().has("legacy")) {
+    if (!translationUnit->global().config().has("legacy")) {
         warning(loc, "Deprecated type declaration used");
     }
     return mk<ast::SubsetType>(std::move(name), std::move(baseTypeName), std::move(loc));
@@ -279,7 +279,7 @@ std::optional<std::filesystem::path> ParserDriver::searchIncludePath(
     }
 
     // search relative from include directories
-    for (auto&& includeDir : Global::config().getMany("include-dir")) {
+    for (auto&& includeDir : glb.config().getMany("include-dir")) {
         auto dir = std::filesystem::path(includeDir);
         if (dir.is_relative()) {
             dir = (std::filesystem::current_path() / includeDir);

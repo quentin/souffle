@@ -472,7 +472,8 @@ bool TypeAnalysis::isSymbol(const Argument* argument) const {
 void TypeAnalysis::run(const TranslationUnit& translationUnit) {
     // Check if debugging information is being generated
     std::ostream* debugStream = nullptr;
-    if (Global::config().has("debug-report") || Global::config().has("show", "type-analysis")) {
+    if (translationUnit.global().config().has("debug-report") ||
+            translationUnit.global().config().has("show", "type-analysis")) {
         debugStream = &analysisLogs;
     }
 

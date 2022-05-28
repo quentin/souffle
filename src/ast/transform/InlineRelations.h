@@ -30,7 +30,7 @@ namespace souffle::ast::transform {
 class InlineRelationsTransformer : public Transformer {
 public:
     using ExcludedRelations = std::set<QualifiedName>;
-    static ExcludedRelations excluded();
+    static ExcludedRelations excluded(Global& glb);
 
     std::string getName() const override {
         return "InlineRelationsTransformer";

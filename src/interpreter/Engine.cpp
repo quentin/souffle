@@ -85,6 +85,7 @@
 #include "souffle/SignalHandler.h"
 #include "souffle/SymbolTable.h"
 #include "souffle/TypeAttribute.h"
+#include "souffle/datastructure/RecordTableImpl.h"
 #include "souffle/datastructure/SymbolTableImpl.h"
 #include "souffle/io/IOSystem.h"
 #include "souffle/io/ReadStream.h"
@@ -285,10 +286,10 @@ RamDomain callStateless(ExecuteFn&& execute, Context& ctxt, Shadow& shadow, souf
 
 }  // namespace
 
-Engine::Engine(ram::TranslationUnit& tUnit)
-        : profileEnabled(Global::config().has("profile")),
-          frequencyCounterEnabled(Global::config().has("profile-frequency")),
-          numOfThreads(number_of_threads(std::stoi(Global::config().get("jobs")))), tUnit(tUnit),
+Engine::Engine(ram::TranslationUnit& tUnit, const std::size_t numberOfThreadsOrZero)
+        : tUnit(tUnit), global(tUnit.global()), profileEnabled(global.config().has("profile")),
+          frequencyCounterEnabled(global.config().has("profile-frequency")),
+          numOfThreads(number_of_threads(numberOfThreadsOrZero)),
           isa(tUnit.getAnalysis<ram::analysis::IndexAnalysis>()), recordTable(numOfThreads),
           symbolTable(numOfThreads) {}
 
@@ -304,6 +305,14 @@ void Engine::swapRelation(const std::size_t ramRel1, const std::size_t ramRel2) 
 
 RamDomain Engine::incCounter() {
     return counter++;
+}
+
+Global& Engine::getGlobal() {
+    return global;
+}
+
+SymbolTable& Engine::getSymbolTable() {
+    return symbolTable;
 }
 
 RecordTable& Engine::getRecordTable() {
@@ -352,19 +361,19 @@ const std::vector<void*>& Engine::loadDLL() {
         return dll;
     }
 
-    if (!Global::config().has("libraries")) {
-        Global::config().set("libraries", "functors");
+    if (!global.config().has("libraries")) {
+        global.config().set("libraries", "functors");
     }
-    if (!Global::config().has("library-dir")) {
-        Global::config().set("library-dir", ".");
+    if (!global.config().has("library-dir")) {
+        global.config().set("library-dir", ".");
     }
 
-    for (auto&& library : Global::config().getMany("libraries")) {
+    for (auto&& library : global.config().getMany("libraries")) {
         // The library may be blank
         if (library.empty()) {
             continue;
         }
-        auto paths = Global::config().getMany("library-dir");
+        auto paths = global.config().getMany("library-dir");
         // Set up our paths to have a library appended
         for (std::string& path : paths) {
             if (path.back() != pathSeparator) {
@@ -408,7 +417,7 @@ void Engine::resetIterationNumber() {
 
 void Engine::executeMain() {
     SignalHandler::instance()->set();
-    if (Global::config().has("verbose")) {
+    if (global.config().has("verbose")) {
         SignalHandler::instance()->enableLogging();
     }
 
@@ -423,7 +432,7 @@ void Engine::executeMain() {
         Context ctxt;
         execute(main.get(), ctxt);
     } else {
-        ProfileEventSingleton::instance().setOutputFile(Global::config().get("profile"));
+        ProfileEventSingleton::instance().setOutputFile(global.config().get("profile"));
         // Prepare the frequency table for threaded use
         const ram::Program& program = tUnit.getProgram();
         visit(program, [&](const ram::TupleOperation& node) {
@@ -436,7 +445,7 @@ void Engine::executeMain() {
         ProfileEventSingleton::instance().startTimer();
         ProfileEventSingleton::instance().makeTimeEvent("@time;starttime");
         // Store configuration
-        for (auto&& [k, vs] : Global::config().data())
+        for (auto&& [k, vs] : global.config().data())
             for (auto&& v : vs)
                 ProfileEventSingleton::instance().makeConfigRecord(k, v);
 
@@ -757,7 +766,7 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                     fatal("ICE: functor `%s` must map onto `NestedIntrinsicOperator`", cur.getOperator());
             }
 
-            { UNREACHABLE_BAD_CASE_ANALYSIS }
+        {UNREACHABLE_BAD_CASE_ANALYSIS}
 
 #undef BINARY_OP_LOGICAL
 #undef BINARY_OP_INTEGRAL
@@ -791,7 +800,7 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                 case ram::NestedIntrinsicOp::FRANGE: return RUN_RANGE(RamFloat);
             }
 
-            { UNREACHABLE_BAD_CASE_ANALYSIS }
+        {UNREACHABLE_BAD_CASE_ANALYSIS}
 #undef RUN_RANGE
         ESAC(NestedIntrinsicOperator)
 
@@ -1052,7 +1061,7 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                 }
             }
 
-            { UNREACHABLE_BAD_CASE_ANALYSIS }
+        {UNREACHABLE_BAD_CASE_ANALYSIS}
 
 #undef COMPARE_NUMERIC
 #undef COMPARE_STRING

@@ -49,6 +49,7 @@ namespace souffle::ast2ram {
 
 TranslatorContext::TranslatorContext(const ast::TranslationUnit& tu) {
     program = &tu.getProgram();
+    global = &tu.global();
 
     // Set up analyses
     functorAnalysis = &tu.getAnalysis<ast::analysis::FunctorAnalysis>();
@@ -75,13 +76,13 @@ TranslatorContext::TranslatorContext(const ast::TranslationUnit& tu) {
 
     // Set up SIPS metric
     std::string sipsChosen = "all-bound";
-    if (Global::config().has("RamSIPS")) {
-        sipsChosen = Global::config().get("RamSIPS");
+    if (global->config().has("RamSIPS")) {
+        sipsChosen = global->config().get("RamSIPS");
     }
     sipsMetric = ast::SipsMetric::create(sipsChosen, tu);
 
     // Set up the correct strategy
-    if (Global::config().has("provenance")) {
+    if (global->config().has("provenance")) {
         translationStrategy = mk<provenance::TranslationStrategy>();
     } else {
         translationStrategy = mk<seminaive::TranslationStrategy>();
