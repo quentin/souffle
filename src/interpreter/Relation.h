@@ -44,8 +44,8 @@ struct RelationWrapper {
     using arity_type = souffle::Relation::arity_type;
 
 public:
-    RelationWrapper(arity_type arity, arity_type auxiliaryArity, std::string relName,
-            const TypeDesc* typeDesc)
+    RelationWrapper(
+            arity_type arity, arity_type auxiliaryArity, std::string relName, const TypeDesc* typeDesc)
             : relName(std::move(relName)), arity(arity), auxiliaryArity(auxiliaryArity), typeDesc(typeDesc) {}
 
     virtual ~RelationWrapper() = default;

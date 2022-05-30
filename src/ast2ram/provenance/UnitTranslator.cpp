@@ -67,15 +67,15 @@ Own<ram::Sequence> UnitTranslator::generateProgram(const ast::TranslationUnit& t
     return ramProgram;
 }
 
-Own<ram::Relation> UnitTranslator::createRamRelation(TypeRegistry& typeRegistry,
-        const ast::Relation* baseRelation, std::string ramRelationName) const {
+Own<ram::Relation> UnitTranslator::createRamRelation(
+        TypeRegistry& typeRegistry, const ast::Relation* baseRelation, std::string ramRelationName) const {
     auto arity = baseRelation->getArity();
 
     // All relations in a provenance program should have a provenance data structure
     auto representation = RelationRepresentation::PROVENANCE;
 
     auto typeDesc = typeRegistry.newTuple(ramRelationName);
-    
+
     // Add in base relation information
     std::vector<std::string> attributeNames;
     std::vector<std::string> attributeTypeQualifiers;
