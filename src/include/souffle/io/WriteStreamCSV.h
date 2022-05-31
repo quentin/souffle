@@ -263,7 +263,7 @@ protected:
 
 class WriteFileCSVFactory : public WriteStreamFactory {
 public:
-    Own<WriteStream> getWriter(const std::map<std::string, std::string>& rwOperation,
+    Own<WriteAllInterface> getWriter(const std::map<std::string, std::string>& rwOperation,
             const SymbolTable& symbolTable, const RecordTable& recordTable) override {
 #ifdef USE_LIBZ
         if (contains(rwOperation, "compress")) {
@@ -281,7 +281,7 @@ public:
 
 class WriteCoutCSVFactory : public WriteStreamFactory {
 public:
-    Own<WriteStream> getWriter(const std::map<std::string, std::string>& rwOperation,
+    Own<WriteAllInterface> getWriter(const std::map<std::string, std::string>& rwOperation,
             const SymbolTable& symbolTable, const RecordTable& recordTable) override {
         return mk<WriteCoutCSV>(rwOperation, symbolTable, recordTable);
     }
@@ -295,7 +295,7 @@ public:
 
 class WriteCoutPrintSizeFactory : public WriteStreamFactory {
 public:
-    Own<WriteStream> getWriter(const std::map<std::string, std::string>& rwOperation,
+    Own<WriteAllInterface> getWriter(const std::map<std::string, std::string>& rwOperation,
             const SymbolTable& symbolTable, const RecordTable& recordTable) override {
         return mk<WriteCoutPrintSize>(rwOperation, symbolTable, recordTable);
     }

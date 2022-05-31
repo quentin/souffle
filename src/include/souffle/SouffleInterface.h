@@ -21,10 +21,12 @@
 #include "souffle/SouffleTypes.h"
 #include "souffle/SymbolTable.h"
 #include "souffle/utility/MiscUtil.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <iostream>
 #include <map>
@@ -39,13 +41,40 @@ namespace souffle {
 
 class tuple;
 
-/**
- * Object-oriented wrapper class for Souffle's templatized relations.
- */
-class Relation {
+/** Common interface of both the interpreted and synthesized relations */
+class RelationBase {
 public:
     using arity_type = std::size_t;
 
+    virtual ~RelationBase() = default;
+
+    /** Return the arity of a relation. */
+    virtual arity_type getArity() const = 0;
+
+    /** Return the name of the relation. */
+    virtual const std::string& getName() const = 0;
+
+    /** Return the type descriptor of the relation tuple. */
+    virtual const TypeDesc* getTypeDescriptor() const = 0;
+
+    /**
+     * Enumerate each tuple contained in the relation.
+     *
+     * @param Fn is a function object that is called for each tuple.
+     */
+    virtual void each(const std::function<void(const RamDomain* tuple)>& Fn) const = 0;
+
+    /** Insert a tuple in the relation. */
+    virtual void insert(const RamDomain* tuple) = 0;
+
+    /** Return the number of tuples contained in the relation. */
+    virtual std::size_t size() const = 0;
+};
+
+/**
+ * Object-oriented wrapper class for Souffle's templatized relations.
+ */
+class Relation : public RelationBase {
 protected:
     /**
      * Abstract iterator class.
@@ -328,7 +357,7 @@ public:
      *
      * @return The name of a relation (std::string)
      */
-    virtual std::string getName() const = 0;
+    virtual const std::string& getName() const = 0;
 
     /**
      * Get the attribute type of a relation at the column specified by the parameter.

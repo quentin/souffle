@@ -58,6 +58,10 @@ public:
         relation.insert(t.data);
     }
 
+    void insert(const RamDomain* data) override {
+        return relation.insert(data);
+    }
+
     /** Check whether tuple exists */
     bool contains(const tuple& t) const override {
         return relation.contains(t.data);
@@ -74,7 +78,7 @@ public:
     }
 
     /** Get name */
-    std::string getName() const override {
+    const std::string& getName() const override {
         return name;
     }
 
@@ -118,6 +122,10 @@ public:
     /** Eliminate all the tuples in relation*/
     void purge() override {
         relation.purge();
+    }
+
+    void each(const std::function<void(const RamDomain*)>& Fn) const override {
+        relation.each(Fn);
     }
 
 protected:

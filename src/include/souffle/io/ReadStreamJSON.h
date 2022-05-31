@@ -353,8 +353,8 @@ protected:
 
 class ReadCinJSONFactory : public ReadStreamFactory {
 public:
-    Own<ReadStream> getReader(const std::map<std::string, std::string>& rwOperation, SymbolTable& symbolTable,
-            RecordTable& recordTable) override {
+    Own<ReadAllInterface> getReader(const std::map<std::string, std::string>& rwOperation,
+            SymbolTable& symbolTable, RecordTable& recordTable) override {
         return mk<ReadStreamJSON>(std::cin, rwOperation, symbolTable, recordTable);
     }
 
@@ -367,8 +367,8 @@ public:
 
 class ReadFileJSONFactory : public ReadStreamFactory {
 public:
-    Own<ReadStream> getReader(const std::map<std::string, std::string>& rwOperation, SymbolTable& symbolTable,
-            RecordTable& recordTable) override {
+    Own<ReadAllInterface> getReader(const std::map<std::string, std::string>& rwOperation,
+            SymbolTable& symbolTable, RecordTable& recordTable) override {
         return mk<ReadFileJSON>(rwOperation, symbolTable, recordTable);
     }
 

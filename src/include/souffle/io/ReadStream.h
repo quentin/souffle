@@ -17,6 +17,8 @@
 #include "souffle/RamTypes.h"
 #include "souffle/RecordTable.h"
 #include "souffle/SymbolTable.h"
+#include "souffle/io/ReadAllInterface.h"
+#include "souffle/io/ReadStreamFactory.h"
 #include "souffle/io/SerialisationStream.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/MiscUtil.h"
@@ -33,15 +35,14 @@
 
 namespace souffle {
 
-class ReadStream : public SerialisationStream<false> {
+class ReadStream : public SerialisationStream<false>, public ReadAllInterface {
 protected:
     ReadStream(
             const std::map<std::string, std::string>& rwOperation, SymbolTable& symTab, RecordTable& recTab)
             : SerialisationStream(symTab, recTab, rwOperation) {}
 
 public:
-    template <typename T>
-    void readAll(T& relation) {
+    void readAll(RelationBase& relation) override {
         while (const auto next = readNextTuple()) {
             const RamDomain* ramDomain = next.get();
             relation.insert(ramDomain);
@@ -381,14 +382,6 @@ protected:
     }
 
     virtual Own<RamDomain[]> readNextTuple() = 0;
-};
-
-class ReadStreamFactory {
-public:
-    virtual Own<ReadStream> getReader(
-            const std::map<std::string, std::string>&, SymbolTable&, RecordTable&) = 0;
-    virtual const std::string& getName() const = 0;
-    virtual ~ReadStreamFactory() = default;
 };
 
 } /* namespace souffle */

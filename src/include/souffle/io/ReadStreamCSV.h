@@ -363,8 +363,8 @@ protected:
 
 class ReadCinCSVFactory : public ReadStreamFactory {
 public:
-    Own<ReadStream> getReader(const std::map<std::string, std::string>& rwOperation, SymbolTable& symbolTable,
-            RecordTable& recordTable) override {
+    Own<ReadAllInterface> getReader(const std::map<std::string, std::string>& rwOperation,
+            SymbolTable& symbolTable, RecordTable& recordTable) override {
         return mk<ReadStreamCSV>(std::cin, rwOperation, symbolTable, recordTable);
     }
 
@@ -377,8 +377,8 @@ public:
 
 class ReadFileCSVFactory : public ReadStreamFactory {
 public:
-    Own<ReadStream> getReader(const std::map<std::string, std::string>& rwOperation, SymbolTable& symbolTable,
-            RecordTable& recordTable) override {
+    Own<ReadAllInterface> getReader(const std::map<std::string, std::string>& rwOperation,
+            SymbolTable& symbolTable, RecordTable& recordTable) override {
         return mk<ReadFileCSV>(rwOperation, symbolTable, recordTable);
     }
 

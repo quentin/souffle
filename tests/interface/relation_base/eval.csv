@@ -1,0 +1,9 @@
+$Num(4)	4
+$Num(12)	12
+$Num(1)	1
+$Add($Num(12), $Num(1))	13
+$Mul($Num(4), $Add($Num(12), $Num(1)))	52
+$Num(5)	5
+$Mul($Num(5), $Num(5))	25
+$Mul($Mul($Num(5), $Num(5)), $Num(5))	125
+$Add($Num(1), $Mul($Mul($Num(5), $Num(5)), $Num(5)))	126

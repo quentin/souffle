@@ -17,6 +17,8 @@
 #include "souffle/RamTypes.h"
 #include "souffle/RecordTable.h"
 #include "souffle/SymbolTable.h"
+#include "souffle/io/WriteAllInterface.h"
+#include "souffle/io/WriteStreamFactory.h"
 #include "souffle/io/SerialisationStream.h"
 #include "souffle/utility/MiscUtil.h"
 #include "souffle/utility/json11.h"
@@ -32,31 +34,29 @@ namespace souffle {
 
 using json11::Json;
 
-class WriteStream : public SerialisationStream<true> {
+class WriteStream : public SerialisationStream<true>, public WriteAllInterface {
 public:
     WriteStream(const std::map<std::string, std::string>& rwOperation, const SymbolTable& symbolTable,
             const RecordTable& recordTable)
             : SerialisationStream(symbolTable, recordTable, rwOperation),
               summary(rwOperation.at("IO") == "stdoutprintsize") {}
 
-    template <typename T>
-    void writeAll(const T& relation) {
+    void writeAll(const RelationBase& relation) override {
         if (summary) {
             return writeSize(relation.size());
         }
         if (arity == 0) {
-            if (relation.begin() != relation.end()) {
+            if (relation.size() != 0) {
                 writeNullary();
             }
             return;
         }
-        for (const auto& current : relation) {
-            writeNext(current);
-        }
+        relation.each([&](const RamDomain* tuple) {
+            writeNextTuple(tuple);
+        });
     }
 
-    template <typename T>
-    void writeSize(const T& relation) {
+    void writeSize(const RelationBase& relation) {
         writeSize(relation.size());
     }
 
@@ -67,12 +67,6 @@ protected:
     virtual void writeNextTuple(const RamDomain* tuple) = 0;
     virtual void writeSize(std::size_t) {
         fatal("attempting to print size of a write operation");
-    }
-
-    template <typename Tuple>
-    void writeNext(const Tuple tuple) {
-        using tcb::make_span;
-        writeNextTuple(make_span(tuple).data());
     }
 
     virtual void outputSymbol(std::ostream& destination, const std::string& value) {
@@ -186,19 +180,5 @@ protected:
         }
     }
 };
-
-class WriteStreamFactory {
-public:
-    virtual Own<WriteStream> getWriter(const std::map<std::string, std::string>& rwOperation,
-            const SymbolTable& symbolTable, const RecordTable& recordTable) = 0;
-
-    virtual const std::string& getName() const = 0;
-    virtual ~WriteStreamFactory() = default;
-};
-
-template <>
-inline void WriteStream::writeNext(const RamDomain* tuple) {
-    writeNextTuple(tuple);
-}
 
 } /* namespace souffle */

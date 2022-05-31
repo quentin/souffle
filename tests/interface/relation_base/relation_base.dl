@@ -1,0 +1,64 @@
+// a simple calculus grammar.
+.type AST
+    = Num {val:number}
+    | Add {lhs:AST, rhs:AST}
+    | Mul {lhs:AST, rhs:AST}
+
+// a program has a name and an AST.
+.decl program(name: symbol, ast:AST)
+
+program("4*(12+1)", $Mul($Num(4), $Add($Num(12), $Num(1)))).
+program("5*5*5", $Mul($Mul($Num(5),$Num(5)),$Num(5))).
+program("1+5*5*5", $Add($Num(1),$Mul($Mul($Num(5),$Num(5)),$Num(5)))).
+
+// a result has the name of a program and its result value.
+.decl result(name: symbol, res:number)
+.output result()
+result(name, res) :-
+    program(name, ast),
+    eval(ast, res).
+
+
+// the evaluation plan:
+// top-to-bottom recursive splitting of AST into
+// its individual components.
+.decl eval_plan(ast:AST)
+.output eval_plan()
+
+// bootstrap the evaluation plan with the program's AST
+eval_plan(ast) :-
+    program(_,ast).
+
+// evaluation plan for Add: evaluate lhs and rhs
+eval_plan(lhs),
+eval_plan(rhs) :-
+    eval_plan($Add(lhs,rhs)).
+
+// evaluation plan for Mul: evaluate lhs and rhs
+eval_plan(lhs),
+eval_plan(rhs) :-
+    eval_plan($Mul(lhs,rhs)).
+
+
+// actual evaluation:
+// bottom-up evaluation of each AST component.
+.decl eval(ast:AST, res:number)
+.output eval()
+
+// trivial evaluation of Num
+eval($Num(v), v) :- eval_plan($Num(v)).
+
+// evaluation of Add: evaluate lhs and rhs, then add
+eval($Add(lhs,rhs), v) :-
+    eval_plan($Add(lhs,rhs)),
+    eval(lhs, l),
+    eval(rhs, r),
+    v = l + r.
+
+// evaluation of Mul: evaluate lhs and rhs, then multiply
+eval($Mul(lhs,rhs), v) :-
+    eval_plan($Mul(lhs,rhs)),
+    eval(lhs, l),
+    eval(rhs, r),
+    v = l * r.
+

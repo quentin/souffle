@@ -167,6 +167,7 @@ souffle_positive_cpp_test(signal_error)
 souffle_positive_cpp_test(tuple_insertion_diff_element_type)
 souffle_positive_cpp_test(tuple_insertion_diff_relation)
 souffle_positive_cpp_test(type_registry)
+souffle_positive_cpp_test(relation_base)
 
 # The following test fails because we use -g (instead -o)
 # TODO: (This neeads to be investigated)

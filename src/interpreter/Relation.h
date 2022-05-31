@@ -40,9 +40,7 @@ namespace souffle::interpreter {
  * It also defines virtual interfaces for ProgInterface and some virtual helper functions for interpreter
  * execution.
  */
-struct RelationWrapper {
-    using arity_type = souffle::Relation::arity_type;
-
+struct RelationWrapper : public souffle::RelationBase {
 public:
     RelationWrapper(
             arity_type arity, arity_type auxiliaryArity, std::string relName, const TypeDesc* typeDesc)
@@ -106,6 +104,8 @@ public:
 
     virtual Iterator end() const = 0;
 
+    virtual void each(const std::function<void(const RamDomain*)>& Fn) const = 0;
+
     virtual void insert(const RamDomain*) = 0;
 
     virtual bool contains(const RamDomain*) const = 0;
@@ -114,7 +114,7 @@ public:
 
     virtual void purge() = 0;
 
-    const std::string& getName() const {
+    const std::string& getName() const override {
         return relName;
     }
 
@@ -255,9 +255,10 @@ public:
 
         const RamDomain* operator*() override {
             const auto& tuple = *iter;
-            // Not using constexpr Arity to avoid compiler warning. (When Arity == 0)
-            for (std::size_t i = 0; i < order.size(); ++i) {
-                data[order[i]] = tuple[i];
+            if constexpr (Arity > 0) {
+                for (std::size_t i = 0; i < Arity; ++i) {
+                    data[order[i]] = tuple[i];
+                }
             }
             return data;
         }
@@ -280,6 +281,15 @@ public:
 
     Iterator end() const override {
         return Iterator(new iterator_base(main->end(), main->getOrder()));
+    }
+
+    void each(const std::function<void(const RamDomain*)>& Fn) const override {
+        Iterator it = begin();
+        const Iterator e = end();
+        while (it != e) {
+            Fn(*it);
+            ++it;
+        }
     }
 
     // -----

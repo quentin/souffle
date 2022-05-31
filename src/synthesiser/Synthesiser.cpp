@@ -346,7 +346,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << "}\n";
                 out << "IOSystem::getInstance().getReader(";
                 out << "directiveMap, getSymbolTable(), getRecordTable()";
-                out << ")->readAll(*" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()));
+                out << ")->readAll(wrapper_" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()));
                 out << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << \"Error loading " << io.getRelation()
                     << " data: \" << e.what() "
@@ -362,7 +362,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << "}\n";
                 out << "IOSystem::getInstance().getWriter(";
                 out << "directiveMap, getSymbolTable(), getRecordTable()";
-                out << ")->writeAll(*" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()))
+                out << ")->writeAll(wrapper_" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()))
                     << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
             } else {
@@ -3157,7 +3157,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         printAll.body() << "}\n";
         printAll.body() << "IOSystem::getInstance().getWriter(";
         printAll.body() << "directiveMap, getSymbolTable(), getRecordTable()";
-        printAll.body() << ")->writeAll(*" << getRelationName(lookup(store->getRelation())) << ");\n";
+        printAll.body() << ")->writeAll(wrapper_" << getRelationName(lookup(store->getRelation())) << ");\n";
         printAll.body() << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
     }
 
@@ -3177,7 +3177,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         loadAll.body() << "}\n";
         loadAll.body() << "IOSystem::getInstance().getReader(";
         loadAll.body() << "directiveMap, getSymbolTable(), getRecordTable()";
-        loadAll.body() << ")->readAll(*" << getRelationName(lookup(load->getRelation()));
+        loadAll.body() << ")->readAll(wrapper_" << getRelationName(lookup(load->getRelation()));
         loadAll.body() << ");\n";
         loadAll.body() << "} catch (std::exception& e) {std::cerr << \"Error loading " << load->getRelation()
                        << " data: \" << e.what() << "
@@ -3205,7 +3205,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         os << ";\n";
         os << "IOSystem::getInstance().getWriter(";
         os << "rwOperation, getSymbolTable(), getRecordTable()";
-        os << ")->writeAll(*" << relName << ");\n";
+        os << ")->writeAll(wrapper_" << relName << ");\n";
         os << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
     };
 

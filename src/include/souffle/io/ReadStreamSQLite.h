@@ -190,8 +190,8 @@ protected:
 
 class ReadSQLiteFactory : public ReadStreamFactory {
 public:
-    Own<ReadStream> getReader(const std::map<std::string, std::string>& rwOperation, SymbolTable& symbolTable,
-            RecordTable& recordTable) override {
+    Own<ReadAllInterface> getReader(const std::map<std::string, std::string>& rwOperation,
+            SymbolTable& symbolTable, RecordTable& recordTable) override {
         return mk<ReadStreamSQLite>(rwOperation, symbolTable, recordTable);
     }
 
