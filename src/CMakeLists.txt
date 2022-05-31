@@ -218,7 +218,10 @@ target_compile_features(libsouffle PUBLIC cxx_std_17)
 target_compile_features(compiled PUBLIC cxx_std_17)
 
 set_target_properties(libsouffle PROPERTIES CXX_EXTENSIONS OFF)
+set_target_properties(libsouffle PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 set_target_properties(compiled PROPERTIES CXX_EXTENSIONS OFF)
+set_target_properties(compiled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if (NOT MSVC)
   target_compile_options(libsouffle PUBLIC -Wall -Wextra -Werror -fwrapv)
