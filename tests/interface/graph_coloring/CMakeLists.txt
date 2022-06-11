@@ -18,7 +18,7 @@ if (NOT MSVC)
 target_compile_options(gcfunctors
                        PUBLIC "-Wall;-Wextra;-Werror;-fwrapv")
 else ()
-  target_compile_options(functors PUBLIC /W3 /WX)
+  target_compile_options(gcfunctors PUBLIC /W3 /WX)
 endif()
 
 if (WIN32)
@@ -30,6 +30,6 @@ if (WIN32)
 endif ()
 
 if (SOUFFLE_DOMAIN_64BIT)
-    target_compile_definitions(functors
+    target_compile_definitions(gcfunctors
                                PUBLIC RAM_DOMAIN_SIZE=64)
 endif()

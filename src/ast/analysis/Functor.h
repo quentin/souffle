@@ -46,11 +46,10 @@ public:
 
     void print(std::ostream& /* os */) const override {}
 
-    static bool isMultiResult(const Functor& functor);
+    bool isMultiResult(const Functor& functor) const;
 
     std::size_t getFunctorArity(UserDefinedFunctor const& functor) const;
     QualifiedName const& getFunctorReturnType(const UserDefinedFunctor& functor) const;
-    bool isStatefulFunctor(const UserDefinedFunctor& functor) const;
     bool isStatefulFunctor(const UserDefinedAggregator& aggregator) const;
     const FunctorDeclaration& getFunctorDeclaration(const UserDefinedFunctor& functor) const;
     const FunctorDeclaration& getFunctorDeclaration(const UserDefinedAggregator& aggregator) const;

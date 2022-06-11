@@ -87,7 +87,7 @@ Own<ram::Expression> ValueTranslator::visit_(
         values.push_back(translateValue(cur));
     }
 
-    if (ast::analysis::FunctorAnalysis::isMultiResult(inf)) {
+    if (context.isMultiResultFunctor(inf)) {
         return makeRamTupleElement(index.getGeneratorLoc(inf));
     } else {
         return mk<ram::IntrinsicOperator>(context.getOverloadedFunctorOp(inf), std::move(values));
@@ -100,10 +100,14 @@ Own<ram::Expression> ValueTranslator::visit_(
     for (const auto& cur : udf.getArguments()) {
         values.push_back(translateValue(cur));
     }
-    auto returnType = context.getFunctorReturnTypeAttribute(udf);
-    auto paramTypes = context.getFunctorParamTypeAtributes(udf);
-    return mk<ram::UserDefinedOperator>(
-            udf.getName(), paramTypes, returnType, context.isStatefulFunctor(udf), std::move(values));
+    if (context.isMultiResultFunctor(udf)) {
+        return makeRamTupleElement(index.getGeneratorLoc(udf));
+    } else {
+        auto returnType = context.getFunctorReturnTypeAttribute(udf);
+        auto paramTypes = context.getFunctorParamTypeAtributes(udf);
+        return mk<ram::UserDefinedOperator>(
+                udf.getName(), paramTypes, returnType, context.isStatefulFunctor(udf), std::move(values));
+    }
 }
 
 Own<ram::Expression> ValueTranslator::visit_(type_identity<ast::Counter>, const ast::Counter&) {
@@ -115,7 +119,11 @@ Own<ram::Expression> ValueTranslator::visit_(type_identity<ast::RecordInit>, con
     for (const auto& cur : init.getArguments()) {
         values.push_back(translateValue(cur));
     }
-    return mk<ram::PackRecord>(std::move(values));
+    if (index.isDefined(init)) {
+        return makeRamTupleElement(index.getDefinitionPoint(init));
+    } else {
+        return mk<ram::PackRecord>(std::move(values));
+    }
 }
 
 Own<ram::Expression> ValueTranslator::visit_(type_identity<ast::BranchInit>, const ast::BranchInit& adt) {

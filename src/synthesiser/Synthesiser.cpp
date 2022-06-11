@@ -55,6 +55,7 @@
 #include "ram/Negation.h"
 #include "ram/NestedIntrinsicOperator.h"
 #include "ram/NestedOperation.h"
+#include "ram/NestedUserDefinedOperator.h"
 #include "ram/Node.h"
 #include "ram/Operation.h"
 #include "ram/PackRecord.h"
@@ -2328,6 +2329,33 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             UNREACHABLE_BAD_CASE_ANALYSIS
         }
 
+        void visit_(type_identity<NestedUserDefinedOperator>, const NestedUserDefinedOperator& op,
+                std::ostream& out) override {
+            PRINT_BEGIN_COMMENT(out);
+
+            out << "RamDomain env" << op.getTupleId() << "in[" << op.getArguments().size() << "];\n";
+            std::size_t i = 0;
+            for (auto& arg : op.getArguments()) {
+                out << "env" << op.getTupleId() << "in[" << i << "] = ";
+                out << "ramBitCast<RamDomain>(";
+                dispatch(*arg, out);
+                out << ");\n";
+                ++i;
+            }
+
+            out << "RamDomain env" << op.getTupleId() << "[1];\n";
+
+            const std::string& name = op.getName();
+            out << name << "(&symTable, &recordTable, ";
+            out << "[&]() -> void {\n";
+            out << "do {\n";
+            visit_(type_identity<TupleOperation>(), op, out);
+            out << "} while(false);\n";
+            out << "}, env" << op.getTupleId() << "in, env" << op.getTupleId() << ");";
+
+            PRINT_END_COMMENT(out);
+        }
+
         void visit_(type_identity<UserDefinedOperator>, const UserDefinedOperator& op,
                 std::ostream& out) override {
             const std::string& name = op.getName();
@@ -2473,6 +2501,11 @@ std::set<std::string> Synthesiser::accessedUserDefinedFunctors(Statement& stmt) 
     };
     visit(stmt, [&](const Aggregate& op) { visitAggregate(op); });
     visit(stmt, [&](const IndexAggregate& op) { visitAggregate(op); });
+    
+    visit(stmt, [&](const NestedUserDefinedOperator& node) {
+        const std::string& name = node.getName();
+        accessed.insert(name);
+    });
     return accessed;
 };
 
@@ -2521,33 +2554,48 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     } else {
         db.setNS("souffle");
     }
+    
+    constexpr int Stateless = 0;
+    constexpr int Stateful = 1;
+    constexpr int Universal = 2;
 
     // produce external definitions for user-defined functors
-    std::map<std::string, std::tuple<TypeAttribute, std::vector<TypeAttribute>, bool>> functors;
+    std::map<std::string, std::tuple<TypeAttribute, std::vector<TypeAttribute>, int>> functors;
     visit(prog, [&](const UserDefinedOperator& op) {
         if (functors.find(op.getName()) == functors.end()) {
-            functors[op.getName()] = std::make_tuple(op.getReturnType(), op.getArgsTypes(), op.isStateful());
+            int k = (op.isStateful() ? Stateful : Stateless);
+            functors[op.getName()] = std::make_tuple(op.getReturnType(), op.getArgsTypes(), k);
         }
-        withSharedLibrary = true;
     });
+
+    visit(prog, [&](const NestedUserDefinedOperator& op) {
+        if (functors.find(op.getName()) == functors.end()) {
+            functors[op.getName()] = std::make_tuple(op.getReturnType(), op.getArgsTypes(), Universal);
+        }
+    });
+
+    
+
     auto visitAggregate = [&](const AbstractAggregate& op) {
         const Aggregator& aggregator = op.getAggregator();
         if (const auto* uda = as<UserDefinedAggregator>(aggregator)) {
+            int k = (uda->isStateful() ? Stateful : Stateless);
             functors[uda->getName()] =
-                    std::make_tuple(uda->getReturnType(), uda->getArgsTypes(), uda->isStateful());
-            withSharedLibrary = true;
+                    std::make_tuple(uda->getReturnType(), uda->getArgsTypes(), k);
         }
     };
     visit(prog, [&](const Aggregate& op) { visitAggregate(op); });
     visit(prog, [&](const IndexAggregate& op) { visitAggregate(op); });
 
+    withSharedLibrary = !functors.empty();
+    
     for (const auto& f : functors) {
         const std::string& name = f.first;
 
         const auto& functorTypes = f.second;
         const auto& returnType = std::get<0>(functorTypes);
         const auto& argsTypes = std::get<1>(functorTypes);
-        const auto& stateful = std::get<2>(functorTypes);
+        const int kind = std::get<2>(functorTypes);
 
         auto cppTypeDecl = [](TypeAttribute ty) -> char const* {
             switch (ty) {
@@ -2564,19 +2612,27 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
         std::vector<std::string> argsTy;
         std::string retTy;
-        if (stateful) {
+        if (kind == Stateful) {
             retTy = "souffle::RamDomain";
             argsTy.push_back("souffle::SymbolTable*");
             argsTy.push_back("souffle::RecordTable*");
             for (std::size_t i = 0; i < argsTypes.size(); i++) {
                 argsTy.push_back("souffle::RamDomain");
             }
-        } else {
+        } else if (kind == Stateless) {
             retTy = cppTypeDecl(returnType);
             for (auto ty : argsTypes) {
                 argsTy.push_back(cppTypeDecl(ty));
             }
+        } else if (kind == Universal) {
+            retTy = "souffle::RamDomain";
+            argsTy.push_back("souffle::SymbolTable*");
+            argsTy.push_back("souffle::RecordTable*");
+            argsTy.push_back("const std::function<void()>&");
+            argsTy.push_back("const souffle::RamDomain*");
+            argsTy.push_back("souffle::RamDomain*");
         }
+
         functor_signatures[name] = std::make_pair(argsTy, retTy);
         auto extern_decl = [&](std::ostream& os) {
             os << retTy << " " << name << "("

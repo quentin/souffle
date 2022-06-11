@@ -56,6 +56,7 @@
 #include "ram/Negation.h"
 #include "ram/NestedIntrinsicOperator.h"
 #include "ram/NestedOperation.h"
+#include "ram/NestedUserDefinedOperator.h"
 #include "ram/Node.h"
 #include "ram/NumericConstant.h"
 #include "ram/Operation.h"
@@ -140,6 +141,9 @@ public:
 
     NodePtr visit_(
             type_identity<ram::NestedIntrinsicOperator>, const ram::NestedIntrinsicOperator& op) override;
+
+    NodePtr visit_(
+            type_identity<ram::NestedUserDefinedOperator>, const ram::NestedUserDefinedOperator& op) override;
 
     NodePtr visit_(type_identity<ram::PackRecord>, const ram::PackRecord& pr) override;
 

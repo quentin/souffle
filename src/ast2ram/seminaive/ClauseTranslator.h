@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "ast/Functor.h"
 #include "ast2ram/ClauseTranslator.h"
 #include "souffle/RamTypes.h"
 #include "souffle/utility/ContainerUtil.h"
@@ -90,7 +91,9 @@ protected:
     virtual void indexAtoms(const ast::Clause& clause);
     void indexAggregators(const ast::Clause& clause);
     void indexMultiResultFunctors(const ast::Clause& clause);
-    void indexNodeArguments(std::size_t nodeLevel, const std::vector<ast::Argument*>& nodeArgs);
+    void indexArgument(std::size_t nodeLevel, std::size_t i, const ast::Argument& arg, bool isOperator);
+    void indexNodeArguments(
+            std::size_t nodeLevel, const std::vector<ast::Argument*>& nodeArgs, bool isOperator);
     void indexAggregatorBody(const ast::Aggregator& agg);
     void indexGenerator(const ast::Argument& arg);
 
@@ -124,7 +127,7 @@ protected:
     Own<ram::Operation> instantiateAggregator(Own<ram::Operation> op, const ast::Clause& clause,
             const ast::Aggregator* agg, std::size_t curLevel) const;
     Own<ram::Operation> instantiateMultiResultFunctor(
-            Own<ram::Operation> op, const ast::IntrinsicFunctor& inf, std::size_t curLevel) const;
+            Own<ram::Operation> op, const ast::Functor& inf, std::size_t curLevel) const;
 
     /** Operation levelling */
     std::size_t addGeneratorLevel(const ast::Argument* arg);

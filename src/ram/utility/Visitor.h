@@ -58,6 +58,7 @@
 #include "ram/Negation.h"
 #include "ram/NestedIntrinsicOperator.h"
 #include "ram/NestedOperation.h"
+#include "ram/NestedUserDefinedOperator.h"
 #include "ram/Node.h"
 #include "ram/NumericConstant.h"
 #include "ram/Operation.h"
@@ -163,6 +164,7 @@ struct Visitor : souffle::detail::VisitorBase<R, NodeType, Params...> {
         SOUFFLE_VISITOR_FORWARD(Aggregate);
         SOUFFLE_VISITOR_FORWARD(ParallelIndexAggregate);
         SOUFFLE_VISITOR_FORWARD(IndexAggregate);
+        SOUFFLE_VISITOR_FORWARD(NestedUserDefinedOperator);
 
         // Statements
         SOUFFLE_VISITOR_FORWARD(IO);
@@ -241,6 +243,7 @@ protected:
     SOUFFLE_VISITOR_LINK(Break, AbstractConditional);
     SOUFFLE_VISITOR_LINK(AbstractConditional, NestedOperation);
     SOUFFLE_VISITOR_LINK(NestedOperation, Operation);
+    SOUFFLE_VISITOR_LINK(NestedUserDefinedOperator, TupleOperation)
 
     SOUFFLE_VISITOR_LINK(Operation, Node);
 

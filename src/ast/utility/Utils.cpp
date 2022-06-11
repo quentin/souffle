@@ -117,6 +117,12 @@ bool isRecursiveClause(const Clause& clause) {
     return recursive;
 }
 
+bool isMultiResult(const IntrinsicFunctor& intrinsic) {
+    auto candidates = functorBuiltIn(intrinsic.getBaseFunctionOp());
+    assert(!candidates.empty() && "at least one op should match");
+    return candidates[0].get().multipleResults;
+}
+
 bool isFact(const Clause& clause) {
     // there must be a head
     if (clause.getHead() == nullptr) {
@@ -134,9 +140,8 @@ bool isFact(const Clause& clause) {
             hasAggregatesOrMultiResultFunctor = true;
         }
 
-        auto* func = as<IntrinsicFunctor>(arg);
-        hasAggregatesOrMultiResultFunctor |=
-                (func != nullptr) && analysis::FunctorAnalysis::isMultiResult(*func);
+        const auto* func = as<IntrinsicFunctor>(arg);
+        hasAggregatesOrMultiResultFunctor |= (func != nullptr) && isMultiResult(*func);
     });
     return !hasAggregatesOrMultiResultFunctor;
 }

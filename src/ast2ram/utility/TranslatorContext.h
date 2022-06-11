@@ -118,6 +118,7 @@ public:
     TypeAttribute getFunctorParamTypeAtribute(const ast::Functor& functor, std::size_t idx) const;
     std::vector<TypeAttribute> getFunctorParamTypeAtributes(const ast::UserDefinedFunctor& udf) const;
     bool isStatefulFunctor(const ast::UserDefinedFunctor& functor) const;
+    bool isMultiResultFunctor(const ast::Functor& functor) const;
 
     /** Functor methods */
     TypeAttribute getFunctorReturnTypeAttribute(const ast::UserDefinedAggregator& aggregator) const;

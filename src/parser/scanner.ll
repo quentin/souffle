@@ -181,6 +181,7 @@ WS [ \t\r\v\f]
 "strlen"                              { return yy::parser::make_STRLEN(yylloc); }
 "substr"                              { return yy::parser::make_SUBSTR(yylloc); }
 "stateful"                            { return yy::parser::make_STATEFUL(yylloc); }
+"multiresult"                         { return yy::parser::make_MULTIRESULT(yylloc); }
 "contains"                            { return yy::parser::make_TCONTAINS(yylloc); }
 "output"                              { return yy::parser::make_OUTPUT_QUALIFIER(yylloc); }
 "input"                               { return yy::parser::make_INPUT_QUALIFIER(yylloc); }

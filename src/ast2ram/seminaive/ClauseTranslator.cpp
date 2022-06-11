@@ -53,6 +53,7 @@
 #include "ram/LogRelationTimer.h"
 #include "ram/Negation.h"
 #include "ram/NestedIntrinsicOperator.h"
+#include "ram/NestedUserDefinedOperator.h"
 #include "ram/Query.h"
 #include "ram/Scan.h"
 #include "ram/Sequence.h"
@@ -405,33 +406,54 @@ Own<ram::Operation> ClauseTranslator::instantiateAggregator(Own<ram::Operation> 
 }
 
 Own<ram::Operation> ClauseTranslator::instantiateMultiResultFunctor(
-        Own<ram::Operation> op, const ast::IntrinsicFunctor& inf, std::size_t curLevel) const {
+        Own<ram::Operation> op, const ast::Functor& functor, std::size_t curLevel) const {
     VecOwn<ram::Expression> args;
-    for (auto&& x : inf.getArguments()) {
+    for (auto&& x : functor.getArguments()) {
         args.push_back(context.translateValue(*valueIndex, x));
     }
 
-    auto func_op = [&]() -> ram::NestedIntrinsicOp {
-        switch (context.getOverloadedFunctorOp(inf)) {
-            case FunctorOp::RANGE: return ram::NestedIntrinsicOp::RANGE;
-            case FunctorOp::URANGE: return ram::NestedIntrinsicOp::URANGE;
-            case FunctorOp::FRANGE: return ram::NestedIntrinsicOp::FRANGE;
+    if (const auto* inf = as<ast::IntrinsicFunctor>(functor)) {
+        auto func_op = [&]() -> ram::NestedIntrinsicOp {
+            switch (context.getOverloadedFunctorOp(*inf)) {
+                case FunctorOp::RANGE: return ram::NestedIntrinsicOp::RANGE;
+                case FunctorOp::URANGE: return ram::NestedIntrinsicOp::URANGE;
+                case FunctorOp::FRANGE: return ram::NestedIntrinsicOp::FRANGE;
 
-            default: fatal("missing case handler or bad code-gen");
-        }
-    };
+                default: fatal("missing case handler or bad code-gen");
+            }
+        };
 
-    return mk<ram::NestedIntrinsicOperator>(func_op(), std::move(args), std::move(op), curLevel);
+        return mk<ram::NestedIntrinsicOperator>(func_op(), std::move(args), std::move(op), curLevel);
+    } else if (const auto* udf = as<ast::UserDefinedFunctor>(functor)) {
+        auto returnType = context.getFunctorReturnTypeAttribute(*udf);
+        auto paramTypes = context.getFunctorParamTypeAtributes(*udf);
+        return mk<ram::NestedUserDefinedOperator>(
+                std::move(op), curLevel, udf->getName(), paramTypes, returnType, std::move(args));
+    } else {
+        fatal("missing case handler");
+    }
 }
 
 Own<ram::Operation> ClauseTranslator::addGeneratorLevels(
         Own<ram::Operation> op, const ast::Clause& clause) const {
+    // generators are nested below the operators
     std::size_t curLevel = operators.size() + generators.size() - 1;
     for (const auto* generator : reverse(generators)) {
         if (auto agg = as<ast::Aggregator>(generator)) {
             op = instantiateAggregator(std::move(op), clause, agg, curLevel);
-        } else if (const auto* inf = as<ast::IntrinsicFunctor>(generator)) {
-            op = instantiateMultiResultFunctor(std::move(op), *inf, curLevel);
+        } else if (const auto* functor = as<ast::Functor>(generator)) {
+            op = instantiateMultiResultFunctor(std::move(op), *functor, curLevel);
+        } else if (const auto* rec = as<ast::RecordInit>(generator)) {
+            // add record arguments through an unpack
+            op = addRecordUnpack(std::move(op), rec, curLevel);
+        } else if (const auto* adt = as<ast::BranchInit>(generator)) {
+            // add adt arguments through an unpack
+            op = addAdtUnpack(std::move(op), adt, curLevel);
+            if (!context.isADTBranchSimple(adt)) {
+                // for non-simple ADTs (arity > 1), we introduced two
+                // nesting levels
+                curLevel--;
+            }
         } else {
             assert(false && "unhandled generator");
         }
@@ -699,42 +721,47 @@ std::size_t ClauseTranslator::addGeneratorLevel(const ast::Argument* arg) {
 }
 
 void ClauseTranslator::indexNodeArguments(
-        std::size_t nodeLevel, const std::vector<ast::Argument*>& nodeArgs) {
+        const std::size_t nodeLevel, const std::vector<ast::Argument*>& nodeArgs, const bool isOperator) {
     for (std::size_t i = 0; i < nodeArgs.size(); i++) {
-        const auto& arg = nodeArgs.at(i);
+        const ast::Argument* arg = nodeArgs.at(i);
+        indexArgument(nodeLevel, i, *arg, isOperator);
+    }
+}
 
-        // check for variable references
-        if (const auto* var = as<ast::Variable>(arg)) {
-            valueIndex->addVarReference(var->getName(), nodeLevel, i);
-        }
+void ClauseTranslator::indexArgument(
+        const std::size_t nodeLevel, const std::size_t i, const ast::Argument& arg, const bool isOperator) {
+    // check for variable references
+    if (const auto* var = as<ast::Variable>(arg)) {
+        valueIndex->addVarReference(var->getName(), nodeLevel, i);
+    }
 
-        // check for nested records
-        if (const auto* rec = as<ast::RecordInit>(arg)) {
-            valueIndex->setRecordDefinition(*rec, nodeLevel, i);
+    // check for nested records
+    if (const auto* rec = as<ast::RecordInit>(arg)) {
+        valueIndex->setRecordDefinition(*rec, nodeLevel, i);
 
-            // introduce new nesting level for unpack
-            auto unpackLevel = addOperatorLevel(rec);
-            indexNodeArguments(unpackLevel, rec->getArguments());
-        }
+        // introduce new nesting level for unpack
+        const auto unpackLevel = (isOperator ? addOperatorLevel(rec) : addGeneratorLevel(rec));
+        indexNodeArguments(unpackLevel, rec->getArguments(), isOperator);
+    }
 
-        // check for nested ADT branches
-        if (const auto* adt = as<ast::BranchInit>(arg)) {
-            if (!context.isADTEnum(adt)) {
-                valueIndex->setAdtDefinition(*adt, nodeLevel, i);
-                auto unpackLevel = addOperatorLevel(adt);
+    // check for nested ADT branches
+    if (const auto* adt = as<ast::BranchInit>(arg)) {
+        if (!context.isADTEnum(adt)) {
+            valueIndex->setAdtDefinition(*adt, nodeLevel, i);
+            const auto unpackLevel = (isOperator ? addOperatorLevel(adt) : addGeneratorLevel(adt));
 
-                if (context.isADTBranchSimple(adt)) {
-                    std::vector<ast::Argument*> arguments;
-                    auto dummyArg = mk<ast::UnnamedVariable>();
-                    arguments.push_back(dummyArg.get());
-                    for (auto* arg : adt->getArguments()) {
-                        arguments.push_back(arg);
-                    }
-                    indexNodeArguments(unpackLevel, arguments);
-                } else {
-                    auto argumentUnpackLevel = addOperatorLevel(adt);
-                    indexNodeArguments(argumentUnpackLevel, adt->getArguments());
+            if (context.isADTBranchSimple(adt)) {
+                std::vector<ast::Argument*> arguments;
+                auto dummyArg = mk<ast::UnnamedVariable>();
+                arguments.push_back(dummyArg.get());
+                for (auto* arg : adt->getArguments()) {
+                    arguments.push_back(arg);
                 }
+                indexNodeArguments(unpackLevel, arguments, isOperator);
+            } else {
+                const auto argumentUnpackLevel =
+                        (isOperator ? addOperatorLevel(adt) : addGeneratorLevel(adt));
+                indexNodeArguments(argumentUnpackLevel, adt->getArguments(), isOperator);
             }
         }
     }
@@ -749,7 +776,7 @@ void ClauseTranslator::indexAtoms(const ast::Clause& clause) {
     for (const auto* atom : getAtomOrdering(clause)) {
         // give the atom the current level
         std::size_t scanLevel = addOperatorLevel(atom);
-        indexNodeArguments(scanLevel, atom->getArguments());
+        indexNodeArguments(scanLevel, atom->getArguments(), true);
     }
 }
 
@@ -791,8 +818,8 @@ void ClauseTranslator::indexAggregators(const ast::Clause& clause) {
 
 void ClauseTranslator::indexMultiResultFunctors(const ast::Clause& clause) {
     // Add each multi-result functor as an internal generator
-    visit(clause, [&](const ast::IntrinsicFunctor& func) {
-        if (ast::analysis::FunctorAnalysis::isMultiResult(func)) {
+    visit(clause, [&](const ast::Functor& func) {
+        if (context.isMultiResultFunctor(func)) {
             indexGenerator(func);
         }
     });
@@ -800,11 +827,14 @@ void ClauseTranslator::indexMultiResultFunctors(const ast::Clause& clause) {
     // Add multi-result functor value introductions
     visit(clause, [&](const ast::BinaryConstraint& bc) {
         if (!isEqConstraint(bc.getBaseOperator())) return;
-        const auto* lhs = as<ast::Variable>(bc.getLHS());
-        const auto* rhs = as<ast::IntrinsicFunctor>(bc.getRHS());
+        const auto* lhs = bc.getLHS();
+        const auto* rhs = as<ast::Functor>(bc.getRHS());
         if (lhs == nullptr || rhs == nullptr) return;
-        if (!ast::analysis::FunctorAnalysis::isMultiResult(*rhs)) return;
-        valueIndex->addVarReference(lhs->getName(), valueIndex->getGeneratorLoc(*rhs));
+        if (!context.isMultiResultFunctor(*rhs)) return;
+        indexArgument(valueIndex->getGeneratorLoc(*rhs).identifier, 0, *lhs, /*isOperator=*/false);
+        // if (const ast::Variable* var = as<ast::Variable>(lhs)) {
+        //     valueIndex->addVarReference(var->getName(), valueIndex->getGeneratorLoc(*rhs));
+        // }
     });
 }
 

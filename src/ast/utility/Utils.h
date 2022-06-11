@@ -194,4 +194,6 @@ bool renameAtoms(Program& program, const std::map<QualifiedName, QualifiedName>&
 bool renameAtoms(Program& program, QualifiedName const& relation,
         const std::map<QualifiedName, QualifiedName>& oldToNew);
 
+bool isMultiResult(const IntrinsicFunctor& intrinsic);
+
 }  // namespace souffle::ast

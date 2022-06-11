@@ -18,10 +18,10 @@
 
 namespace souffle::ast {
 
-FunctorDeclaration::FunctorDeclaration(
-        std::string name, VecOwn<Attribute> params, Own<Attribute> returnType, bool stateful, SrcLocation loc)
+FunctorDeclaration::FunctorDeclaration(std::string name, VecOwn<Attribute> params, Own<Attribute> returnType,
+        bool stateful, bool multiResult, SrcLocation loc)
         : Node(std::move(loc)), name(std::move(name)), params(std::move(params)),
-          returnType(std::move(returnType)), stateful(stateful) {
+          returnType(std::move(returnType)), stateful(stateful), multiResult(multiResult) {
     assert(this->name.length() > 0 && "functor name is empty");
     assert(allValidPtrs(this->params));
     assert(this->returnType != nullptr);
@@ -33,6 +33,9 @@ void FunctorDeclaration::print(std::ostream& out) const {
     };
 
     tfm::format(out, ".functor %s(%s): %s", name, join(map(params, convert), ","), returnType->getTypeName());
+    if (multiResult) {
+        out << " multiresult";
+    }
     if (stateful) {
         out << " stateful";
     }
@@ -45,7 +48,7 @@ bool FunctorDeclaration::equal(const Node& node) const {
 }
 
 FunctorDeclaration* FunctorDeclaration::cloning() const {
-    return new FunctorDeclaration(name, clone(params), clone(returnType), stateful, getSrcLoc());
+    return new FunctorDeclaration(name, clone(params), clone(returnType), stateful, multiResult, getSrcLoc());
 }
 
 }  // namespace souffle::ast

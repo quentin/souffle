@@ -52,10 +52,12 @@ public:
 
     // -- records --
     void setRecordDefinition(const ast::RecordInit& init, std::size_t ident, std::size_t pos);
+    bool isDefined(const ast::RecordInit& init) const;
     const Location& getDefinitionPoint(const ast::RecordInit& init) const;
 
     // -- adts --
     void setAdtDefinition(const ast::BranchInit& adt, std::size_t ident, std::size_t pos);
+    bool isDefined(const ast::BranchInit& init) const;
     const Location& getDefinitionPoint(const ast::BranchInit& adt) const;
 
     // -- generators (aggregates & some functors) --

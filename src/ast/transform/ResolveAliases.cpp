@@ -202,7 +202,8 @@ public:
 
 }  // namespace
 
-Own<Clause> ResolveAliasesTransformer::resolveAliases(const Clause& clause) {
+Own<Clause> ResolveAliasesTransformer::resolveAliases(
+        const Clause& clause, const analysis::FunctorAnalysis& functorAnalysis) {
     // -- utilities --
 
     // tests whether something is a variable
@@ -220,9 +221,9 @@ Own<Clause> ResolveAliasesTransformer::resolveAliases(const Clause& clause) {
         if (isA<Aggregator>(&arg)) return true;
 
         // or multi-result functors
-        const auto* inf = as<IntrinsicFunctor>(arg);
+        const auto* inf = as<Functor>(arg);
         if (inf == nullptr) return false;
-        return analysis::FunctorAnalysis::isMultiResult(*inf);
+        return functorAnalysis.isMultiResult(*inf);
     };
 
     // tests whether a value `a` occurs in a term `b`
@@ -257,11 +258,56 @@ Own<Clause> ResolveAliasesTransformer::resolveAliases(const Clause& clause) {
         });
     }
 
+    //// variables appearing in equality binary constraint with a
+    //// generator should not be resolved.
+    // std::set<const BinaryConstraint*> lockedEqualities;
+    // visit(clause, [&](const BinaryConstraint& constraint) {
+    //     if (isEqConstraint(constraint.getBaseOperator())) {
+    //         const Argument& lhs = *constraint.getLHS();
+    //         const Argument& rhs = *constraint.getRHS();
+    //         const Argument* grounded = nullptr;
+    //         if (isGenerator(rhs)) {
+    //             if (isVar(lhs)) {
+    //                 grounded = &lhs;
+    //                 baseGroundedVariables.insert(as<Variable>(lhs)->getName());
+    //             } else if (isRec(lhs) || isAdt(lhs)) {
+    //                 grounded = &lhs;
+    //             }
+    //         } else if (isGenerator(lhs)) {
+    //             if (isVar(rhs)) {
+    //                 grounded = &rhs;
+    //             } else if (isRec(rhs) || isAdt(rhs)) {
+    //                 grounded = &rhs;
+    //                 baseGroundedVariables.insert(as<Variable>(rhs)->getName());
+    //             }
+    //         }
+    //         if (grounded != nullptr) {
+    //             lockedEqualities.insert(&constraint);
+    //             visit(*grounded, [&](const RecordInit& rec) {
+    //                 for (const Argument* arg : rec.getArguments()) {
+    //                     if (const auto* var = as<ast::Variable>(arg)) {
+    //                         baseGroundedVariables.insert(var->getName());
+    //                     }
+    //                 }
+    //             });
+    //             visit(*grounded, [&](const BranchInit& adt) {
+    //                 for (const Argument* arg : adt.getArguments()) {
+    //                     if (const auto* var = as<ast::Variable>(arg)) {
+    //                         baseGroundedVariables.insert(var->getName());
+    //                     }
+    //                 }
+    //             });
+    //         }
+    //     }
+    // });
+
     // I) extract equations
     std::vector<Equation> equations;
     visit(clause, [&](const BinaryConstraint& constraint) {
         if (isEqConstraint(constraint.getBaseOperator())) {
-            equations.push_back(Equation(constraint.getLHS(), constraint.getRHS()));
+            /*if (lockedEqualities.count(&constraint) == 0)*/ {
+                equations.push_back(Equation(constraint.getLHS(), constraint.getRHS()));
+            }
         }
     });
 
@@ -496,6 +542,8 @@ Own<Clause> ResolveAliasesTransformer::removeComplexTermsInAtoms(const Clause& c
 bool ResolveAliasesTransformer::transform(TranslationUnit& translationUnit) {
     bool changed = false;
     Program& program = translationUnit.getProgram();
+    const ast::analysis::FunctorAnalysis& functorAnalysis =
+            translationUnit.getAnalysis<ast::analysis::FunctorAnalysis>();
 
     // get all clauses
     std::vector<const Clause*> clauses;
@@ -513,7 +561,7 @@ bool ResolveAliasesTransformer::transform(TranslationUnit& translationUnit) {
     for (const Clause* clause : clauses) {
         // -- Step 1 --
         // get rid of aliases
-        Own<Clause> noAlias = resolveAliases(*clause);
+        Own<Clause> noAlias = resolveAliases(*clause, functorAnalysis);
 
         // clean up equalities
         Own<Clause> cleaned = removeTrivialEquality(*noAlias);

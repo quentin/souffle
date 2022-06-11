@@ -74,6 +74,10 @@ const Location& ValueIndex::getDefinitionPoint(const ast::RecordInit& init) cons
     return recordDefinitionPoints.at(&init);
 }
 
+bool ValueIndex::isDefined(const ast::RecordInit& init) const {
+    return contains(recordDefinitionPoints, &init);
+}
+
 void ValueIndex::setAdtDefinition(const ast::BranchInit& adt, std::size_t ident, std::size_t pos) {
     adtDefinitionPoints.insert({&adt, Location({ident, pos})});
 }
@@ -81,6 +85,10 @@ void ValueIndex::setAdtDefinition(const ast::BranchInit& adt, std::size_t ident,
 const Location& ValueIndex::getDefinitionPoint(const ast::BranchInit& adt) const {
     assert(contains(adtDefinitionPoints, &adt) && "undefined adt");
     return adtDefinitionPoints.at(&adt);
+}
+
+bool ValueIndex::isDefined(const ast::BranchInit& init) const {
+    return contains(adtDefinitionPoints, &init);
 }
 
 bool ValueIndex::isGenerator(const std::size_t level) const {

@@ -65,7 +65,8 @@ TEST(Transformers, GroundTermPropagation) {
     EXPECT_EQ("p(a,b) :- \n   p(x,y),\n   r = [x,y],\n   s = r,\n   s = [w,v],\n   [w,v] = [a,b].",
             toString(*a));
 
-    Own<Clause> res = ResolveAliasesTransformer::resolveAliases(*a);
+    const auto& fa = tu->getAnalysis<FunctorAnalysis>();
+    Own<Clause> res = ResolveAliasesTransformer::resolveAliases(*a, fa);
     Own<Clause> cleaned = ResolveAliasesTransformer::removeTrivialEquality(*res);
 
     EXPECT_EQ(
@@ -96,7 +97,8 @@ TEST(Transformers, GroundTermPropagation2) {
 
     EXPECT_EQ("p(a,b) :- \n   p(x,y),\n   x = y,\n   x = a,\n   y = b.", toString(*a));
 
-    Own<Clause> res = ResolveAliasesTransformer::resolveAliases(*a);
+    const auto& fa = tu->getAnalysis<FunctorAnalysis>();
+    Own<Clause> res = ResolveAliasesTransformer::resolveAliases(*a, fa);
     Own<Clause> cleaned = ResolveAliasesTransformer::removeTrivialEquality(*res);
 
     EXPECT_EQ("p(b,b) :- \n   p(b,b),\n   b = b,\n   b = b,\n   b = b.", toString(*res));

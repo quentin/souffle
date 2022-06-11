@@ -143,6 +143,7 @@
 %token TMATCH                    "match predicate"
 %token TCONTAINS                 "checks whether substring is contained in a string"
 %token STATEFUL                  "stateful functor"
+%token MULTIRESULT               "multi-result functor"
 %token CAT                       "concatenation of strings"
 %token ORD                       "ordinal number of a string"
 %token RANGE                     "range"
@@ -1357,11 +1358,15 @@ component_init
 functor_decl
   : FUNCTOR IDENT LPAREN functor_arg_type_list[args] RPAREN COLON qualified_name
     {
-      $$ = mk<ast::FunctorDeclaration>($IDENT, $args, mk<ast::Attribute>("return_type", $qualified_name, @qualified_name), false, @$);
+      $$ = mk<ast::FunctorDeclaration>($IDENT, $args, mk<ast::Attribute>("return_type", $qualified_name, @qualified_name), false, false, @$);
     }
   | FUNCTOR IDENT LPAREN functor_arg_type_list[args] RPAREN COLON qualified_name STATEFUL
     {
-      $$ = mk<ast::FunctorDeclaration>($IDENT, $args, mk<ast::Attribute>("return_type", $qualified_name, @qualified_name), true, @$);
+      $$ = mk<ast::FunctorDeclaration>($IDENT, $args, mk<ast::Attribute>("return_type", $qualified_name, @qualified_name), true, false, @$);
+    }
+  | FUNCTOR IDENT LPAREN functor_arg_type_list[args] RPAREN COLON qualified_name MULTIRESULT
+    {
+      $$ = mk<ast::FunctorDeclaration>($IDENT, $args, mk<ast::Attribute>("return_type", $qualified_name, @qualified_name), true, true, @$);
     }
   ;
 

@@ -9,6 +9,7 @@ add_subdirectory(aggregates)
 add_subdirectory(functors)
 add_subdirectory(graph_coloring)
 add_subdirectory(pathseq)
+add_subdirectory(multiresult_functors)
 
 # swig test which will run python, java or both
 function(SOUFFLE_POSITIVE_FUNCTOR_TEST TEST_NAME)
@@ -167,6 +168,7 @@ souffle_positive_cpp_test(load_print)
 souffle_positive_cpp_test(signal_error)
 souffle_positive_cpp_test(tuple_insertion_diff_element_type)
 souffle_positive_cpp_test(tuple_insertion_diff_relation)
+souffle_positive_functor_test(multiresult_functors CATEGORY interface)
 
 # The following test fails because we use -g (instead -o)
 # TODO: (This neeads to be investigated)

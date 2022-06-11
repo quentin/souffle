@@ -37,7 +37,7 @@ namespace souffle::ast {
 class FunctorDeclaration : public Node {
 public:
     FunctorDeclaration(std::string name, VecOwn<Attribute> params, Own<Attribute> returnType, bool stateful,
-            SrcLocation loc = {});
+            bool multiResult, SrcLocation loc = {});
 
     /** Return name */
     const std::string& getName() const {
@@ -64,6 +64,10 @@ public:
         return stateful;
     }
 
+    bool isMultiResult() const {
+        return multiResult;
+    }
+
 protected:
     void print(std::ostream& out) const override;
 
@@ -84,6 +88,8 @@ private:
 
     /** Stateful flag */
     const bool stateful;
+
+    const bool multiResult;
 };
 
 }  // namespace souffle::ast

@@ -1,0 +1,47 @@
+
+.functor myrange(from:number, cnt:unsigned) : number multiresult
+.functor myrange_step_f(from:float, cnt:unsigned, step:float) : float multiresult
+.functor safe_div_f(numerator:float, denominator:float) : float multiresult
+.type SymbolNumber = [str:symbol, bytes:number]
+.functor to_str_f(v:float, precision:number) : SymbolNumber multiresult
+.functor index_of(s:symbol, c:symbol) : unsigned multiresult
+
+.decl query1(i:number)
+.output query1()
+
+query1(i) :- i = @myrange(-2,10).
+
+.decl query2(n:float,d:float,f:float)
+.output query2()
+
+query2(1.5,0.25,f) :- f = @safe_div_f(1.5,0.25).
+query2(2.5,0.0,f) :- f = @safe_div_f(2.5,0.0).
+query2(2.5,0.5,f) :- f = @safe_div_f(2.5,0.5).
+
+
+.decl query3(n:float, d:float, f:float)
+.output query3()
+
+query3(n,d,f) :-
+  n = 10.0,
+  d = @myrange_step_f(2.0, 8, -0.5),
+  d != -1.5,
+  d != 1.5,
+  f = @safe_div_f(n,d).
+
+.decl query4(s:symbol, b:number)
+.output query4
+query4(s,b) :-
+  ( f = -3.141592, p = 2
+  ; f = -3.141592, p = 6
+  ; f = 17000001, p = 4 ),
+  [s,b] = @to_str_f(f,p).
+
+.decl query5(s:symbol, c:symbol, p:unsigned)
+.output query5
+query5(s,c,p) :-
+  ( s = "hello", c = "l"
+  ; s = "hello", c = "el"
+  ; s = "world", c = "x"
+  ),
+  p = @index_of(s, c).

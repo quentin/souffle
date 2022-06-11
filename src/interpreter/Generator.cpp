@@ -174,6 +174,24 @@ NodePtr NodeGenerator::visit_(
     return mk<NestedIntrinsicOperator>(I_NestedIntrinsicOperator, &op, std::move(children));
 }
 
+NodePtr NodeGenerator::visit_(
+        type_identity<ram::NestedUserDefinedOperator>, const ram::NestedUserDefinedOperator& op) {
+    auto arity = op.getArguments().size();
+    orderingContext.addNewTuple(op.getTupleId(), arity);
+    NodePtrVec children;
+    for (auto&& arg : op.getArguments()) {
+        children.push_back(dispatch(*arg));
+    }
+    // push the inner node as the last children
+    children.push_back(visit_(type_identity<ram::TupleOperation>(), op));
+
+    /* Resolve functor to actual function pointer now */
+    void* functionPointer = engine.getMethodHandle(op.getName());
+
+    return mk<NestedUserDefinedOperator>(
+            I_NestedUserDefinedOperator, &op, std::move(children), functionPointer);
+}
+
 NodePtr NodeGenerator::visit_(type_identity<ram::PackRecord>, const ram::PackRecord& pr) {
     NodePtrVec children;
     for (const auto& arg : pr.getArguments()) {

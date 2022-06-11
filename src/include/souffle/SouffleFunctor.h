@@ -19,3 +19,4 @@
 #include "souffle/RamTypes.h"
 #include "souffle/RecordTable.h"
 #include "souffle/SymbolTable.h"
+#include <functional>

@@ -194,7 +194,11 @@ std::vector<TypeAttribute> TranslatorContext::getFunctorParamTypeAtributes(
 }
 
 bool TranslatorContext::isStatefulFunctor(const ast::UserDefinedFunctor& udf) const {
-    return functorAnalysis->isStatefulFunctor(udf);
+    return functorAnalysis->isStateful(udf);
+}
+
+bool TranslatorContext::isMultiResultFunctor(const ast::Functor& functor) const {
+    return functorAnalysis->isMultiResult(functor);
 }
 
 TypeAttribute TranslatorContext::getFunctorReturnTypeAttribute(const ast::UserDefinedAggregator& uda) const {

@@ -18,9 +18,9 @@
 #include "ast/transform/NormaliseGenerators.h"
 #include "ast/Aggregator.h"
 #include "ast/BinaryConstraint.h"
-#include "ast/IntrinsicFunctor.h"
 #include "ast/Program.h"
 #include "ast/TranslationUnit.h"
+#include "ast/UserDefinedFunctor.h"
 #include "ast/Variable.h"
 #include "ast/analysis/Functor.h"
 #include "souffle/utility/ContainerUtil.h"
@@ -31,10 +31,13 @@ bool NormaliseGeneratorsTransformer::transform(TranslationUnit& translationUnit)
     bool changed = false;
     auto& program = translationUnit.getProgram();
 
+    const auto& functorAnalysis = translationUnit.getAnalysis<souffle::ast::analysis::FunctorAnalysis>();
+
     // Assign a unique name to each generator
     struct name_generators : public NodeMapper {
         mutable int count{0};
         mutable std::vector<std::pair<std::string, Own<Argument>>> generatorNames{};
+        const souffle::ast::analysis::FunctorAnalysis* functorAnalysis = nullptr;
         name_generators() = default;
 
         std::vector<std::pair<std::string, Own<Argument>>> getGeneratorNames() {
@@ -50,9 +53,9 @@ bool NormaliseGeneratorsTransformer::transform(TranslationUnit& translationUnit)
         Own<Node> operator()(Own<Node> node) const override {
             node->apply(*this);
 
-            if (auto* inf = as<IntrinsicFunctor>(node)) {
+            if (auto* inf = as<Functor>(node)) {
                 // Multi-result functors
-                if (analysis::FunctorAnalysis::isMultiResult(*inf)) {
+                if (functorAnalysis->isMultiResult(*inf)) {
                     std::string name = getUniqueName();
                     generatorNames.emplace_back(name, clone(inf));
                     return mk<Variable>(name);
@@ -71,6 +74,7 @@ bool NormaliseGeneratorsTransformer::transform(TranslationUnit& translationUnit)
     // Apply the mapper to each clause
     for (auto* clause : program.getClauses()) {
         name_generators update;
+        update.functorAnalysis = &functorAnalysis;
         clause->apply(update);
         for (auto& [name, generator] : update.getGeneratorNames()) {
             changed = true;

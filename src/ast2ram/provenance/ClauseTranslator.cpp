@@ -86,7 +86,7 @@ void ClauseTranslator::indexAtoms(const ast::Clause& clause) {
     for (const auto* atom : getAtomOrdering(clause)) {
         // give the atom the current level
         std::size_t scanLevel = addOperatorLevel(atom);
-        indexNodeArguments(scanLevel, atom->getArguments());
+        indexNodeArguments(scanLevel, atom->getArguments(), true);
 
         // Add rule num variable
         std::string ruleNumVarName = "@rule_num_" + std::to_string(atomIdx);

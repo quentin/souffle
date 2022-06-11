@@ -66,6 +66,7 @@ struct RelationWrapper;
     Forward(IntrinsicOperator)\
     Forward(UserDefinedOperator)\
     Forward(NestedIntrinsicOperator)\
+    Forward(NestedUserDefinedOperator)\
     Forward(PackRecord)\
     Forward(SubroutineArgument)\
     Forward(True)\
@@ -536,6 +537,22 @@ public:
  */
 class NestedIntrinsicOperator : public CompoundNode {
     using CompoundNode::CompoundNode;
+};
+
+/**
+ * @class NestedUserDefinedOperator
+ */
+class NestedUserDefinedOperator : public CompoundNode {
+public:
+    NestedUserDefinedOperator(NodeType ty, const ram::Node* sdw, VecOwn<Node> children, void* functionPointer)
+            : CompoundNode(ty, sdw, std::move(children)), functionPointer(functionPointer) {}
+
+    void* getFunctionPointer() const {
+        return functionPointer;
+    }
+
+private:
+    void* functionPointer;
 };
 
 /**

@@ -33,7 +33,7 @@ void FunctorAnalysis::run(const TranslationUnit& translationUnit) {
     });
 }
 
-bool FunctorAnalysis::isStatefulFunctor(const UserDefinedFunctor& functor) const {
+bool FunctorAnalysis::isStateful(const UserDefinedFunctor& functor) const {
     return getFunctorDeclaration(functor).isStateful();
 }
 
@@ -58,9 +58,9 @@ FunctorDeclaration const& FunctorAnalysis::getFunctorDeclaration(
     return *functorNameToDeclaration.at(aggregator.getBaseOperatorName());
 }
 
-bool FunctorAnalysis::isMultiResult(const Functor& functor) {
-    if (isA<UserDefinedFunctor>(functor)) {
-        return false;
+bool FunctorAnalysis::isMultiResult(const Functor& functor) const {
+    if (const auto* userDef = as<UserDefinedFunctor>(functor)) {
+        return getFunctorDeclaration(*userDef).isMultiResult();
     } else if (auto* intrinsic = as<IntrinsicFunctor>(functor)) {
         auto candidates = functorBuiltIn(intrinsic->getBaseFunctionOp());
         assert(!candidates.empty() && "at least one op should match");

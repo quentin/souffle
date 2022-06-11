@@ -24,7 +24,6 @@
 #include "ast/Constant.h"
 #include "ast/Constraint.h"
 #include "ast/Functor.h"
-#include "ast/IntrinsicFunctor.h"
 #include "ast/Literal.h"
 #include "ast/Negation.h"
 #include "ast/Node.h"

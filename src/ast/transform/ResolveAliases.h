@@ -16,6 +16,7 @@
 
 #include "ast/Clause.h"
 #include "ast/TranslationUnit.h"
+#include "ast/analysis/Functor.h"
 #include "ast/transform/Transformer.h"
 #include "souffle/utility/ContainerUtil.h"
 #include <memory>
@@ -48,7 +49,7 @@ public:
      * @param clause the clause to be processed
      * @return a modified clone of the processed clause
      */
-    static Own<Clause> resolveAliases(const Clause& clause);
+    static Own<Clause> resolveAliases(const Clause& clause, const analysis::FunctorAnalysis&);
 
     /**
      * Removes trivial equalities of the form t = t from the given clause.

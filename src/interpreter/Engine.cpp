@@ -53,6 +53,7 @@
 #include "ram/MergeExtend.h"
 #include "ram/Negation.h"
 #include "ram/NestedIntrinsicOperator.h"
+#include "ram/NestedUserDefinedOperator.h"
 #include "ram/NumericConstant.h"
 #include "ram/PackRecord.h"
 #include "ram/Parallel.h"
@@ -201,6 +202,18 @@ RamDomain callStatefulAggregate(AnyFunctor&& userFunctor, souffle::SymbolTable* 
     args[1] = arg2;
     auto argsTuple = statefulCallTuple(symbolTable, recordTable, args, std::make_index_sequence<2>{});
     return callWithTuple<RamDomain>(std::forward<AnyFunctor>(userFunctor), argsTuple);
+}
+
+/** Call a multiresult functor. */
+RamDomain callMultiresult(const RamDomain* args, RamDomain* tuple, void (*userFunctor)(),
+        souffle::SymbolTable* symbolTable, souffle::RecordTable* recordTable,
+        const std::function<void()>& Inner) {
+    /* the functor implementation return the number of times it called the inner block */
+    using FunType = std::function<RamDomain(souffle::SymbolTable*, souffle::RecordTable*,
+            const std::function<void()>&, const RamDomain*, RamDomain*)>;
+    FunType Fn(reinterpret_cast<RamDomain (*)(souffle::SymbolTable*, souffle::RecordTable*,
+                    const std::function<void()>&, const RamDomain*, RamDomain*)>(userFunctor));
+    return std::invoke(Fn, symbolTable, recordTable, Inner, args, tuple);
 }
 
 /**
@@ -814,7 +827,9 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
                 case ram::NestedIntrinsicOp::FRANGE: return RUN_RANGE(RamFloat);
             }
 
+        // clang-format off
         {UNREACHABLE_BAD_CASE_ANALYSIS}
+            // clang-format on
 #undef RUN_RANGE
         ESAC(NestedIntrinsicOperator)
 
@@ -941,6 +956,35 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             }
 
         ESAC(UserDefinedOperator)
+
+        CASE(NestedUserDefinedOperator)
+            static constexpr std::size_t MAX_ARITY = 30;
+            const std::string& name = cur.getName();
+            const std::size_t arity = cur.getArguments().size();
+            if (arity > MAX_ARITY)
+                fatal("cannot call user-defined operator `%s`: more than %u arguments", name,
+                        (unsigned)MAX_ARITY);
+
+            std::array<RamDomain, MAX_ARITY> tuple;
+            const auto runNested = [&]() {
+                ctxt[cur.getTupleId()] = tuple.data();
+                execute(shadow.getChild(arity), ctxt);
+            };
+
+            auto userFunctor = reinterpret_cast<void (*)()>(shadow.getFunctionPointer());
+            if (userFunctor == nullptr) fatal("cannot find user-defined operator `%s`", name);
+
+            std::array<RamDomain, MAX_ARITY> args;
+            for (std::size_t i = 0; i < arity; ++i) {
+                args[i] = execute(shadow.getChild(i), ctxt);
+            }
+
+            // returns the number of times the nested block was called
+            callMultiresult((const RamDomain*)args.data(), tuple.data(), userFunctor, &getSymbolTable(),
+                    &getRecordTable(), runNested);
+
+            return true;
+        ESAC(NestedUserDefinedOperator)
 
         CASE(PackRecord)
             auto values = cur.getArguments();
