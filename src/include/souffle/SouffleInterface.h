@@ -321,6 +321,9 @@ public:
      */
     virtual void insert(const tuple& t) = 0;
 
+    /** Insert a tuple in the relation. */
+    virtual void insert(const RamDomain* tuple) = 0;
+
     /**
      * Check whether a tuple exists in a relation.
      * The definition of contains has to be defined by the child class of relation class.

@@ -109,8 +109,8 @@ public:
         iterator it = begin();
         const iterator e = end();
         while (it != e) {
-          Fn((*it).data);
-          ++it;
+            Fn((*it).data);
+            ++it;
         }
     }
 
@@ -307,9 +307,6 @@ public:
         insert_lock.lock();
         t_tuple t;
         std::memcpy(t.data(), ramDomain, Arity * sizeof(RamDomain));
-        //for (std::size_t i = 0; i < Arity; ++i) {
-        //    t[i] = ramDomain[i];
-        //}
         data.push_back(t);
         insert_lock.unlock();
     }
