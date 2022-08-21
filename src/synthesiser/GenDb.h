@@ -97,6 +97,8 @@ class Gen {
 public:
     Gen(std::string name) : name(name) {}
 
+    virtual ~Gen() {}
+
     /* Emit the declaration of this construct in C++,
      * typically what we would expect from a .hpp file
      */
@@ -107,12 +109,16 @@ public:
      */
     virtual void definition(std::ostream& o) const = 0;
 
-    std::string& getName() {
-        return name;
-    }
+    const std::string& getName() const;
+
+    std::string getQualifiedName() const;
+
+    /// Set the scope enclosing class when this object is nested in a parent
+    void enclosed(Gen* parent);
 
 protected:
     std::string name;
+    Gen* enclosing = nullptr;
 };
 
 class GenClass;
@@ -129,8 +135,10 @@ enum Visibility { Public = 0, Private };
  */
 class GenFunction : public Gen {
 public:
-    GenFunction(std::string name, GenClass* cl, Visibility v)
-            : Gen(name), cl(cl), visibility(v), override(false) {}
+    GenFunction(std::string name, Gen* enclosing, Visibility v)
+            : Gen(name), visibility(v), isOverride(false), isConst(false) {
+        enclosed(enclosing);
+    }
 
     virtual ~GenFunction() = default;
 
@@ -142,8 +150,11 @@ public:
         isConstructor = true;
     };
     void setOverride() {
-        override = true;
+        isOverride = true;
     };
+    void setConst() {
+        isConst = true;
+    }
 
     void declaration(std::ostream& o) const override;
 
@@ -158,10 +169,10 @@ public:
     }
 
 private:
-    GenClass* cl;
     Visibility visibility;
     bool isConstructor = false;
-    bool override;
+    bool isOverride = false;
+    bool isConst = false;
     std::string retType;
     std::vector<std::tuple<std::string, std::string, std::optional<std::string>>> args;
     std::vector<std::pair<std::string, std::string>> initializer;
@@ -179,6 +190,7 @@ public:
 
     GenFunction& addFunction(std::string name, Visibility);
     GenFunction& addConstructor(Visibility);
+    GenClass& addClass(std::string name, Visibility);
 
     void addField(
             std::string type, std::string name, Visibility, std::optional<std::string> init = std::nullopt);
@@ -199,11 +211,17 @@ public:
     }
 
 private:
+    /// methods in the scope of this class
     std::vector<Own<GenFunction>> methods;
+
+    /// fields in the scope of this class
     std::vector<std::tuple<std::string /*name*/, std::string /*type*/, Visibility,
             std::optional<std::string> /* initializer value */
             >>
             fields;
+
+    /// classes enclosed in the scope of this class
+    std::vector<std::tuple<Visibility, Own<GenClass>>> classes;
     std::vector<std::string> inheritance;
     std::stringstream hiddenHooksStream;
 };

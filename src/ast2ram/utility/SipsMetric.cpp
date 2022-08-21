@@ -15,7 +15,6 @@
  ***********************************************************************/
 
 #include "ast2ram/utility/SipsMetric.h"
-#include "Global.h"
 #include "ast/Clause.h"
 #include "ast/TranslationUnit.h"
 #include "ast/Variable.h"
@@ -309,7 +308,7 @@ std::vector<std::size_t> SelingerProfileSipsMetric::getReordering(
 
 /** Create a SIPS metric based on a given heuristic. */
 std::unique_ptr<SipsMetric> SipsMetric::create(const std::string& heuristic, const TranslationUnit& tu) {
-    if (Global::config().has("auto-schedule")) {
+    if (tu.global().config().has("auto-schedule")) {
         return mk<SelingerProfileSipsMetric>(tu);
     } else if (heuristic == "strict")
         return mk<StrictSips>(tu);

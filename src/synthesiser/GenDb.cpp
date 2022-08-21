@@ -64,25 +64,50 @@ void GenFunction::declaration(std::ostream& o) const {
         if (defaultValue) {
             out << " = " << *defaultValue;
         }
-    }) << ");";
+    }) << ")";
+    if (isConst) {
+        o << " const";
+    }
+    if (isOverride) {
+        o << " override";
+    }
+    o << ";";
 }
 
 void GenFunction::definition(std::ostream& o) const {
     o << retType << " ";
-    if (cl) {
-        o << cl->getName() << "::";
-    }
-    o << name << "(" << join(args, ",", [&](auto& out, const auto arg) {
+    o << getQualifiedName();
+    o << "(" << join(args, ",", [&](auto& out, const auto arg) {
         out << std::get<0>(arg) << " " << std::get<1>(arg);
     }) << ")";
+    if (isConst) {
+        o << " const";
+    }
     if (isConstructor && initializer.size() > 0) {
-        o << ":\n";
+        o << " :\n";
         o << join(initializer, ",\n",
                 [&](auto& out, const auto arg) { out << arg.first << "(" << arg.second << ")"; });
     }
     o << "{\n";
     o << bodyStream.str();
     o << "}\n";
+}
+
+const std::string& Gen::getName() const {
+    return name;
+}
+
+std::string Gen::getQualifiedName() const {
+    std::string qualname;
+    if (enclosing) {
+        qualname = enclosing->getQualifiedName() + "::";
+    }
+    qualname += name;
+    return qualname;
+}
+
+void Gen::enclosed(Gen* parent) {
+    enclosing = parent;
 }
 
 GenFunction& GenClass::addFunction(std::string name, Visibility v) {
@@ -101,8 +126,16 @@ GenFunction& GenClass::addConstructor(Visibility v) {
     return m;
 }
 
+GenClass& GenClass::addClass(std::string name, Visibility v) {
+    GenClass& cl =
+            *std::get<1>(classes.emplace_back(v, mk<GenClass>(name, fs::path(this->name + "__" + name))));
+    return cl;
+}
+
 void GenClass::declaration(std::ostream& o) const {
-    o << "namespace souffle {\n";
+    if (enclosing == nullptr) {
+        o << "namespace souffle {\n";
+    }
 
     o << "class " << name;
     if (inheritance.size() > 0) {
@@ -114,11 +147,21 @@ void GenClass::declaration(std::ostream& o) const {
     public_o << "public:\n";
     private_o << "private:\n";
 
+    // nested classes declarations
+    for (auto& [v, cl] : classes) {
+        auto& o = (v == Public) ? public_o : private_o;
+        cl->declaration(o);
+        o << "\n";
+    }
+
+    // methods in scope of this class
     for (auto& fn : methods) {
         auto& o = (fn->getVisibility() == Public) ? public_o : private_o;
         fn->declaration(o);
         o << "\n";
     }
+
+    // fields in scope of this class
     for (auto& [field, ty, v, init] : fields) {
         auto& o = (v == Public) ? public_o : private_o;
         o << ty << " " << field;
@@ -127,10 +170,14 @@ void GenClass::declaration(std::ostream& o) const {
         }
         o << ";\n";
     }
+
     o << public_o.str();
     o << private_o.str();
     o << "};\n";
-    o << "} // namespace souffle\n";
+
+    if (enclosing == nullptr) {
+        o << "} // namespace souffle\n";
+    }
 }
 
 void GenClass::definition(std::ostream& o) const {
@@ -139,12 +186,21 @@ void GenClass::definition(std::ostream& o) const {
         o << "#pragma warning(disable: 4100)\n";
         o << "#endif // _MSC_VER\n";
     }
-    o << "namespace souffle {\n";
+    if (enclosing == nullptr) {
+        o << "namespace souffle {\n";
+    }
     for (auto& fn : methods) {
         fn->definition(o);
         o << "\n";
     }
-    o << "} // namespace souffle\n";
+    for (auto& [v, cl] : classes) {
+        cl->definition(o);
+        o << "\n";
+    }
+
+    if (enclosing == nullptr) {
+        o << "} // namespace souffle\n";
+    }
 
     if (ignoreUnusedArgumentWarning) {
         // restore unused argument warning

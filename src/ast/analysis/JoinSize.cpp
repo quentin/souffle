@@ -16,7 +16,6 @@
  ***********************************************************************/
 
 #include "ast/analysis/JoinSize.h"
-#include "Global.h"
 #include "GraphUtils.h"
 #include "ast/BinaryConstraint.h"
 #include "ast/Constant.h"
@@ -120,7 +119,8 @@ analysis::StratumJoinSizeEstimates JoinSizeAnalysis::computeRuleVersionStatement
     return statements;
 }
 
-std::vector<analysis::StratumJoinSizeEstimates> JoinSizeAnalysis::computeJoinSizeStatements() {
+std::vector<analysis::StratumJoinSizeEstimates> JoinSizeAnalysis::computeJoinSizeStatements(
+        bool hasEmitStatistics) {
     auto* prog = program;
     auto getSccAtoms = [prog](const ast::Clause* clause, const ast::RelationSet& scc) {
         const auto& sccAtoms = filter(ast::getBodyLiterals<ast::Atom>(*clause),
@@ -133,8 +133,7 @@ std::vector<analysis::StratumJoinSizeEstimates> JoinSizeAnalysis::computeJoinSiz
     std::vector<analysis::StratumJoinSizeEstimates> joinSizeStatements;
     joinSizeStatements.resize(sccOrdering.size());
 
-    auto& config = Global::config();
-    if (!config.has("emit-statistics")) {
+    if (!hasEmitStatistics) {
         return joinSizeStatements;
     }
 
@@ -240,7 +239,8 @@ void JoinSizeAnalysis::run(const TranslationUnit& translationUnit) {
     topsortSCCGraphAnalysis = &translationUnit.getAnalysis<TopologicallySortedSCCGraphAnalysis>();
     recursiveClauses = &translationUnit.getAnalysis<RecursiveClausesAnalysis>();
     polyAnalysis = &translationUnit.getAnalysis<ast::analysis::PolymorphicObjectsAnalysis>();
-    joinSizeStatements = computeJoinSizeStatements();
+    const bool hasEmitStatistics = translationUnit.global().config().has("emit-statistics");
+    joinSizeStatements = computeJoinSizeStatements(hasEmitStatistics);
 }
 
 void JoinSizeAnalysis::print(std::ostream& os) const {

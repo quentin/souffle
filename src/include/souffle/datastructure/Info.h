@@ -34,7 +34,7 @@ public:
     context createContext() {
         return context();
     }
-    class iterator : public std::iterator<std::forward_iterator_tag, Tuple<RamDomain, Arity>> {
+    class iterator {
         typename std::vector<Tuple<RamDomain, Arity>>::const_iterator it;
 
     public:
@@ -77,7 +77,7 @@ public:
         insert_lock.lock();
         t_tuple t;
         for (std::size_t i = 0; i < Arity; ++i) {
-            t.data[i] = ramDomain[i];
+            t[i] = ramDomain[i];
         }
         data.push_back(t);
         insert_lock.unlock();

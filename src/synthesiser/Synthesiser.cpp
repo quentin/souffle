@@ -345,8 +345,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << R"_(directiveMap["fact-dir"] = inputDirectory;)_";
                 out << "}\n";
                 out << "IOSystem::getInstance().getReader(";
-                out << "directiveMap, getSymbolTable(), getRecordTable()";
-                out << ")->readAll(wrapper_" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()));
+                out << "directiveMap, symTable, recordTable";
+                out << ")->readAll(wrapper_"
+                    << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()));
                 out << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << \"Error loading " << io.getRelation()
                     << " data: \" << e.what() "
@@ -361,9 +362,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << R"_(directiveMap["output-dir"] = outputDirectory;)_";
                 out << "}\n";
                 out << "IOSystem::getInstance().getWriter(";
-                out << "directiveMap, getSymbolTable(), getRecordTable()";
-                out << ")->writeAll(wrapper_" << synthesiser.getRelationName(synthesiser.lookup(io.getRelation()))
-                    << ");\n";
+                out << "directiveMap, symTable, recordTable";
+                out << ")->writeAll(wrapper_"
+                    << synthesiser.getRelationName(synthesiser.lookup(io.getRelation())) << ");\n";
                 out << "} catch (std::exception& e) {std::cerr << e.what();exit(1);}\n";
             } else {
                 assert("Wrong i/o operation");
@@ -823,18 +824,18 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             }
 
             // create a copy of the map to the real numeric constants
-            std::map<std::size_t, RamDomain> keyConstants;
+            std::map<std::size_t, std::string> keyConstants;
             for (auto [k, constant] : estimateJoinSize.getConstantsMap()) {
-                RamDomain value;
+                std::string value;
                 if (const auto* signedConstant = as<ram::SignedConstant>(constant)) {
-                    value = ramBitCast<RamDomain>(signedConstant->getValue());
+                    value = "ramBitCast<RamDomain>(" + std::to_string(signedConstant->getValue()) + ")";
                 } else if (const auto* stringConstant = as<ram::StringConstant>(constant)) {
-                    value = ramBitCast<RamDomain>(
-                            synthesiser.convertSymbol2Idx(stringConstant->getConstant()));
+                    value = "ramBitCast<RamDomain>(" +
+                            synthesiser.convertSymbolToIdentifier(stringConstant->getConstant()) + ")";
                 } else if (const auto* unsignedConstant = as<ram::UnsignedConstant>(constant)) {
-                    value = ramBitCast<RamDomain>(unsignedConstant->getValue());
+                    value = "ramBitCast<RamDomain>(" + std::to_string(unsignedConstant->getValue()) + "U)";
                 } else if (const auto* floatConstant = as<ram::FloatConstant>(constant)) {
-                    value = ramBitCast<RamDomain>(floatConstant->getValue());
+                    value = "ramBitCast<RamDomain>(" + std::to_string(floatConstant->getValue()) + ")";
                 } else {
                     fatal("Something went wrong. Should have gotten a constant!");
                 }
@@ -1069,7 +1070,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             // Unpack tuple
             out << "const RamDomain *"
                 << "env" << unpack.getTupleId() << " = "
-                << "recordTable->unpack(ref," << arity << ");"
+                << "recordTable.unpack(ref," << arity << ");"
                 << "\n";
 
             out << "{\n";
@@ -1931,9 +1932,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
     out << ")";                 \
     break
 #define COMPARE_STRING(op)                \
-    out << "(symTable->decode(";           \
+    out << "(symTable.decode(";           \
     EVAL_CHILD(RamDomain, getLHS);        \
-    out << ") " #op " symTable->decode(";  \
+    out << ") " #op " symTable.decode(";  \
     EVAL_CHILD(RamDomain, getRHS);        \
     out << "))";                          \
     break
@@ -1961,34 +1962,34 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 // strings
                 case BinaryConstraintOp::MATCH: {
                     synthesiser.SubroutineUsingStdRegex = true;
-                    out << "regex_wrapper(symTable->decode(";
+                    out << "regex_wrapper(symTable.decode(";
                     dispatch(rel.getLHS(), out);
-                    out << "),symTable->decode(";
+                    out << "),symTable.decode(";
                     dispatch(rel.getRHS(), out);
                     out << "))";
                     break;
                 }
                 case BinaryConstraintOp::NOT_MATCH: {
                     synthesiser.SubroutineUsingStdRegex = true;
-                    out << "!regex_wrapper(symTable->decode(";
+                    out << "!regex_wrapper(symTable.decode(";
                     dispatch(rel.getLHS(), out);
-                    out << "),symTable->decode(";
+                    out << "),symTable.decode(";
                     dispatch(rel.getRHS(), out);
                     out << "))";
                     break;
                 }
                 case BinaryConstraintOp::CONTAINS: {
-                    out << "(symTable->decode(";
+                    out << "(symTable.decode(";
                     dispatch(rel.getRHS(), out);
-                    out << ").find(symTable->decode(";
+                    out << ").find(symTable.decode(";
                     dispatch(rel.getLHS(), out);
                     out << ")) != std::string::npos)";
                     break;
                 }
                 case BinaryConstraintOp::NOT_CONTAINS: {
-                    out << "(symTable->decode(";
+                    out << "(symTable.decode(";
                     dispatch(rel.getRHS(), out);
-                    out << ").find(symTable->decode(";
+                    out << ").find(symTable.decode(";
                     dispatch(rel.getLHS(), out);
                     out << ")) == std::string::npos)";
                     break;
@@ -2154,16 +2155,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
         void visit_(
                 type_identity<IntrinsicOperator>, const IntrinsicOperator& op, std::ostream& out) override {
-#define MINMAX_SYMBOL(op)                    \
-    {                                        \
-        out << "symTable->encode(" #op "({"; \
-        for (auto& cur : args) {             \
-            out << "symTable->decode(";      \
-            dispatch(*cur, out);             \
-            out << "), ";                    \
-        }                                    \
-        out << "}))";                        \
-        break;                               \
+#define MINMAX_SYMBOL(op)                   \
+    {                                       \
+        out << "symTable.encode(" #op "({"; \
+        for (auto& cur : args) {            \
+            out << "symTable.decode(";      \
+            dispatch(*cur, out);            \
+            out << "), ";                   \
+        }                                   \
+        out << "}))";                       \
+        break;                              \
     }
 
             PRINT_BEGIN_COMMENT(out);
@@ -2242,7 +2243,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
 #define CONV_TO_STRING(opcode, ty)                \
     case FunctorOp::opcode: {                     \
-        out << "symTable->encode(std::to_string("; \
+        out << "symTable.encode(std::to_string("; \
         dispatch(*args[0], out);                  \
         out << "))";                              \
     } break;
@@ -2250,7 +2251,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 #define CONV_FROM_STRING(opcode, ty)                                                       \
     case FunctorOp::opcode: {                                                              \
         synthesiser.currentClass->addInclude("\"souffle/utility/EvaluatorUtil.h\"", true); \
-        out << "souffle::evaluator::symbol2numeric<" #ty ">(symTable->decode(";             \
+        out << "souffle::evaluator::symbol2numeric<" #ty ">(symTable.decode(";             \
         dispatch(*args[0], out);                                                           \
         out << "))";                                                                       \
     } break;
@@ -2267,7 +2268,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 }
                 // TODO: change the signature of `STRLEN` to return an unsigned?
                 case FunctorOp::STRLEN: {
-                    out << "static_cast<RamSigned>(symTable->decode(";
+                    out << "static_cast<RamSigned>(symTable.decode(";
                     dispatch(*args[0], out);
                     out << ").size())";
                     break;
@@ -2352,15 +2353,15 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
                 // strings
                 case FunctorOp::CAT: {
-                    out << "symTable->encode(";
+                    out << "symTable.encode(";
                     std::size_t i = 0;
                     while (i < args.size() - 1) {
-                        out << "symTable->decode(";
+                        out << "symTable.decode(";
                         dispatch(*args[i], out);
                         out << ") + ";
                         i++;
                     }
-                    out << "symTable->decode(";
+                    out << "symTable.decode(";
                     dispatch(*args[i], out);
                     out << "))";
                     break;
@@ -2369,8 +2370,8 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 /** Ternary Functor Operators */
                 case FunctorOp::SUBSTR: {
                     synthesiser.SubroutineUsingSubstr = true;
-                    out << "symTable->encode(";
-                    out << "substr_wrapper(symTable->decode(";
+                    out << "symTable.encode(";
+                    out << "substr_wrapper(symTable.decode(";
                     dispatch(*args[0], out);
                     out << "),(";
                     dispatch(*args[1], out);
@@ -2424,7 +2425,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             auto args = op.getArguments();
             if (op.isStateful()) {
-                out << name << "(symTable.get(), recordTable.get()";
+                out << name << "(&symTable, &recordTable";
                 for (auto& arg : args) {
                     out << ",";
                     dispatch(*arg, out);
@@ -2434,7 +2435,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 const std::vector<TypeAttribute>& argTypes = op.getArgsTypes();
 
                 if (op.getReturnType() == TypeAttribute::Symbol) {
-                    out << "symTable->encode(";
+                    out << "symTable.encode(";
                 }
                 out << name << "(";
 
@@ -2459,7 +2460,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                             out << ")";
                             break;
                         case TypeAttribute::Symbol:
-                            out << "symTable->decode(";
+                            out << "symTable.decode(";
                             dispatch(*args[i], out);
                             out << ").c_str()";
                             break;
@@ -2483,7 +2484,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             synthesiser.arities.emplace(arity);
 
-            out << "pack(*recordTable,"
+            out << "pack(recordTable,"
                 << "Tuple<RamDomain," << arity << ">";
             if (pack.getArguments().size() == 0) {
                 out << "{{}}";
@@ -2681,31 +2682,6 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         db.usesDatastructure(mainClass, typeName);
     }
 
-    // substring wrapper
-    os << "private:\n";
-    os << "static inline std::string substr_wrapper(const std::string& str, std::size_t idx, "
-          "std::size_t "
-          "len) {\n";
-    os << "   std::string result; \n";
-    os << "   try { result = str.substr(idx,len); } catch(...) { \n";
-    os << "     std::cerr << \"warning: wrong index position provided by substr(\\\"\";\n";
-    os << "     std::cerr << str << \"\\\",\" << (int32_t)idx << \",\" << (int32_t)len << \") "
-          "functor.\\n\";\n";
-    os << "   } return result;\n";
-    os << "}\n";
-
-    if (glb.config().has("profile")) {
-        os << "std::string profiling_fname;\n";
-    }
-
-    os << "public:\n";
-
-    // declare symbol table
-    os << "std::shared_ptr<SymbolTable> symTable;\n";
-
-    // declare record table
-    os << "std::shared_ptr<RecordTable> recordTable;\n";
-
     std::stringstream registerSymbols;
     {
         // Encode all string constants, in lexical order
@@ -2722,57 +2698,23 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         for (const std::string& sc : constantSymbols) {
             const std::string ident = convertSymbolToIdentifier(sc);
             const std::string dchars = toHex(std::hash<std::string>{}(sc));  // 16 chars
-            os << "RamDomain " << ident << ";\n";
+            mainClass.addField("RamDomain", ident, Visibility::Private);
             registerSymbols << ident << " = symTable->encode(" << rawStr(sc) << ");\n";
         }
     }
 
+    // record table initialization
     std::stringstream initRT;
     {
-        initRT << "recordTable = std::make_shared<SpecializedRecordTable<0";
+        initRT << "std::make_shared<SpecializedRecordTable<0";
         for (std::size_t arity : arities) {
             if (arity > 0) {
                 initRT << "," << arity;
             }
         }
-        initRT << ">>();\n";
+        initRT << ">>()";
     }
 
-    if (glb.config().has("profile")) {
-        os << "private:\n";
-        std::size_t numFreq = 0;
-        visit(prog, [&](const Statement&) { numFreq++; });
-        os << "  std::size_t freqs[" << numFreq << "]{};\n";
-        std::size_t numRead = 0;
-        for (auto rel : prog.getRelations()) {
-            if (!rel->isTemp()) {
-                numRead++;
-            }
-        }
-        os << "  std::size_t reads[" << numRead << "]{};\n";
-    }
-
-    emitTypeRegistryDecl(os);
-
-    // print relation definitions
-    std::stringstream initCons;     // initialization of constructor
-    std::stringstream registerRel;  // registration of relations
-    auto initConsSep = [&, empty = true]() mutable -> std::stringstream& {
-        initCons << (empty ? "\n: " : "\n, ");
-        empty = false;
-        return initCons;
-    };
-
-    initConsSep() << "typeRegistry()";
-
-    // `pf` must be a ctor param (see below)
-    if (glb.config().has("profile")) {
-        initConsSep() << "profiling_fname(std::move(pf))";
-    }
-
-    int relCtr = 0;
-    std::set<std::string> storeRelations;
-    std::set<std::string> loadRelations;
     std::set<const IO*> loadIOs;
     std::set<const IO*> storeIOs;
 
@@ -2810,30 +2752,38 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         GenFunction& constructor = gen.addConstructor(Visibility::Public);
 
         enum Mode { Reference, Relation };
-        std::vector<std::tuple<Mode, std::string /*name*/, std::string /*type*/>> args;
-        args.push_back(std::make_tuple(Reference, "symTable", "SymbolTable"));
-        args.push_back(std::make_tuple(Reference, "recordTable", "RecordTable"));
-        args.push_back(std::make_tuple(Reference, "pruneImdtRels", "bool"));
-        args.push_back(std::make_tuple(Reference, "performIO", "bool"));
-        args.push_back(std::make_tuple(Reference, "signalHandler", "SignalHandler*"));
-        args.push_back(std::make_tuple(Reference, "iter", "std::atomic<std::size_t>"));
-        args.push_back(std::make_tuple(Reference, "ctr", "std::atomic<RamDomain>"));
-        args.push_back(std::make_tuple(Reference, "inputDirectory", "std::string"));
-        args.push_back(std::make_tuple(Reference, "outputDirectory", "std::string"));
+        std::vector<std::tuple<Mode, std::string /*name*/, std::string /*type*/, std::string /*call value*/>>
+                args;
+        args.push_back(std::make_tuple(Reference, "symTable", "SymbolTable", "getSymbolTable()"));
+        args.push_back(std::make_tuple(Reference, "recordTable", "RecordTable", "getRecordTable()"));
+        args.push_back(std::make_tuple(Reference, "pruneImdtRels", "bool", "pruneImdtRels"));
+        args.push_back(std::make_tuple(Reference, "performIO", "bool", "performIO"));
+        args.push_back(std::make_tuple(Reference, "signalHandler", "SignalHandler*", "signalHandler"));
+        args.push_back(std::make_tuple(Reference, "iter", "std::atomic<std::size_t>", "iter"));
+        args.push_back(std::make_tuple(Reference, "ctr", "std::atomic<RamDomain>", "ctr"));
+        args.push_back(std::make_tuple(Reference, "inputDirectory", "std::string", "inputDirectory"));
+        args.push_back(std::make_tuple(Reference, "outputDirectory", "std::string", "outputDirectory"));
         for (std::string rel : accessedRels) {
             std::string name = getRelationName(lookup(rel));
             std::string tyname = relationTypes[name];
-            args.push_back(std::make_tuple(Relation, name, tyname));
+            args.push_back(std::make_tuple(Relation, name, tyname, name));
             db.usesDatastructure(gen, tyname);
+
+            // only require the RelationBase interface when the relation needs to be loaded or stored
+            if (!glb.config().has("no-io") && !lookup(rel)->isTemp() &&
+                    (loadRelations.count(rel) + storeRelations.count(rel)) > 0) {
+                args.push_back(
+                        std::make_tuple(Reference, "wrapper_" + name, "RelationBase", "wrapper_" + name));
+            }
         }
         for (std::string fn : accessedFunctors) {
-            args.push_back(std::make_tuple(Reference, fn, function_ty(fn)));
+            args.push_back(std::make_tuple(Reference, fn, function_ty(fn), fn));
         }
 
         for (auto arg : args) {
             Mode kind;
-            std::string name, ty;
-            std::tie(kind, name, ty) = arg;
+            std::string name, ty, call_value;
+            std::tie(kind, name, ty, call_value) = arg;
             constructor.setNextArg(ty + std::string("&"), name);
 
             constructor.setNextInitializer(
@@ -2844,9 +2794,9 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         std::stringstream initStr;
         initStr << join(args, ",", [&](auto& out, const auto arg) {
             Mode kind;
-            std::string name, ty;
-            std::tie(kind, name, ty) = arg;
-            out << (kind == Relation ? "*" : "") << name;
+            std::string name, ty, call_value;
+            std::tie(kind, name, ty, call_value) = arg;
+            out << (kind == Relation ? "*" : "") << call_value;
         });
         subroutineInits.push_back(std::make_pair(sub.first, initStr.str()));
 
@@ -2860,6 +2810,18 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         if (needLock) {
             run.body() << "std::mutex lock;\n";
         }
+
+        {
+            // emit code to retrieve indices of symbols used by the subroutine
+            std::set<std::string> constantSymbols;
+            visit(*sub.second, [&](const StringConstant& sc) { constantSymbols.insert(sc.getConstant()); });
+
+            for (const auto& sc : constantSymbols) {
+                const std::string ident = convertSymbolToIdentifier(sc);
+                run.body() << "const RamDomain " << ident << " = symTable.encode(" << rawStr(sc) << ");\n";
+            }
+        }
+
         SubroutineUsingStdRegex = false;
         SubroutineUsingSubstr = false;
         // emit code for subroutine
@@ -2909,30 +2871,17 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         constructor.setNextInitializer("profiling_fname", "std::move(pf)");
     }
 
-    // issue symbol table with string constants
-    visit(prog, [&](const StringConstant& sc) { convertSymbol2Idx(sc.getConstant()); });
-    std::stringstream st;
-    if (!symbolMap.empty()) {
-        st << "{\n";
-        for (const auto& x : symbolIndex) {
-            st << "\tR\"_(" << x << ")_\",\n";
-        }
-        st << "}";
-    }
-    mainClass.addField("SymbolTableImpl", "symTable", Visibility::Private);
-    constructor.setNextInitializer("symTable", st.str());
+    // symbol table declaration and initialization
+    mainClass.addField("std::shared_ptr<SymbolTable> ", "symTable", Visibility::Private);
+    constructor.setNextInitializer("symTable", "std::make_shared<SymbolTableImpl>()");
+    constructor.body() << "initSymbols();\n";
 
-    // declare record table
-    std::stringstream rt;
-    rt << "SpecializedRecordTable<0";
-    for (std::size_t arity : arities) {
-        if (arity > 0) {
-            rt << "," << arity;
-        }
-    }
-    rt << ">";
-    mainClass.addField(rt.str(), "recordTable", Visibility::Private);
-    constructor.setNextInitializer("recordTable", "");
+    // record table declaration and initialization
+    mainClass.addField("std::shared_ptr<RecordTable>", "recordTable", Visibility::Private);
+    constructor.setNextInitializer("recordTable", initRT.str());
+
+    // type registry declaration and definition
+    emitTypeRegistry(mainClass, constructor, prog);
 
     if (glb.config().has("profile")) {
         std::size_t numFreq = 0;
@@ -2983,8 +2932,8 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
             init << relCtr++ << ", *" << cppName << ", *this, \"" << datalogName << "\", "
                  << strLitAry(rel->getAttributeTypes()) << ", " << strLitAry(rel->getAttributeNames()) << ", "
-                 << rel->getAuxiliaryArity() << ", typeRegistry.getTuple(" << datalogName << ")";
-            constructor.body() << "addRelation(\"" << datalogName << "\", wrapper_" << cppName << ", "
+                 << rel->getAuxiliaryArity() << ", typeRegistry.getTuple(\"" << datalogName << "\")";
+            constructor.body() << "addRelation(\"" << datalogName << "\", " << wrapper_name.str() << ", "
                                << foundIn(loadRelations) << ", " << foundIn(storeRelations) << ");\n";
 
             mainClass.addField(ty.str(), wrapper_name.str(), Visibility::Private);
@@ -2999,12 +2948,6 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         constructor.setNextInitializer(fName, value);
     }
 
-    os << registerRel.str();
-    os << "symTable = std::make_shared<SymbolTableImpl>();\n";
-    os << initRT.str();
-    os << "initSymbols();\n";
-    os << "}\n";
-
     if (glb.config().has("profile")) {
         constructor.body() << "ProfileEventSingleton::instance().setOutputFile(profiling_fname);\n";
     }
@@ -3018,11 +2961,10 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     GenFunction& destructor = mainClass.addFunction("~" + classname, Visibility::Public);
     destructor.setIsConstructor();
 
-    //
-    os << "private:\n";
-    os << "void initSymbols() {\n";
-    os << registerSymbols.str();
-    os << "}\n";
+    // symbols initialization function
+    GenFunction& initSymbols = mainClass.addFunction("initSymbols", Visibility::Public);
+    initSymbols.setRetType("void");
+    initSymbols.body() << registerSymbols.str();
 
     // issue state variables for the evaluation
     //
@@ -3240,7 +3182,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     setSymbolTable.setRetType("void");
     setSymbolTable.setNextArg("std::shared_ptr<SymbolTable>", "ptr");
     setSymbolTable.body() << "symTable = ptr;\n"
-                          << "symtable->setNumThreads(getNumThreads());\n"
+                          << "symTable->setNumThreads(getNumThreads());\n"
                           << "initSymbols();\n";
 
     GenFunction& setRecordTable = mainClass.addFunction("setRecordTable", Visibility::Public);
@@ -3255,8 +3197,8 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     setNumThreads.setNextArg("std::size_t", "numThreadsValue");
 
     setNumThreads.body() << "SouffleProgram::setNumThreads(numThreadsValue);\n";
-    setNumThreads.body() << "getSymbolTable().setNumLanes(getNumThreads());\n";
-    setNumThreads.body() << "getRecordTable().setNumLanes(getNumThreads());\n";
+    setNumThreads.body() << "getSymbolTable().setNumThreads(getNumThreads());\n";
+    setNumThreads.body() << "getRecordTable().setNumThreads(getNumThreads());\n";
 
     if (!prog.getSubroutines().empty()) {
         // generate subroutine adapter
@@ -3305,8 +3247,6 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
     std::ostream& hook = mainClass.hooks();
     std::ostream& factory_hook = factory.hooks();
-
-    emitTypeRegistryDef(os, classname, prog);
 
     // hidden hooks
     hook << "namespace souffle {\n";
@@ -3461,44 +3401,40 @@ void emitType(std::ostream& out, const TypeRegistry& TR, std::set<const TypeDesc
     }
 }
 
-void Synthesiser::emitTypeRegistryDecl(std::ostream& out) {
-    out << "private:\n";
-    out << "class SpecializedTypeRegistry : public TypeRegistry {\n";
-    out << "public:\n";
-    out << "SpecializedTypeRegistry();\n";
-    out << "};\n";
+void Synthesiser::emitTypeRegistry(GenClass& mainClass, GenFunction& mainConstructor, const Program& prog) {
+    GenClass& SpecializedTypeRegistry = mainClass.addClass("SpecializedTypeRegistry", Visibility::Private);
+    SpecializedTypeRegistry.inherits("public TypeRegistry");
+    SpecializedTypeRegistry.enclosed(&mainClass);
 
-    out << "private:\n";
-    out << "const SpecializedTypeRegistry typeRegistry;\n";
+    mainClass.addField("SpecializedTypeRegistry", "typeRegistry", Visibility::Private);
 
-    out << "public:\n";
-    out << "/** types */\n";
-    out << "const TypeRegistry& getTypeRegistry() const override;\n";
-}
+    mainConstructor.setNextInitializer("typeRegistry", "");
 
-void Synthesiser::emitTypeRegistryDef(std::ostream& out, const std::string& classname, const Program& prog) {
+    {
+        // main class `getTypeRegistry()`
+        GenFunction& getTypeRegistry = mainClass.addFunction("getTypeRegistry", Visibility::Public);
+        getTypeRegistry.setOverride();
+        getTypeRegistry.setConst();
+        getTypeRegistry.setRetType("const TypeRegistry&");
+        getTypeRegistry.body() << "return typeRegistry;\n";
+    }
+
+    //
     const TypeRegistry& TR = prog.getTypeRegistry();
-
-    out << "/*\n";
-    TR.printAll(out);
-    out << "*/\n";
-    out << classname << "::SpecializedTypeRegistry::SpecializedTypeRegistry() : TypeRegistry() {\n";
+    GenFunction& constructor = SpecializedTypeRegistry.addConstructor(Visibility::Public);
+    constructor.setNextInitializer("TypeRegistry", "");
+    std::ostream& body = constructor.body();
 
     std::set<const TypeDesc*> done;
     for (std::size_t i = 0; i < TR.numCanonicalTypes(); ++i) {
         const TypeDesc* T = TR.getCanonicalType(i);
-        emitType(out, TR, done, T);
+        emitType(body, TR, done, T);
     }
 
     for (const auto& rel : prog.getRelations()) {
         const TypeDesc* T = rel->getTypeDescriptor();
-        emitType(out, TR, done, T);
+        emitType(body, TR, done, T);
     }
-
-    out << "}\n";
-    out << "const TypeRegistry& " << classname << "::getTypeRegistry() const {\n";
-    out << "return typeRegistry;\n";
-    out << "}\n";
 }
 
 std::string Synthesiser::convertSymbolToIdentifier(const std::string& symbol) const {

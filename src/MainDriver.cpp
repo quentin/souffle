@@ -969,13 +969,13 @@ int main(Global& glb, const char* souffle_executable) {
         return 0;
     }
 
-    const bool execute_mode = Global::config().has("compile") || Global::config().has("compile-many");
-    const bool compile_mode = Global::config().has("dl-program");
-    const bool generate_mode = Global::config().has("generate");
-    const bool generate_many_mode = Global::config().has("generate-many");
+    const bool execute_mode = glb.config().has("compile") || glb.config().has("compile-many");
+    const bool compile_mode = glb.config().has("dl-program");
+    const bool generate_mode = glb.config().has("generate");
+    const bool generate_many_mode = glb.config().has("generate-many");
 
     const bool must_interpret = !execute_mode && !compile_mode && !generate_mode && !generate_many_mode &&
-                                !Global::config().has("swig");
+                                !glb.config().has("swig");
     const bool must_execute = execute_mode;
     const bool must_compile = must_execute || compile_mode || glb.config().has("swig");
 
@@ -1002,7 +1002,7 @@ int main(Global& glb, const char* souffle_executable) {
                     baseFilename = baseFilename.substr(0, baseFilename.size() - 4);
                 }
             } else if (generate_many_mode) {
-                baseFilename = Global::config().get("generate-many");
+                baseFilename = glb.config().get("generate-many");
             } else {
                 baseFilename = tempFile();
             }
@@ -1019,7 +1019,7 @@ int main(Global& glb, const char* souffle_executable) {
             auto synthesisStart = std::chrono::high_resolution_clock::now();
             const bool emitToStdOut = glb.config().has("generate", "-");
             const bool emitMultipleFiles =
-                    Global::config().has("generate-many") || Global::config().has("compile-many");
+                    glb.config().has("generate-many") || glb.config().has("compile-many");
 
             synthesiser::GenDb db;
             synthesiser->generateCode(db, baseIdentifier, withSharedLibrary);
@@ -1028,8 +1028,8 @@ int main(Global& glb, const char* souffle_executable) {
             if (emitToStdOut) {
                 db.emitSingleFile(std::cout);
             } else if (emitMultipleFiles) {
-                fs::path directory = Global::config().has("generate-many")
-                                             ? fs::path(Global::config().get("generate-many"))
+                fs::path directory = glb.config().has("generate-many")
+                                             ? fs::path(glb.config().get("generate-many"))
                                              : fs::temp_directory_path() / baseIdentifier;
                 std::string mainClass = db.emitMultipleFilesInDir(directory, srcFiles);
                 binaryFilename = (directory / fs::path(mainClass)).string();
