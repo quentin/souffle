@@ -594,6 +594,8 @@ std::vector<MainOption> getMainOptions() {
             "<FILE>. If <FILE> is `-` then stdout is used."},
         {"generate-many", 'G', "DIR", "", false,
             "Generate C++ source code in multiple files for the given Datalog program and write it to <DIR>."},
+        {"generate-namespace", NextOptChar++, "NS", "", false,
+            "The namespace of generated C++ source code. Empty name denotes the anonymous namespace."},
         {"help", 'h', "", "", false,
             "Display this help message."},
         {"include-dir", 'I', "DIR", ".", true,

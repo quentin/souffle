@@ -17,7 +17,6 @@
 #include "synthesiser/Synthesiser.h"
 #include "AggregateOp.h"
 #include "FunctorOps.h"
-#include "GenDb.h"
 #include "Global.h"
 #include "RelationTag.h"
 #include "ast/analysis/typesystem/TypeEnvironment.h"
@@ -2595,6 +2594,12 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
         db.addGlobalInclude("\"souffle/profile/ProfileEvent.h\"");
     }
 
+    if (glb.config().has("generate-namespace")) {
+      db.setNS(glb.config().get("generate-namespace"));
+    } else {
+      db.setNS("souffle");
+    }
+
     // produce external definitions for user-defined functors
     std::map<std::string, std::tuple<TypeAttribute, std::vector<TypeAttribute>, bool>> functors;
     visit(prog, [&](const UserDefinedOperator& op) {
@@ -3240,26 +3245,27 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     factory.addDependency(mainClass, true);
     factory.inherits("souffle::ProgramFactory");
     GenFunction& newInstance = factory.addFunction("newInstance", Visibility::Public);
-    newInstance.setRetType("SouffleProgram*");
-    newInstance.body() << "return new " << classname << "();\n";
+    newInstance.setRetType("souffle::SouffleProgram*");
+    newInstance.body() << "return new " << db.getNS() << "::" << classname << "();\n";
     GenFunction& factoryConstructor = factory.addConstructor(Visibility::Public);
-    factoryConstructor.setNextInitializer("ProgramFactory", "\"" + id + "\"");
+    factoryConstructor.setNextInitializer("souffle::ProgramFactory", "\"" + id + "\"");
 
     std::ostream& hook = mainClass.hooks();
     std::ostream& factory_hook = factory.hooks();
 
     // hidden hooks
     hook << "namespace souffle {\n";
-    hook << "SouffleProgram *newInstance_" << id << "(){return new " << classname << ";}\n";
-    hook << "SymbolTable *getST_" << id << "(SouffleProgram *p){return &reinterpret_cast<" << classname
-         << "*>(p)->getSymbolTable();}\n";
+    hook << "SouffleProgram *newInstance_" << id << "(){return new " << db.getNS() << "::" << classname
+         << ";}\n";
+    hook << "SymbolTable *getST_" << id << "(SouffleProgram *p){return &reinterpret_cast<" << db.getNS()
+         << "::" << classname << "*>(p)->getSymbolTable();}\n";
 
     hook << "} // namespace souffle\n";
 
     factory_hook << "namespace souffle {\n";
     factory_hook << "\n#ifdef __EMBEDDED_SOUFFLE__\n";
     factory_hook << "extern \"C\" {\n";
-    factory_hook << "factory_" << classname << " __factory_" << classname << "_instance;\n";
+    factory_hook << db.getNS() << "::factory_" << classname << " __factory_" << classname << "_instance;\n";
     factory_hook << "}\n";
     factory_hook << "#endif\n";
     factory_hook << "} // namespace souffle\n";
@@ -3287,7 +3293,9 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
 
     hook << "if (!opt.parse(argc,argv)) return 1;\n";
 
-    hook << "souffle::";
+    if(!db.getNS(false).empty()) {
+      hook << db.getNS(false) << "::";
+    }
     if (glb.config().has("profile")) {
         hook << classname + " obj(opt.getProfileName());\n";
     } else {
