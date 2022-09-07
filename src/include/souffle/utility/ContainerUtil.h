@@ -146,6 +146,15 @@ std::vector<U*> toPtrVector(const VecOwn<T>& v) {
     return res;
 }
 
+template <typename A = void, typename T, typename U = std::conditional_t<std::is_same_v<A, void>, T, A>>
+std::vector<const U*> toConstPtrVector(const VecOwn<T>& v) {
+    std::vector<const U*> res;
+    for (auto& e : v) {
+        res.push_back(e.get());
+    }
+    return res;
+}
+
 // -------------------------------------------------------------------------------
 //                             Equality Utilities
 // -------------------------------------------------------------------------------

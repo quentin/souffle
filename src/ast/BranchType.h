@@ -55,6 +55,9 @@ public:
     /** Get fields of branch */
     std::vector<Attribute*> getFields();
 
+    /** Get fields of branch */
+    std::vector<const Attribute*> getFields() const;
+
     /** Set field type */
     void setFieldType(std::size_t idx, QualifiedName type);
 

@@ -24,6 +24,10 @@ std::vector<Attribute*> BranchType::getFields() {
     return toPtrVector(fields);
 }
 
+std::vector<const Attribute*> BranchType::getFields() const {
+    return toConstPtrVector(fields);
+}
+
 void BranchType::print(std::ostream& os) const {
     os << tfm::format("%s {%s}", name, join(fields, ", "));
 }
