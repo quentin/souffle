@@ -25,6 +25,8 @@ std::optional<WarnType> WarnSet::warnTypeFromString(const std::string& s) {
         return std::optional<WarnType>(WarnType::DeprecatedQualifier);
     } else if (s == "dollar-sign") {
         return std::optional<WarnType>(WarnType::DollarSign);
+    } else if (s == "forbidden-identifier") {
+        return std::optional<WarnType>(WarnType::ForbiddenIdentifier);
     } else if (s == "no-rules-nor-facts") {
         return std::optional<WarnType>(WarnType::NoRulesNorFacts);
     } else if (s == "no-subsumptive-rule") {

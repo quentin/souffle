@@ -34,19 +34,19 @@
 .type InnerUnion = T2 | T3
 
 // instantiate the component
-.init comp = Component
+.init r#comp = Component
 
 // depends on the inner component types
-.decl outer_rel1(x: comp.InnerRecord)
+.decl outer_rel1(x: r#comp.InnerRecord)
 outer_rel1(["x", 1]).
-.decl out1(x: comp.T1, y: comp.T2)
+.decl out1(x: r#comp.T1, y: r#comp.T2)
 out1(x,y) :- outer_rel1([x,y]).
 .output out1()
 
 // depends on the inner component types
-.decl outer_rel2(x: comp.InnerUnion)
+.decl outer_rel2(x: r#comp.InnerUnion)
 outer_rel2(1).
-.decl out2(x: comp.InnerUnion)
+.decl out2(x: r#comp.InnerUnion)
 out2(x) :- outer_rel2(x).
 .output out2()
 

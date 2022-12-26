@@ -2,4 +2,4 @@
 
 .type Type <: symbol
 
-.decl R(type:Type, type:Type)
+.decl R(r#type:Type, r#type:Type)

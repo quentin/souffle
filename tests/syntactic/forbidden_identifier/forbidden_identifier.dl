@@ -1,0 +1,39 @@
+// Souffle - A Datalog Compiler
+// Copyright (c) 2022, The Souffle Developers. All rights reserved
+// Licensed under the Universal Permissive License v 1.0 as shown at:
+// - https://opensource.org/licenses/UPL
+// - <souffle root>/licenses/SOUFFLE-UPL.txt
+
+.decl comp(u:number)
+.decl decl(u:number)
+.decl functor(u:number)
+.decl include(u:number)
+.decl init(u:number)
+//.decl input(u:number)
+.decl limitsize(u:number)
+.decl number_type(u:number)
+.decl once(u:number)
+//.decl output(u:number)
+.decl override(u:number)
+.decl plan(u:number)
+.decl pragma(u:number)
+//.decl printsize(u:number)
+.decl symbol_type(u:number)
+.decl type(u:number)
+
+.input comp()
+.input decl()
+.input functor()
+.input include()
+.input init()
+//.input input()
+.input limitsize()
+.input number_type()
+.input once()
+//.input output()
+.input override()
+.input plan()
+.input pragma()
+//.input printsize()
+.input symbol_type()
+.input type()

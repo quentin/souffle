@@ -18,7 +18,7 @@ c(2, 5).
   .decl c(x: number, y: number)
   b(x, y) :- c(x, y).
 }
-.init comp = Comp
-comp.c(2, 0).
-comp.c(2, 5).
-.output comp.b
+.init r#comp = Comp
+r#comp.c(2, 0).
+r#comp.c(2, 5).
+.output r#comp.b

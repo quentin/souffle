@@ -208,14 +208,14 @@ void ParserDriver::addIoFromDeprecatedTag(ast::Relation& rel) {
 
 std::set<RelationTag> ParserDriver::addDeprecatedTag(
         RelationTag tag, SrcLocation tagLoc, std::set<RelationTag> tags) {
-    if (!translationUnit->global().config().has("legacy")) {
+    if (!allowDeprecated()) {
         warning(WarnType::DeprecatedQualifier, tagLoc, tfm::format("Deprecated %s qualifier was used", tag));
     }
     return addTag(tag, std::move(tagLoc), std::move(tags));
 }
 
 Own<ast::Counter> ParserDriver::addDeprecatedCounter(SrcLocation tagLoc) {
-    if (!translationUnit->global().config().has("legacy")) {
+    if (!allowDeprecated()) {
         warning(WarnType::DollarSign, tagLoc,
                 "Deprecated $ symbol was used. Use functor 'autoinc()' instead.");
     }
@@ -244,7 +244,7 @@ std::set<RelationTag> ParserDriver::addTag(RelationTag tag, std::vector<Relation
 
 Own<ast::SubsetType> ParserDriver::mkDeprecatedSubType(
         ast::QualifiedName name, ast::QualifiedName baseTypeName, SrcLocation loc) {
-    if (!translationUnit->global().config().has("legacy")) {
+    if (!allowDeprecated()) {
         warning(WarnType::DeprecatedTypeDecl, loc, "Deprecated type declaration used");
     }
     return mk<ast::SubsetType>(std::move(name), std::move(baseTypeName), std::move(loc));
@@ -303,6 +303,10 @@ bool ParserDriver::canEnterOnce(const SrcLocation& onceLoc) {
 
 void ParserDriver::addComment(const SrcLocation& Loc, const std::stringstream& Content) {
     ScannedComments.emplace_back(Loc, Content.str());
+}
+
+bool ParserDriver::allowDeprecated() const {
+    return translationUnit->global().config().has("legacy");
 }
 
 }  // end of namespace souffle

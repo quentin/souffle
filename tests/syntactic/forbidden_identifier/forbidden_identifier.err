@@ -1,0 +1,78 @@
+Warning: Use of forbidden identifier 'comp'. Use 'r#comp' instead. in file forbidden_identifier.dl at line 7
+.decl comp(u:number)
+------^--------------
+Warning: Use of forbidden identifier 'decl'. Use 'r#decl' instead. in file forbidden_identifier.dl at line 8
+.decl decl(u:number)
+------^--------------
+Warning: Use of forbidden identifier 'functor'. Use 'r#functor' instead. in file forbidden_identifier.dl at line 9
+.decl functor(u:number)
+------^-----------------
+Warning: Use of forbidden identifier 'include'. Use 'r#include' instead. in file forbidden_identifier.dl at line 10
+.decl include(u:number)
+------^-----------------
+Warning: Use of forbidden identifier 'init'. Use 'r#init' instead. in file forbidden_identifier.dl at line 11
+.decl init(u:number)
+------^--------------
+Warning: Use of forbidden identifier 'limitsize'. Use 'r#limitsize' instead. in file forbidden_identifier.dl at line 13
+.decl limitsize(u:number)
+------^-------------------
+Warning: Use of forbidden identifier 'number_type'. Use 'r#number_type' instead. in file forbidden_identifier.dl at line 14
+.decl number_type(u:number)
+------^---------------------
+Warning: Use of forbidden identifier 'once'. Use 'r#once' instead. in file forbidden_identifier.dl at line 15
+.decl once(u:number)
+------^--------------
+Warning: Use of forbidden identifier 'override'. Use 'r#override' instead. in file forbidden_identifier.dl at line 17
+.decl override(u:number)
+------^------------------
+Warning: Use of forbidden identifier 'plan'. Use 'r#plan' instead. in file forbidden_identifier.dl at line 18
+.decl plan(u:number)
+------^--------------
+Warning: Use of forbidden identifier 'pragma'. Use 'r#pragma' instead. in file forbidden_identifier.dl at line 19
+.decl pragma(u:number)
+------^----------------
+Warning: Use of forbidden identifier 'symbol_type'. Use 'r#symbol_type' instead. in file forbidden_identifier.dl at line 21
+.decl symbol_type(u:number)
+------^---------------------
+Warning: Use of forbidden identifier 'type'. Use 'r#type' instead. in file forbidden_identifier.dl at line 22
+.decl type(u:number)
+------^--------------
+Warning: Use of forbidden identifier 'comp'. Use 'r#comp' instead. in file forbidden_identifier.dl at line 24
+.input comp()
+-------^------
+Warning: Use of forbidden identifier 'decl'. Use 'r#decl' instead. in file forbidden_identifier.dl at line 25
+.input decl()
+-------^------
+Warning: Use of forbidden identifier 'functor'. Use 'r#functor' instead. in file forbidden_identifier.dl at line 26
+.input functor()
+-------^---------
+Warning: Use of forbidden identifier 'include'. Use 'r#include' instead. in file forbidden_identifier.dl at line 27
+.input include()
+-------^---------
+Warning: Use of forbidden identifier 'init'. Use 'r#init' instead. in file forbidden_identifier.dl at line 28
+.input init()
+-------^------
+Warning: Use of forbidden identifier 'limitsize'. Use 'r#limitsize' instead. in file forbidden_identifier.dl at line 30
+.input limitsize()
+-------^-----------
+Warning: Use of forbidden identifier 'number_type'. Use 'r#number_type' instead. in file forbidden_identifier.dl at line 31
+.input number_type()
+-------^-------------
+Warning: Use of forbidden identifier 'once'. Use 'r#once' instead. in file forbidden_identifier.dl at line 32
+.input once()
+-------^------
+Warning: Use of forbidden identifier 'override'. Use 'r#override' instead. in file forbidden_identifier.dl at line 34
+.input override()
+-------^----------
+Warning: Use of forbidden identifier 'plan'. Use 'r#plan' instead. in file forbidden_identifier.dl at line 35
+.input plan()
+-------^------
+Warning: Use of forbidden identifier 'pragma'. Use 'r#pragma' instead. in file forbidden_identifier.dl at line 36
+.input pragma()
+-------^--------
+Warning: Use of forbidden identifier 'symbol_type'. Use 'r#symbol_type' instead. in file forbidden_identifier.dl at line 38
+.input symbol_type()
+-------^-------------
+Warning: Use of forbidden identifier 'type'. Use 'r#type' instead. in file forbidden_identifier.dl at line 39
+.input type()
+-------^------

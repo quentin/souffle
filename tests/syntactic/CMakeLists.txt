@@ -11,7 +11,7 @@ function(POSITIVE_TEST NAME)
 endfunction()
 
 function(NEGATIVE_TEST NAME)
-    souffle_negative_test(${NAME} syntactic)
+    souffle_negative_test(${NAME} syntactic ${ARGN})
 endfunction()
 
 positive_test(binary COMPILED_SPLITTED)
@@ -92,3 +92,5 @@ souffle_run_test(
   INCLUDE_DIRS q1 q2
   NO_PREPROCESSOR
   )
+positive_test(forbidden_identifier)
+positive_test(raw_identifier)

@@ -135,6 +135,7 @@ function(SOUFFLE_RUN_TEST_HELPER)
 #PARAM_NEGATIVE - should it fail or not
 #PARAM_MULTI_TEST - used to distinguish "multi-tests", sort of left over from automake
 #PARAM_NO_PROCESSOR - should the C preprocessor be disabled or not
+#PARAM_LEGACY - with --legacy
 #PARAM_INCLUDE_DIRS - list of include directory paths, relative to the test input directory
 #Basically, the same test dir has multiple sets of facts / outputs
 #We should just get rid of this and make multiple tests
@@ -144,7 +145,7 @@ function(SOUFFLE_RUN_TEST_HELPER)
 #Usually just "facts" but can be different when running multi - tests
     cmake_parse_arguments(
         PARAM
-        "COMPILED;COMPILED_SPLITTED;FUNCTORS;NEGATIVE;MULTI_TEST;NO_PREPROCESSOR" # Options
+        "COMPILED;COMPILED_SPLITTED;FUNCTORS;NEGATIVE;MULTI_TEST;NO_PREPROCESSOR;LEGACY" # Options
         "TEST_NAME;CATEGORY;FACTS_DIR_NAME;EXTRA_DATA" #Single valued options
         "INCLUDE_DIRS" # Multi-valued options
         ${ARGV}
@@ -171,6 +172,10 @@ function(SOUFFLE_RUN_TEST_HELPER)
       if (MSVC)
           list(APPEND EXTRA_FLAGS "--preprocessor" "cl -nologo -TC -E")
       endif()
+    endif()
+
+    if (PARAM_LEGACY)
+      list(APPEND EXTRA_FLAGS "--legacy")
     endif()
 
     if (PARAM_FUNCTORS)

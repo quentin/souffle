@@ -87,6 +87,8 @@ public:
 
     void addComment(const SrcLocation& Loc, const std::stringstream& Content);
 
+    bool allowDeprecated() const;
+
     Own<ast::TranslationUnit> translationUnit;
 
     bool trace_scanning = false;
