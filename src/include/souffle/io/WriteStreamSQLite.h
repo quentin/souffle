@@ -87,6 +87,7 @@ private:
 
         char* errorMessage = nullptr;
         /* Execute SQL statement */
+        std::cout << sql << std::endl;
         int rc = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, &errorMessage);
         if (rc != SQLITE_OK) {
             std::stringstream error;

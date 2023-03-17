@@ -204,6 +204,7 @@ else:
     cmd.extend(list(map(lambda rpath: RPATH_FMT.format(rpath), RPATHS)))
     cmd.extend(list(map(lambda libdir: LIBDIR_FMT.format(libdir), args.lib_dirs)))
     cmd.extend(list(map(lambda libname: LIBNAME_FMT.format(libname), args.lib_names)))
+    cmd.append("/VERBOSE")
 
     cmd = " ".join(cmd)
 
@@ -215,6 +216,7 @@ else:
 
     status = subprocess.run(cmd, capture_output=True, text=True, shell=True)
     if status.returncode != 0:
+        sys.stderr.write("sub-process error:\n")
         sys.stdout.write(status.stdout)
         sys.stderr.write(status.stderr)
 

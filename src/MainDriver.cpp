@@ -134,6 +134,10 @@ namespace souffle {
 [[noreturn]] void executeBinaryAndExit(Global& glb, const std::string& binaryFilename) {
     assert(!binaryFilename.empty() && "binary filename cannot be blank");
 
+    if (glb.config().has("verbose")) {
+        std::cout << "executeBinaryAndExit" << std::endl;
+    }
+
     std::map<char const*, std::string> env;
     if (glb.config().has("library-dir")) {
         auto escapeLdPath = [](auto&& xs) { return escape(xs, {':', ' '}, "\\"); };
@@ -219,7 +223,7 @@ void compileToBinary(
 #endif
     auto exit = execute(interpreter, argv);
     if (!exit) throw std::invalid_argument(tfm::format("unable to execute tool <python3 %s>", command));
-    if (exit != 0) throw std::invalid_argument("failed to compile C++ sources");
+    if (*exit != 0) throw std::invalid_argument("failed to compile C++ sources");
 }
 
 class InputProvider {

@@ -150,11 +150,13 @@ std::optional<detail::LinuxWaitStatus> execute(
     }
     envir += '\0';
 
+    std::cout << "CreateProcessW" << std::endl;
     if (!CreateProcessW(FoundPath, args_w.str().data(), NULL, NULL, FALSE, 0, /*envir.data()*/ nullptr, NULL,
                 &si, &pi)) {
         return {};
     }
 
+    std::cout << "WaitForSingleObject" << std::endl;
     WaitForSingleObject(pi.hProcess, INFINITE);
 
     if (!GetExitCodeProcess(pi.hProcess, &exit_code)) {

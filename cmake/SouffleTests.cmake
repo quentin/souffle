@@ -237,6 +237,8 @@ function(SOUFFLE_RUN_TEST_HELPER)
       list(APPEND SOUFFLE_PARAMS "-j8")
     endif()
 
+    list(APPEND SOUFFLE_PARAMS "-v")
+
     souffle_run_integration_test(TEST_NAME ${PARAM_TEST_NAME}
                                  QUALIFIED_TEST_NAME ${QUALIFIED_TEST_NAME}
                                  INPUT_DIR ${INPUT_DIR}
