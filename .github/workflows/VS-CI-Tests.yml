@@ -16,6 +16,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Dependencies Cache
+      id: cache
       uses: actions/cache@v3
       env:
         cache-name: cache-chocolatey
@@ -29,19 +30,18 @@ jobs:
     - name: Binary Dependencies (Chocolatey)
       run: |
         choco config set cacheLocation ${{ env.CHOCO_CACHE_DIR }}
-        choco install choco-packages.config --no-progress --installargs 'ADD_CMAKE_TO_PATH=""System""'
+        choco install choco-packages.config --no-progress --installargs 'ADD_CMAKE_TO_PATH=System'
 
     # Use vcpkg to install devel library dependencies.
     - name: Library Dependencies (vcpkg)
-      uses: lukka/run-vcpkg@v7
+      uses: lukka/run-vcpkg@v10
       with:
-        vcpkgGitCommitId: '94ce0dab56f4d8ba6bd631ba59ed682b02d45c46'
-        vcpkgTriplet: x64-windows
-        vcpkgArguments: 'sqlite3 zlib libffi'
+        vcpkgGitCommitId: 'a7b6122f6b6504d16d96117336a0562693579933'
 
     - name: Create Build Directory
       working-directory: ${{github.workspace}}
-      run: mkdir build
+      run: |
+        mkdir build
 
     - name: Configure Build
       working-directory: ${{github.workspace}}
@@ -56,6 +56,13 @@ jobs:
       run: cmake --build build --config Release -j4
 
     # Run the tests, Visual Studio must be in the environment because cl.exe is required for compiled Souffle.
+    - name: Check quick
+      working-directory: ${{github.workspace}}/build
+      shell: cmd
+      run: |
+        pushd "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build" & call vcvars64.bat & popd
+        ctest --output-on-failure --build-config Release --progress -R store3 -VV
+
     - name: Check interpreter
       working-directory: ${{github.workspace}}/build
       shell: cmd
