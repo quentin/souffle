@@ -3175,75 +3175,8 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
     hook << "\n#ifndef __EMBEDDED_SOUFFLE__\n";
     hook << "#include \"souffle/CompiledOptions.h\"\n";
 
-    hook << R"(
-#include <tchar.h>
-#include <DbgHelp.h>
-#include <minidumpapiset.h>
-
-    typedef BOOL (WINAPI* MINIDUMPWRITEDUMP)(
-      HANDLE                            hProcess,
-      DWORD                             ProcessId,
-      HANDLE                            hFile,
-      MINIDUMP_TYPE                     DumpType,
-      PMINIDUMP_EXCEPTION_INFORMATION   ExceptionParam,
-      PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
-      PMINIDUMP_CALLBACK_INFORMATION    CallbackParam);
-
-    static LONG WINAPI windowsDump(struct _EXCEPTION_POINTERS* pExceptionInfo) {
-      LONG retValue = EXCEPTION_CONTINUE_SEARCH;
-
-      const HMODULE mhLib = ::LoadLibrary(_T("dbghelp.dll"));
-      if (mhLib == 0) {
-        throw std::runtime_error("Could not load 'dbghelp.dll'");
-      }
-
-      const MINIDUMPWRITEDUMP pDump = (MINIDUMPWRITEDUMP)::GetProcAddress(mhLib, "MiniDumpWriteDump");
-      if (pDump == 0) {
-        throw std::runtime_error("Could not get 'MiniDumpWriteDump'");
-      }
-
-      HANDLE hFile = INVALID_HANDLE_VALUE;
-      try {
-        char dumpPath[_MAX_PATH];
-        snprintf(dumpPath, _MAX_PATH, "pid%i-%i.dmp", (int) GetCurrentProcessId(), (int)GetTickCount());
-        dumpPath[_MAX_PATH-1] = 0;
-        hFile = ::CreateFileA(dumpPath, GENERIC_WRITE, FILE_SHARE_WRITE, NULL,
-                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile == INVALID_HANDLE_VALUE) {
-          throw std::runtime_error("Could not create dump file");
-        }
-
-        MINIDUMP_EXCEPTION_INFORMATION exInfo;
-        exInfo.ThreadId = ::GetCurrentThreadId();
-        exInfo.ExceptionPointers = pExceptionInfo;
-        exInfo.ClientPointers = 0;
-
-        BOOL result = pDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
-                      (MINIDUMP_TYPE)(MiniDumpNormal | MiniDumpWithHandleData | MiniDumpWithDataSegs),
-                      &exInfo, 0, 0);
-
-        if (result == 0) {
-          throw std::runtime_error("Could not save the crash information");
-        }
-
-        std::cerr << "Error: crash information saved to " << dumpPath << "\n";
-
-        retValue = EXCEPTION_EXECUTE_HANDLER;
-      } catch(std::runtime_error& e) {
-        std::cerr << "Error while generating crash information: " << e.what() << "\n";
-      }
-      if (hFile != INVALID_HANDLE_VALUE) {
-        CloseHandle(hFile);
-      }
-
-      return retValue;
-    }
-    )";
-
     hook << "int main(int argc, char** argv)\n{\n";
     hook << "try{\n";
-
-    hook << "SetUnhandledExceptionFilter(windowsDump);\n";
 
     // parse arguments
     hook << "souffle::CmdOptions opt(";
