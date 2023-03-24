@@ -58,9 +58,13 @@ jobs:
     # Run the tests, Visual Studio must be in the environment because cl.exe is required for compiled Souffle.
     - name: Check quick
       working-directory: ${{github.workspace}}/build
-      shell: cmd
       run: |
-        pushd "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build" & call vcvars64.bat & popd
+        $vsPath = &(Join-Path ${env:ProgramFiles(x86)} '\Microsoft Visual Studio\Installer\vswhere.exe') -property installationpath
+        Import-Module (Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
+        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        refreshenv
         ctest --output-on-failure --build-config Release --progress -R store3 -VV
 
     - name: Check interpreter
