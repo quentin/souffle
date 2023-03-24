@@ -60,11 +60,11 @@ jobs:
       working-directory: ${{github.workspace}}/build
       run: |
         $vsPath = &(Join-Path ${env:ProgramFiles(x86)} '\Microsoft Visual Studio\Installer\vswhere.exe') -property installationpath
-        Import-Module (Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
-        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
         $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
         Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
-        refreshenv
+        Update-SessionEnvironment
+        Import-Module (Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
+        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
         echo $env:Path;
         ctest --output-on-failure --build-config Release --progress -R store3 -VV
 
