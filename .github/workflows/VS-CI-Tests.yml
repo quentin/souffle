@@ -58,13 +58,22 @@ jobs:
     # Run the tests, Visual Studio must be in the environment because cl.exe is required for compiled Souffle.
     - name: Check quick
       working-directory: ${{github.workspace}}/build
-      run: ctest --output-on-failure --build-config Release --progress -R store3 -VV
+      shell: cmd
+      run: |
+        pushd "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build" & call vcvars64.bat & popd
+        ctest --output-on-failure --build-config Release --progress -R store3 -VV
 
     - name: Check interpreter
       working-directory: ${{github.workspace}}/build
-      run: ctest --output-on-failure --build-config Release --progress -j4 -L interpreted
+      shell: cmd
+      run: |
+        pushd "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build" & call vcvars64.bat & popd
+        ctest --output-on-failure --build-config Release --progress -j4 -L interpreted
 
     - name: Check others
       working-directory: ${{github.workspace}}/build
-      run: ctest --output-on-failure --build-config Release --progress -j2 -LE interpreted
+      shell: cmd
+      run: |
+        pushd "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build" & call vcvars64.bat & popd
+        ctest --output-on-failure --build-config Release --progress -j2 -LE interpreted
 
