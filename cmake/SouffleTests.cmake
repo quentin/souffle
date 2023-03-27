@@ -65,16 +65,11 @@ function(SOUFFLE_RUN_INTEGRATION_TEST)
 
     if (WIN32)
       string(REPLACE ";" "\\;" escaped_path "$ENV{PATH}")
+      cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH CL_DIR)
       set_tests_properties(${PARAM_QUALIFIED_TEST_NAME}_run_souffle PROPERTIES
-        ENVIRONMENT "PATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC/14.29.30133/bin/Hostx64/x64\\;$<SHELL_PATH:$<TARGET_FILE_DIR:souffle>>\\;${escaped_path}"
+        ENVIRONMENT "PATH=${CL_DIR}\\;$<SHELL_PATH:$<TARGET_FILE_DIR:souffle>>\\;${escaped_path}"
       )
     endif()
-    #if (WIN32)
-    #  string(REPLACE ";" "\\;" escaped_path "$ENV{PATH}")
-    #  set_tests_properties(${PARAM_QUALIFIED_TEST_NAME}_run_souffle PROPERTIES
-    #    ENVIRONMENT_MODIFICATION PATH=path_list_append:"$<SHELL_PATH:$<TARGET_FILE_DIR:souffle>>"
-    #  )
-    #endif()
 
     if (PARAM_NEGATIVE)
       #Mark the souffle run as "will fail" for negative tests
@@ -108,15 +103,9 @@ function(SOUFFLE_COMPARE_STD_OUTPUTS)
     if (WIN32)
       string(REPLACE ";" "\\;" escaped_path "$ENV{PATH}")
       set_tests_properties(${PARAM_QUALIFIED_TEST_NAME}_compare_std_outputs PROPERTIES
-        ENVIRONMENT "PATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Tools/MSVC/14.29.30133/bin/Hostx64/x64\\;$<SHELL_PATH:$<TARGET_FILE_DIR:souffle>>\\;${escaped_path}"
+        ENVIRONMENT "$<SHELL_PATH:$<TARGET_FILE_DIR:souffle>>\\;${escaped_path}"
       )
     endif()
-    #if (WIN32)
-    #  string(REPLACE ";" "\\;" escaped_path "$ENV{PATH}")
-    #  set_tests_properties(${PARAM_QUALIFIED_TEST_NAME}_compare_std_outputs PROPERTIES
-    #    ENVIRONMENT_MODIFICATION PATH=path_list_append:"$<SHELL_PATH:$<TARGET_FILE_DIR:souffle>>"
-    #  )
-    #endif()
 endfunction()
 
 function(SOUFFLE_COMPARE_CSV)
