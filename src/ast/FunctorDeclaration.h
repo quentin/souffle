@@ -49,8 +49,16 @@ public:
         return params;
     }
 
+    VecOwn<Attribute>& getParams() {
+        return params;
+    }
+
     /** Get return type */
     Attribute const& getReturnType() const {
+        return *returnType;
+    }
+
+    Attribute& getReturnType() {
         return *returnType;
     }
 
@@ -77,10 +85,10 @@ private:
     const std::string name;
 
     /** Types of arguments */
-    const VecOwn<Attribute> params;
+    VecOwn<Attribute> params;
 
     /** Type of the return value */
-    const Own<Attribute> returnType;
+    Own<Attribute> returnType;
 
     /** Stateful flag */
     const bool stateful;

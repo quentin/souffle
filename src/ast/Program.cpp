@@ -253,6 +253,14 @@ void Program::clearComponents() {
     instantiations.clear();
 }
 
+ModuleDecl* Program::getTopModule() {
+    return topModule.get();
+}
+
+void Program::setTopModule(Own<ModuleDecl> mod) {
+    topModule = std::move(mod);
+}
+
 void Program::apply(const NodeMapper& map) {
     mapAll(pragmas, map);
     mapAll(components, map);
@@ -290,6 +298,9 @@ void Program::print(std::ostream& os) const {
     show(getRelations());
     show(getClauses(), "\n\n");
     show(getDirectives(), "\n\n");
+    if (topModule) {
+        show(topModule->getItems());
+    }
 }
 
 bool Program::equal(const Node& node) const {
@@ -326,6 +337,7 @@ Program* Program::cloning() const {
     res->types = clone(types);
     res->functors = clone(functors);
     res->relations = clone(relations);
+    res->topModule = clone(topModule);
     return res;
 }
 

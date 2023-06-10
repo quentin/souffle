@@ -64,6 +64,15 @@ auto as(const A& x) {
 }
 
 template <typename B, typename CastType = void, typename A>
+std::unique_ptr<B> own_cast(std::unique_ptr<A>& x) {
+    auto casted = as<B, CastType>(x.get());
+    if (casted) {
+        x.release();
+    }
+    return std::unique_ptr<B>(casted);
+}
+
+template <typename B, typename CastType = void, typename A>
 auto as(const std::reference_wrapper<A>& x) {
     return as<B, CastType>(x.get());
 }

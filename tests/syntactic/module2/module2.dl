@@ -1,0 +1,17 @@
+
+.module A {
+  .module B {
+    f(1).
+    A.f(2).
+    .decl g(s:symbol)
+    g("from B: g").
+    B.g("from B: B.g").
+  }
+
+  .decl f(i:number)
+  B.g("from A").
+}
+
+.output A.f()
+.output A.B.g()
+A.B.g("from top").

@@ -161,6 +161,9 @@ WS [ \t\r\v\f]
                                         }
                                       }
 "debug_delta"                         { return yy::parser::make_DEBUG_DELTA(yylloc); }
+".module"                             {
+                                        return yy::parser::make_MODULE(yylloc);
+                                      }
 "autoinc"                             { return yy::parser::make_AUTOINC(yylloc); }
 "band"                                { return yy::parser::make_BW_AND(yylloc); }
 "bor"                                 { return yy::parser::make_BW_OR(yylloc); }

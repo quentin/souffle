@@ -166,6 +166,11 @@ Own<ast::TranslationUnit> ParserDriver::parseTranslationUnit(Global& glb, const 
     return parser.parse(code, errorReport, debugReport);
 }
 
+ast::Program& ParserDriver::getProgram() {
+    ast::Program& program = translationUnit->getProgram();
+    return program;
+}
+
 void ParserDriver::addPragma(Own<ast::Pragma> p) {
     ast::Program& program = translationUnit->getProgram();
     program.addPragma(std::move(p));

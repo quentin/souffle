@@ -121,6 +121,7 @@ struct Visitor : souffle::detail::VisitorBase<R, NodeType, Params...> {
         SOUFFLE_VISITOR_FORWARD(Program);
         SOUFFLE_VISITOR_FORWARD(Pragma);
         SOUFFLE_VISITOR_FORWARD(FunctorDeclaration);
+        SOUFFLE_VISITOR_FORWARD(Directive);
 
         // did not work ...
         fatal("unsupported type: %s", typeid(node).name());
@@ -185,6 +186,7 @@ struct Visitor : souffle::detail::VisitorBase<R, NodeType, Params...> {
     SOUFFLE_VISITOR_LINK(Relation, Node);
     SOUFFLE_VISITOR_LINK(Pragma, Node);
     SOUFFLE_VISITOR_LINK(FunctorDeclaration, Node);
+    SOUFFLE_VISITOR_LINK(Directive, Node);
 };
 }  // namespace souffle::ast
 

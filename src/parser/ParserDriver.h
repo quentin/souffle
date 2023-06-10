@@ -24,6 +24,7 @@
 #include "ast/Counter.h"
 #include "ast/Directive.h"
 #include "ast/FunctorDeclaration.h"
+#include "ast/ModuleDecl.h"
 #include "ast/Pragma.h"
 #include "ast/QualifiedName.h"
 #include "ast/Relation.h"
@@ -48,6 +49,7 @@ public:
     ParserDriver(Global& g, std::shared_ptr<FileSystem> fs);
     virtual ~ParserDriver() = default;
 
+    ast::Program& getProgram();
     void addRelation(Own<ast::Relation> r);
     void addFunctorDeclaration(Own<ast::FunctorDeclaration> f);
     void addDirective(Own<ast::Directive> d);

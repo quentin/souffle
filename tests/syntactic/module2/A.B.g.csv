@@ -1,0 +1,4 @@
+from top
+from A
+from B: g
+from B: B.g

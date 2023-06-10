@@ -67,6 +67,8 @@ positive_test(input_adt_names1)
 positive_test(input_adt_names2)
 positive_test(input_directive_rfc4180)
 positive_test(equivalent_types_in_negation)
+positive_test(module1)
+positive_test(module2)
 if (NOT MSVC)
 # does not pass with Visual Studio pre-processor because it preserves all whitespaces
 positive_test(whitespaces)

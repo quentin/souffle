@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "souffle/utility/span.h"
+
 #include <iosfwd>
 #include <string>
 #include <vector>
@@ -33,6 +35,7 @@ public:
     QualifiedName(std::string name);
     QualifiedName(const char* name);
     QualifiedName(std::vector<std::string> qualifiers);
+    QualifiedName(const span<const std::string>& qualifiers);
     QualifiedName(const QualifiedName&) = default;
     QualifiedName(QualifiedName&&) = default;
     QualifiedName& operator=(const QualifiedName&) = default;

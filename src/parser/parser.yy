@@ -57,12 +57,16 @@
     #include "ast/ExecutionOrder.h"
     #include "ast/ExecutionPlan.h"
     #include "ast/FunctionalConstraint.h"
+    #include "ast/FunctorAlias.h"
     #include "ast/FunctorDeclaration.h"
+    #include "ast/Items.h"
     #include "ast/IntrinsicFunctor.h"
     #include "ast/IterationCounter.h"
     #include "ast/Literal.h"
+    #include "ast/ModuleDecl.h"
     #include "ast/NilConstant.h"
     #include "ast/NumericConstant.h"
+    #include "ast/Program.h"
     #include "ast/Pragma.h"
     #include "ast/QualifiedName.h"
     #include "ast/RecordInit.h"
@@ -171,6 +175,7 @@
 %token TYPE                      "type declaration"
 %token COMPONENT                 "component declaration"
 %token INSTANTIATE               "component instantiation"
+%token MODULE                    "module declaration"
 %token NUMBER_TYPE               "numeric type declaration"
 %token SYMBOL_TYPE               "symbolic type declaration"
 %token TOFLOAT                   "convert to float"
@@ -228,6 +233,7 @@
 %token FOLD                      "fold"
 
 /* -- Non-Terminal Types -- */
+%type <Mov<ast::Items>>                        unit
 %type <Mov<RuleBody>>                          aggregate_body
 %type <AggregateOp>                            aggregate_func
 %type <Mov<Own<ast::Argument>>>                arg
@@ -240,6 +246,8 @@
 %type <Mov<Own<ast::Component>>>               component_decl
 %type <Mov<Own<ast::Component>>>               component_body
 %type <Mov<Own<ast::Component>>>               component_head
+%type <Mov<Own<ast::ModuleDecl>>>              module_decl
+%type <Mov<Own<ast::ModuleType>>>              module_type
 %type <Mov<RuleBody>>                          conjunction
 %type <Mov<Own<ast::Constraint>>>              constraint
 %type <Mov<Own<ast::FunctionalConstraint>>>    dependency
@@ -253,6 +261,7 @@
 %type <Mov<VecOwn<ast::Attribute>>>            functor_arg_type_list
 %type <Mov<std::string>>                       functor_built_in
 %type <Mov<Own<ast::FunctorDeclaration>>>      functor_decl
+%type <Mov<Own<ast::FunctorAlias>>>            functor_alias
 %type <Mov<VecOwn<ast::Atom>>>                 head
 %type <Mov<ast::QualifiedName>>                qualified_name
 %type <Mov<VecOwn<ast::Directive>>>            directive_list
@@ -307,6 +316,11 @@
  */
 program
   : unit
+    {
+      Own<ast::ModuleType> ty = std::make_unique<ast::ModuleType>();
+      Own<ast::ModuleDecl> mod = std::make_unique<ast::ModuleDecl>("", std::move(ty), std::move($1), @$);
+      driver.getProgram().setTopModule(std::move(mod));
+    }
   ;
 
 /**
@@ -314,47 +328,71 @@ program
  */
 unit
   : %empty
-    { }
+    {
+    }
   | unit directive_head
     {
-      for (auto&& cur : $directive_head)
-        driver.addDirective(std::move(cur));
+      $$ = $1;
+      for (auto&& cur : $directive_head) {
+        $$.push_back(std::move(cur));
+      }
     }
   | unit rule
     {
-      for (auto&& cur : $rule   )
-        driver.addClause(std::move(cur));
+      $$ = $1;
+      for (auto&& cur : $rule) {
+        $$.push_back(std::move(cur));
+      }
     }
   | unit fact
     {
-      driver.addClause($fact);
+      $$ = $1;
+      $$.push_back(*$fact);
     }
   | unit component_decl
     {
-      driver.addComponent($component_decl);
+      $$ = $1;
+      $$.push_back(*$component_decl);
     }
   | unit component_init
     {
-      driver.addInstantiation($component_init);
+      $$ = $1;
+      $$.push_back(*$component_init);
     }
   | unit pragma
     {
-      driver.addPragma($pragma);
+      $$ = $1;
+      $$.push_back(*$pragma);
     }
   | unit type_decl
     {
-      driver.addType($type_decl);
+      $$ = $1;
+      $$.push_back(*$type_decl);
     }
   | unit functor_decl
     {
-      driver.addFunctorDeclaration($functor_decl);
+      $$ = $1;
+      $$.push_back(*$functor_decl);
     }
   | unit relation_decl
     {
+      $$ = $1;
       for (auto&& rel : $relation_decl) {
-        driver.addIoFromDeprecatedTag(*rel);
-        driver.addRelation(std::move(rel));
+        //$$->addIoFromDeprecatedTag(*rel);
+        $$.push_back(std::move(rel));
       }
+    }
+  | unit module_decl
+    {
+      auto &uni = $1;
+      $$ = uni;
+      auto &mod = $2;
+      $$.push_back(*mod);
+    }
+  | unit functor_alias
+    {
+      $$ = $1;
+      $$.push_back(*$functor_alias);
     }
   ;
 
@@ -1372,6 +1410,23 @@ component_init
   ;
 
 /**
+ * Module declaration
+ */
+module_decl
+  : MODULE IDENT module_type LBRACE unit RBRACE
+    {
+      $$ = mk<ast::ModuleDecl>($IDENT, $module_type, $unit, @$);
+    }
+  ;
+
+module_type
+  : %empty
+    {
+      $$ = mk<ast::ModuleType>(@$);
+    }
+  ;
+
+/**
  * User-Defined Functors
  */
 
@@ -1386,6 +1441,18 @@ functor_decl
   | FUNCTOR IDENT LPAREN functor_arg_type_list[args] RPAREN COLON qualified_name STATEFUL
     {
       $$ = mk<ast::FunctorDeclaration>($IDENT, $args, mk<ast::Attribute>("return_type", $qualified_name, @qualified_name), true, @$);
+    }
+  ;
+
+/**
+ * Functor alias
+ *
+ *   .functor alias = some.other.func
+ */
+functor_alias:
+    FUNCTOR IDENT EQUALS qualified_name
+    {
+      $$ = mk<ast::FunctorAlias>($IDENT, $qualified_name, @$);
     }
   ;
 

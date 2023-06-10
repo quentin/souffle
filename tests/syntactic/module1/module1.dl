@@ -1,0 +1,14 @@
+
+.module Q {
+  .decl q1(x:number)
+  q1(1).
+  q1(2).
+}
+
+.module M {
+  .decl m1(x:number)
+  m1(x+1) :- Q.q1(x).
+}
+
+.output M.m1()
+

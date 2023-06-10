@@ -22,6 +22,7 @@
 #include "ast/ComponentInit.h"
 #include "ast/Directive.h"
 #include "ast/FunctorDeclaration.h"
+#include "ast/ModuleDecl.h"
 #include "ast/Node.h"
 #include "ast/Pragma.h"
 #include "ast/QualifiedName.h"
@@ -203,24 +204,6 @@ public:
      */
     void removeDirective(const Directive&);
 
-    /** Return components */
-    std::vector<Component*> getComponents() const;
-
-    /** Return component instantiation */
-    std::vector<ComponentInit*> getComponentInstantiations() const;
-
-    /** Remove components and components' instantiations */
-    void clearComponents();
-
-    void apply(const NodeMapper& map) override;
-
-protected:
-    void print(std::ostream& os) const override;
-
-    NodeVec getChildren() const override;
-
-    friend class souffle::ParserDriver;
-
     void addPragma(Own<Pragma> pragma);
 
     void addFunctorDeclaration(Own<FunctorDeclaration> functor);
@@ -230,6 +213,31 @@ protected:
 
     /** Add component instantiation */
     void addInstantiation(Own<ComponentInit> instantiation);
+
+    /// Add a module declaration
+    void addModule(Own<ModuleDecl> mod);
+
+    /** Return components */
+    std::vector<Component*> getComponents() const;
+
+    /** Return component instantiation */
+    std::vector<ComponentInit*> getComponentInstantiations() const;
+
+    /** Remove components and components' instantiations */
+    void clearComponents();
+
+    ModuleDecl* getTopModule();
+
+    void setTopModule(Own<ModuleDecl>);
+
+    void apply(const NodeMapper& map) override;
+
+protected:
+    void print(std::ostream& os) const override;
+
+    NodeVec getChildren() const override;
+
+    friend class souffle::ParserDriver;
 
 private:
     bool equal(const Node& node) const override;
@@ -254,6 +262,9 @@ private:
 
     /** Pragmas */
     VecOwn<Pragma> pragmas;
+
+    /// The program module
+    Own<ModuleDecl> topModule;
 
 #ifndef NDEBUG
     // SANCHECK - used to assert that the set of clauses isn't mutated mid visit

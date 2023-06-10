@@ -30,6 +30,7 @@ set(SOUFFLE_SOURCES
     ast/Directive.cpp
     ast/ExecutionOrder.cpp
     ast/ExecutionPlan.cpp
+    ast/FunctorAlias.cpp
     ast/FunctorDeclaration.cpp
     ast/FunctionalConstraint.cpp
     ast/IntrinsicFunctor.cpp
@@ -37,6 +38,7 @@ set(SOUFFLE_SOURCES
     ast/Negation.cpp
     ast/NilConstant.cpp
     ast/Node.cpp
+    ast/ModuleDecl.cpp
     ast/NumericConstant.cpp
     ast/Pragma.cpp
     ast/Program.cpp
@@ -91,6 +93,7 @@ set(SOUFFLE_SOURCES
     ast/transform/MaterializeAggregationQueries.cpp
     ast/transform/MaterializeSingletonAggregation.cpp
     ast/transform/Meta.cpp
+    ast/transform/ModuleInstantiation.cpp
     ast/transform/MinimiseProgram.cpp
     ast/transform/NameUnnamedVariables.cpp
     ast/transform/NormaliseGenerators.cpp

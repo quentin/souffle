@@ -41,6 +41,7 @@
 #include "ast/transform/MaterializeAggregationQueries.h"
 #include "ast/transform/MaterializeSingletonAggregation.h"
 #include "ast/transform/MinimiseProgram.h"
+#include "ast/transform/ModuleInstantiation.h"
 #include "ast/transform/NameUnnamedVariables.h"
 #include "ast/transform/NormaliseGenerators.h"
 #include "ast/transform/PartitionBodyLiterals.h"
@@ -477,7 +478,9 @@ Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb) 
                     mk<ast::transform::NameUnnamedVariablesTransformer>()));
 
     // Main pipeline
-    auto pipeline = mk<ast::transform::PipelineTransformer>(mk<ast::transform::ComponentChecker>(),
+    auto pipeline = mk<ast::transform::PipelineTransformer>(
+            mk<ast::transform::ModuleInstantiationTransformer>(),
+            mk<ast::transform::ComponentChecker>(),
             mk<ast::transform::ComponentInstantiationTransformer>(),
             mk<ast::transform::DebugDeltaRelationTransformer>(),
             mk<ast::transform::IODefaultsTransformer>(),

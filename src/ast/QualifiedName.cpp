@@ -22,6 +22,9 @@ QualifiedName::QualifiedName(std::string name) {
 QualifiedName::QualifiedName(const char* name) : QualifiedName(std::string(name)) {}
 QualifiedName::QualifiedName(std::vector<std::string> qualifiers) : qualifiers(std::move(qualifiers)) {}
 
+QualifiedName::QualifiedName(const span<const std::string>& segments)
+        : qualifiers(segments.begin(), segments.end()) {}
+
 void QualifiedName::append(std::string name) {
     qualifiers.push_back(std::move(name));
 }
