@@ -253,11 +253,11 @@ void Program::clearComponents() {
     instantiations.clear();
 }
 
-ModuleDecl* Program::getTopModule() {
+ModuleStruct* Program::getTopModule() {
     return topModule.get();
 }
 
-void Program::setTopModule(Own<ModuleDecl> mod) {
+void Program::setTopModule(Own<ModuleStruct> mod) {
     topModule = std::move(mod);
 }
 

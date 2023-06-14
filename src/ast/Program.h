@@ -226,9 +226,9 @@ public:
     /** Remove components and components' instantiations */
     void clearComponents();
 
-    ModuleDecl* getTopModule();
+    ModuleStruct* getTopModule();
 
-    void setTopModule(Own<ModuleDecl>);
+    void setTopModule(Own<ModuleStruct>);
 
     void apply(const NodeMapper& map) override;
 
@@ -264,7 +264,7 @@ private:
     VecOwn<Pragma> pragmas;
 
     /// The program module
-    Own<ModuleDecl> topModule;
+    Own<ModuleStruct> topModule;
 
 #ifndef NDEBUG
     // SANCHECK - used to assert that the set of clauses isn't mutated mid visit

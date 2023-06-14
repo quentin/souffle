@@ -1,0 +1,16 @@
+
+/// functor module: () -> module
+.module Foo () {
+  .decl f(n:number)
+  .output f()
+}
+
+/// module alias
+.module F = Foo
+
+/// functor module instance
+.module A = F()
+.module B = F()
+
+A.f(1).
+B.f(2).

@@ -247,7 +247,14 @@
 %type <Mov<Own<ast::Component>>>               component_body
 %type <Mov<Own<ast::Component>>>               component_head
 %type <Mov<Own<ast::ModuleDecl>>>              module_decl
-%type <Mov<Own<ast::ModuleType>>>              module_type
+%type <Mov<Own<ast::ModuleDef>>>               module_def
+%type <Mov<Own<ast::ModuleRef>>>               module_ref
+%type <Mov<std::optional<std::vector<ast::QualifiedName>>>>   opt_module_args
+%type <Mov<std::vector<ast::QualifiedName>>>   module_arg_list
+%type <Mov<std::vector<ast::QualifiedName>>>   non_empty_module_arg_list
+%type <Mov<std::optional<std::vector<ast::QualifiedName>>>>   opt_module_params
+%type <Mov<std::vector<ast::QualifiedName>>>   module_param_list
+%type <Mov<std::vector<ast::QualifiedName>>>   non_empty_module_param_list
 %type <Mov<RuleBody>>                          conjunction
 %type <Mov<Own<ast::Constraint>>>              constraint
 %type <Mov<Own<ast::FunctionalConstraint>>>    dependency
@@ -317,9 +324,8 @@
 program
   : unit
     {
-      Own<ast::ModuleType> ty = std::make_unique<ast::ModuleType>();
-      Own<ast::ModuleDecl> mod = std::make_unique<ast::ModuleDecl>("", std::move(ty), std::move($1), @$);
-      driver.getProgram().setTopModule(std::move(mod));
+      Own<ast::ModuleStruct> mstruct = std::make_unique<ast::ModuleStruct>(std::move($1), @$);
+      driver.getProgram().setTopModule(std::move(mstruct));
     }
   ;
 
@@ -362,6 +368,7 @@ unit
   | unit pragma
     {
       $$ = $1;
+      driver.addPragma(clone($pragma));
       $$.push_back(*$pragma);
     }
   | unit type_decl
@@ -1413,16 +1420,105 @@ component_init
  * Module declaration
  */
 module_decl
-  : MODULE IDENT module_type LBRACE unit RBRACE
+  : MODULE IDENT opt_module_params module_def
     {
-      $$ = mk<ast::ModuleDecl>($IDENT, $module_type, $unit, @$);
+      $$ = mk<ast::ModuleDecl>($IDENT, $opt_module_params, $module_def, @$);
     }
   ;
 
-module_type
+/**
+ * Module definition
+ */
+module_def
+  : LBRACE unit RBRACE
+    {
+      $$ = mk<ast::ModuleStruct>($unit, @$);
+    }
+  | EQUALS module_ref
+    {
+      $$ = mk<ast::ModuleAlias>($module_ref, @$);
+    }
+  ;
+
+/**
+ * Module reference
+ */
+module_ref
+  : qualified_name opt_module_args
+    {
+      $$ = mk<ast::ModuleRef>($qualified_name, $opt_module_args, @$);
+    }
+  ;
+
+/**
+ * Arguments to a functor module
+ */
+opt_module_args
   : %empty
     {
-      $$ = mk<ast::ModuleType>(@$);
+      $$ = std::nullopt;
+    }
+  | LPAREN module_arg_list RPAREN
+    {
+      $$ = $module_arg_list;
+    }
+  ;
+
+module_arg_list
+  : %empty
+    {
+    }
+  | non_empty_module_arg_list
+    {
+      $$ = $1;
+    }
+  ;
+
+non_empty_module_arg_list
+  : qualified_name
+    {
+      $$.push_back($qualified_name);
+    }
+  | non_empty_module_arg_list COMMA qualified_name
+    {
+      $$ = $1;
+      $$.push_back($qualified_name);
+    }
+  ;
+
+/**
+ * Parameter list of a functor module
+ */
+opt_module_params
+  : %empty
+    {
+      $$ = std::nullopt;
+    }
+  | LPAREN module_param_list RPAREN
+    {
+      $$ = $module_param_list;
+    }
+  ;
+
+module_param_list
+  : %empty
+    {
+    }
+  | non_empty_module_param_list
+    {
+      $$ = $1;
+    }
+  ;
+
+non_empty_module_param_list
+  : qualified_name
+    {
+      $$.push_back($qualified_name);
+    }
+  | non_empty_module_param_list COMMA qualified_name
+    {
+      $$ = $1;
+      $$.push_back($qualified_name);
     }
   ;
 
