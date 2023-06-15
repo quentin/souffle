@@ -248,8 +248,6 @@
 %type <Mov<Own<ast::Component>>>               component_head
 %type <Mov<Own<ast::ModuleDecl>>>              module_decl
 %type <Mov<Own<ast::ModuleDef>>>               module_def
-%type <Mov<Own<ast::ModuleRef>>>               module_ref
-%type <Mov<std::optional<std::vector<ast::QualifiedName>>>>   opt_module_args
 %type <Mov<std::vector<ast::QualifiedName>>>   module_arg_list
 %type <Mov<std::vector<ast::QualifiedName>>>   non_empty_module_arg_list
 %type <Mov<std::optional<std::vector<ast::QualifiedName>>>>   opt_module_params
@@ -1434,33 +1432,13 @@ module_def
     {
       $$ = mk<ast::ModuleStruct>($unit, @$);
     }
-  | EQUALS module_ref
+  | EQUALS qualified_name LPAREN module_arg_list RPAREN
     {
-      $$ = mk<ast::ModuleAlias>($module_ref, @$);
+      $$ = mk<ast::ModuleApplication>($qualified_name, $module_arg_list, @$);
     }
-  ;
-
-/**
- * Module reference
- */
-module_ref
-  : qualified_name opt_module_args
+  | EQUALS qualified_name
     {
-      $$ = mk<ast::ModuleRef>($qualified_name, $opt_module_args, @$);
-    }
-  ;
-
-/**
- * Arguments to a functor module
- */
-opt_module_args
-  : %empty
-    {
-      $$ = std::nullopt;
-    }
-  | LPAREN module_arg_list RPAREN
-    {
-      $$ = $module_arg_list;
+      $$ = mk<ast::ModuleAlias>($qualified_name, @$);
     }
   ;
 

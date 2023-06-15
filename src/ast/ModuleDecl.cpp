@@ -15,35 +15,30 @@
 #include <string>
 
 namespace souffle::ast {
-ModuleRef::ModuleRef(ast::QualifiedName name, std::optional<std::vector<QualifiedName>> args, SrcLocation loc)
-        : Node(loc), name(name), args(args) {}
+ModuleApplication::ModuleApplication(
+        ast::QualifiedName source, std::vector<QualifiedName> args, SrcLocation loc)
+        : ModuleDef(loc), source(source), args(args) {}
 
-const QualifiedName& ModuleRef::getQualifiedName() const {
-    return name;
+const QualifiedName& ModuleApplication::getSource() const {
+    return source;
 }
 
-void ModuleRef::setQualifiedName(const QualifiedName& qn) {
-    name = qn;
+void ModuleApplication::setSource(const QualifiedName& qn) {
+    source = qn;
 }
 
-ModuleRef* ModuleRef::cloning() const {
-    return new ModuleRef(name, args, getSrcLoc());
+ModuleApplication* ModuleApplication::cloning() const {
+    return new ModuleApplication(source, args, getSrcLoc());
 }
 
-void ModuleRef::print(std::ostream& os) const {
-    os << name;
-    if (hasArgumentList()) {
-        os << "(" << join(*args, ", ") << ")";
-    }
+void ModuleApplication::print(std::ostream& os) const {
+    os << " = " << source;
+    os << "(" << join(args, ", ") << ")";
 }
 
-bool ModuleRef::hasArgumentList() const {
-    return (bool)args;
-}
-
-bool ModuleRef::equal(const Node& node) const {
-    const auto& other = asAssert<ModuleRef>(node);
-    return name == other.name && args == other.args;
+bool ModuleApplication::equal(const Node& node) const {
+    const auto& other = asAssert<ModuleApplication>(node);
+    return source == other.source && args == other.args;
 }
 
 ModuleStruct::ModuleStruct(Items itms, SrcLocation loc) : ModuleDef(loc), items(std::move(itms)) {}
@@ -87,28 +82,18 @@ ModuleStruct* ModuleStruct::cloning() const {
     return res;
 }
 
-ModuleAlias::ModuleAlias(Own<ModuleRef> ref, SrcLocation loc) : ModuleDef(loc), ref(std::move(ref)) {}
+ModuleAlias::ModuleAlias(const QualifiedName& source, SrcLocation loc) : ModuleDef(loc), source(source) {}
 
-const ModuleRef* ModuleAlias::getModuleRef() const {
-    return ref.get();
+const QualifiedName& ModuleAlias::getSource() const {
+    return source;
 }
 
-void ModuleAlias::setModuleRef(Own<ModuleRef> r) {
-    ref = std::move(r);
+void ModuleAlias::setSource(const QualifiedName& src) {
+    source = src;
 }
 
 void ModuleAlias::print(std::ostream& os) const {
-    os << " = " << *ref;
-}
-
-Node::NodeVec ModuleAlias::getChildren() const {
-    std::vector<const Node*> res;
-    res.push_back(ref.get());
-    return res;
-}
-
-void ModuleAlias::apply(const NodeMapper& mapper) {
-    ref = mapper(std::move(ref));
+    os << " = " << source;
 }
 
 bool ModuleAlias::equal(const Node& node) const {
@@ -117,7 +102,7 @@ bool ModuleAlias::equal(const Node& node) const {
 }
 
 ModuleAlias* ModuleAlias::cloning() const {
-    return new ModuleAlias(clone(ref), getSrcLoc());
+    return new ModuleAlias(source, getSrcLoc());
 }
 
 ModuleDecl::ModuleDecl(const std::string& name, std::optional<std::vector<QualifiedName>> params,

@@ -11,42 +11,6 @@
 
 namespace souffle::ast {
 
-/// The reference to a module with possibly some arguments.
-///
-/// ## Example
-///
-/// ```souffle
-/// M::N(u, T::t)
-/// M::K
-/// ```
-///
-class ModuleRef : public Node {
-public:
-    explicit ModuleRef(
-            ast::QualifiedName name, std::optional<std::vector<QualifiedName>> args, SrcLocation loc = {});
-
-    bool hasArgumentList() const;
-
-    const QualifiedName& getQualifiedName() const;
-
-    void setQualifiedName(const QualifiedName&);
-
-    const std::optional<std::vector<QualifiedName>>& getArguments() const;
-
-    std::optional<std::vector<QualifiedName>>& getArguments();
-
-private:
-    void print(std::ostream& os) const override;
-
-    bool equal(const Node& node) const override;
-
-    ModuleRef* cloning() const override;
-
-    QualifiedName name;
-
-    std::optional<std::vector<QualifiedName>> args;
-};
-
 /// The definition of a module.
 class ModuleDef : public Node {
 public:
@@ -94,25 +58,55 @@ private:
 ///
 class ModuleAlias : public ModuleDef {
 public:
-    explicit ModuleAlias(Own<ModuleRef> ref, SrcLocation loc = {});
+    explicit ModuleAlias(const QualifiedName& source, SrcLocation loc = {});
 
-    const ModuleRef* getModuleRef() const;
+    const QualifiedName& getSource() const;
 
-    void setModuleRef(Own<ModuleRef> ref);
+    void setSource(const QualifiedName& src);
 
 protected:
     void print(std::ostream& os) const override;
-
-    NodeVec getChildren() const override;
-
-    void apply(const NodeMapper& mapper) override;
 
 private:
     bool equal(const Node& node) const override;
 
     ModuleAlias* cloning() const override;
 
-    Own<ModuleRef> ref;
+    QualifiedName source;
+};
+
+/// The application of a module functor
+///
+/// ## Example
+///
+/// ```souffle
+/// A()
+/// M::N(u, T::t)
+/// ```
+///
+class ModuleApplication : public ModuleDef {
+public:
+    explicit ModuleApplication(
+            ast::QualifiedName source, std::vector<QualifiedName> args, SrcLocation loc = {});
+
+    const QualifiedName& getSource() const;
+
+    void setSource(const QualifiedName&);
+
+    const std::vector<QualifiedName>& getArguments() const;
+
+    std::vector<QualifiedName>& getArguments();
+
+private:
+    void print(std::ostream& os) const override;
+
+    bool equal(const Node& node) const override;
+
+    ModuleApplication* cloning() const override;
+
+    QualifiedName source;
+
+    std::vector<QualifiedName> args;
 };
 
 /// The declaration of a module, possibly with some parameters.

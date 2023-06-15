@@ -579,23 +579,27 @@ private:
                     define(&inst, Ident::from(name), NS::Type, binding);
 
                 } else if (ModuleAlias* malias = as<ModuleAlias>(moduleDef)) {
-                    const ModuleRef* mref = malias->getModuleRef();
-                    const Ident source = Ident::from(mref->getQualifiedName().getQualifiers().front());
+                    const Ident source = Ident::from(malias->getSource().getQualifiers().front());
                     const Ident target = Ident::from(name);
                     std::optional<ModuleInstance*> importedModule;
                     span<const std::string> modPath;
 
-                    if (mref->getQualifiedName().getQualifiers().size() == 1) {
+                    if (malias->getSource().getQualifiers().size() == 1) {
                         importedModule = &inst;
                     } else {
-                        modPath = span<const std::string>(mref->getQualifiedName().getQualifiers().data() + 1,
-                                mref->getQualifiedName().getQualifiers().size() - 1);
+                        modPath = span<const std::string>(malias->getSource().getQualifiers().data() + 1,
+                                malias->getSource().getQualifiers().size() - 1);
                     }
 
-                    addImport(inst, source, target, DefKind::Mod, modPath, importedModule, mref->getSrcLoc());
+                    addImport(
+                            inst, source, target, DefKind::Mod, modPath, importedModule, malias->getSrcLoc());
 
-                } else {
+                } else if (ModuleApplication* mapp = as<ModuleApplication>(moduleDef)) {
+                    // must resolve the source module and then generate a module for it
+                    // @todo rename in ModuleGeneration ?
                     throw "TODO";
+                } else {
+                    throw "unexpected";
                 }
             } else if (Relation* rel = as<Relation>(n)) {
                 // @todo only allow non-qualified names?
