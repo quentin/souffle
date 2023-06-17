@@ -180,8 +180,18 @@ struct Import {
     SrcLocation loc;
 };
 
-/// either a resolution or a module or an import
-using NameBindingKind = std::variant<Res, Module, Import*>;
+struct NameBinding;
+
+struct ResolvedImport {
+    /// the binding the import resolves to
+    NameBinding* binding;
+
+    /// the original import
+    Import* imptr;
+};
+
+/// either a resolution or a module or a resolved import
+using NameBindingKind = std::variant<Res, Module, ResolvedImport>;
 
 struct NameBinding {
     NameBindingKind kind;
@@ -229,6 +239,18 @@ struct ModuleInstance {
 
     /// AST nodes in this module
     std::vector<NodeId> nodes;
+};
+
+/// A pending module
+struct PendingModule {
+    /// the parent of the module
+    ModuleInstance* parent;
+
+    /// the instance that have been booked for this module
+    ModuleInstance* instance;
+
+    /// the AST module application node that defines this module
+    ModuleApplication* application;
 };
 
 /// Visit and possibly mutate paths (qualified name + namespace)
@@ -392,9 +414,6 @@ private:
     /// mapping the definition identifier of a module to the module instance
     std::map<DefId, ModuleInstance*> moduleInstanceMap;
 
-    /// mapping from a definition identifier to its parent module
-    std::map<DefId, ModuleInstance*> parentMap;
-
     /// mapping from a definition identifier to its full qualified name
     std::map<DefId, QualifiedName> qualifiedNameMap;
 
@@ -403,6 +422,9 @@ private:
 
     /// imports not yet resolved
     std::list<Import*> unresolvedImports;
+
+    /// module applications not yet performed
+    std::list<PendingModule> pendingModules;
 
     /// all the imports
     std::deque<Import> imports;
@@ -420,16 +442,17 @@ private:
         Program& program = tu.getProgram();
 
         // create a module for the program that contains top-level items
-        ModuleInstance& top = createModule(createDef(0), QualifiedName(), nullptr);
+        ModuleInstance* top = createModule(createDef(0), QualifiedName(), nullptr);
 
         // collect definitions and more module instances
         std::list<std::pair<ModuleInstance*, Items*>> modules;
-        modules.emplace_back(&top, &program.getTopModule()->getItems());
+        modules.emplace_back(top, &program.getTopModule()->getItems());
         while (!modules.empty()) {
             std::pair<ModuleInstance*, Items*> task = modules.front();
             modules.pop_front();
-            auto newModules = collectDefinitions(*task.first, *task.second);
+            auto [newModules, newPending] = collectDefinitions(*task.first, *task.second);
             modules.splice(modules.end(), newModules);
+            pendingModules.splice(pendingModules.end(), newPending);
         }
     }
 
@@ -504,8 +527,6 @@ private:
 
         const DefId def = binding->res().toDefId();
 
-        parentMap.emplace(def, parent);
-
         QualifiedName qname(parent->name);
         qname.append(ident.toString());
         qualifiedNameMap.emplace(def, std::move(qname));
@@ -531,11 +552,11 @@ private:
     }
 
     /// Create a new module
-    ModuleInstance& createModule(const DefId def, QualifiedName name, ModuleInstance* parent) {
+    ModuleInstance* createModule(const DefId def, QualifiedName name, ModuleInstance* parent) {
         ModuleInstance& inst = moduleInstances.emplace_back(
                 ModuleInstance{def, name, parent, /*resolutions*/ {}, /*nodes*/ {}});
         moduleInstanceMap.emplace(inst.def, &inst);
-        return inst;
+        return &inst;
     }
 
     /// Add an import binding in `parent` module.
@@ -556,8 +577,10 @@ private:
     /// Collect definitions of a module
     ///
     /// Return the list of new module instances found in the current module.
-    std::list<std::pair<ModuleInstance*, Items*>> collectDefinitions(ModuleInstance& inst, Items& items) {
+    std::tuple<std::list<std::pair<ModuleInstance*, Items*>>, std::list<PendingModule>> collectDefinitions(
+            ModuleInstance& inst, Items& items) {
         std::list<std::pair<ModuleInstance*, Items*>> newModules;
+        std::list<PendingModule> newPendingModules;
 
         for (Own<Node>& item : items) {
             const NodeId id = nextNodeId++;
@@ -573,9 +596,9 @@ private:
                 const DefId def = createDef(id);
                 ModuleDef& moduleDef = md->getDefinition();
                 if (ModuleStruct* mstruct = as<ModuleStruct>(moduleDef)) {
-                    ModuleInstance& mod = createModule(def, qname, &inst);
-                    newModules.emplace_back(&mod, &mstruct->getItems());
-                    NameBinding* binding = allocNameBinding(Module{&mod}, md->getSrcLoc());
+                    ModuleInstance* mod = createModule(def, qname, &inst);
+                    newModules.emplace_back(mod, &mstruct->getItems());
+                    NameBinding* binding = allocNameBinding(Module{mod}, md->getSrcLoc());
                     define(&inst, Ident::from(name), NS::Type, binding);
 
                 } else if (ModuleAlias* malias = as<ModuleAlias>(moduleDef)) {
@@ -595,9 +618,8 @@ private:
                             inst, source, target, DefKind::Mod, modPath, importedModule, malias->getSrcLoc());
 
                 } else if (ModuleApplication* mapp = as<ModuleApplication>(moduleDef)) {
-                    // must resolve the source module and then generate a module for it
-                    // @todo rename in ModuleGeneration ?
-                    throw "TODO";
+                    newPendingModules.emplace_back(
+                            PendingModule{&inst, createModule(createDef(id), qname, &inst), mapp});
                 } else {
                     throw "unexpected";
                 }
@@ -640,7 +662,7 @@ private:
             }
         }
 
-        return newModules;
+        return {newModules, newPendingModules};
     }
 
     /// Try to resolve the given import.
@@ -659,6 +681,7 @@ private:
             PathResult res = resolvePath(imprt->modulePath, ns, imprt->loc, *imprt->parent);
             if (std::holds_alternative<Module>(res)) {
                 mod = std::get<Module>(res).mod;
+                *imprt->importedModule = mod;
             } else if (std::holds_alternative<Failed>(res)) {
                 // cannot resolve the module yet, maybe later
                 return false;
@@ -671,12 +694,14 @@ private:
 
         // try to resolve the source binding in the source module without
         // creating it if it does not exists
-        std::optional<NameBinding*> maybeBinding = resolveIdentInModule(*mod, imprt->source, ns);
+        std::optional<NameBinding*> const maybeBinding = resolveIdentInModule(*mod, imprt->source, ns);
         if (!maybeBinding) {
             return false;
         }
 
-        define(imprt->parent, imprt->target, ns, *maybeBinding);
+        NameBinding* const binding = *maybeBinding;
+        NameBinding* const importedBinding = import(binding, imprt);
+        define(imprt->parent, imprt->target, ns, importedBinding);
         {
             const BindingKey key{imprt->target, ns};
             auto& imports = resolution(*imprt->parent, key).imports;
@@ -744,6 +769,7 @@ private:
     /// The failed resolution of a path
     struct Failed {};
 
+    /// A path rooted at a component instance
     struct ComponentPath {
         QualifiedName qname;
     };
@@ -855,10 +881,11 @@ private:
                     return res;
                 } else if (i == 0 && std::holds_alternative<Def>(res) &&
                            std::get<Def>(res).kind == DefKind::Init) {
+                    // components are not mixed with modules
                     return ComponentPath{QualifiedName(segments)};
                 } else {
-                    Diagnostic err(
-                            Diagnostic::Type::ERROR, DiagnosticMessage("Cannot resolve " + segments[i], loc));
+                    Diagnostic err(Diagnostic::Type::ERROR,
+                            DiagnosticMessage(segments[i] + " is not a module", loc));
                     tu.getErrorReport().addDiagnostic(err);
                     return Failed{};
                 }
@@ -868,6 +895,7 @@ private:
         return Module{mod};
     }
 
+    /// Try to resolve the name in the lexical scope of the module.
     std::optional<NameBinding*> resolveIdentInLexicalScope(ModuleInstance& parent, Ident ident, const NS ns) {
         /// search recusively in scopes
         ModuleInstance* mod = &parent;
@@ -906,6 +934,10 @@ private:
         return it->second.binding;
     }
 
+    NameBinding* import(NameBinding* const binding, Import* const imprt) {
+        return allocNameBinding(NameBindingKind{ResolvedImport{binding, imprt}}, imprt->loc);
+    }
+
     /// Allocate a fresh `NameBinding`
     NameBinding* allocNameBinding(NameBindingKind kind, SrcLocation loc) {
         nameBindings.emplace(NameBinding{kind, loc});
@@ -918,8 +950,8 @@ Res NameBinding::res() const {
         return std::get<Res>(kind);
     } else if (std::holds_alternative<Module>(kind)) {
         return Def{DefKind::Mod, std::get<Module>(kind).mod->def};
-    } else if (std::holds_alternative<Import*>(kind)) {
-        return Res{Err{}};
+    } else if (std::holds_alternative<ResolvedImport>(kind)) {
+        return std::get<ResolvedImport>(kind).binding->res();
     } else {
         throw std::runtime_error("res()");
     }
