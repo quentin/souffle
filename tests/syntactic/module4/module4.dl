@@ -1,0 +1,12 @@
+
+.module A {
+  .decl f(s:symbol)
+  .output f()
+  B.f("from A").
+}
+
+.module B {
+  .decl f(s:symbol)
+  .output f()
+  A.f("from B").
+}

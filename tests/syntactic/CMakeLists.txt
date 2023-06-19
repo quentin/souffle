@@ -67,9 +67,6 @@ positive_test(input_adt_names1)
 positive_test(input_adt_names2)
 positive_test(input_directive_rfc4180)
 positive_test(equivalent_types_in_negation)
-positive_test(module1)
-positive_test(module2)
-positive_test(module3)
 if (NOT MSVC)
 # does not pass with Visual Studio pre-processor because it preserves all whitespaces
 positive_test(whitespaces)
@@ -132,3 +129,7 @@ souffle_run_test(
   NO_PREPROCESSOR
   NEGATIVE
   )
+souffle_run_test(TEST_NAME module1 CATEGORY syntactic NO_PREPROCESSOR POSITIVE)
+souffle_run_test(TEST_NAME module2 CATEGORY syntactic NO_PREPROCESSOR POSITIVE)
+souffle_run_test(TEST_NAME module3 CATEGORY syntactic NO_PREPROCESSOR POSITIVE)
+souffle_run_test(TEST_NAME module4 CATEGORY syntactic NO_PREPROCESSOR POSITIVE)

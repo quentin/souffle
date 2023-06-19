@@ -23,13 +23,45 @@
 #include <variant>
 #include <vector>
 
+// helper to define rust-like structured enums
+#define struct_enum(Struct, Case)          \
+    struct Case;                           \
+    Struct(Case&& v) : _v(std::move(v)) {} \
+    Struct(const Case& v) : _v(v) {}       \
+    enum {}
+
+// helper to define rust-like structured enums
+#define struct_enum_body(Struct, Cases...)      \
+    Struct(Struct&& f) : _v(std::move(f._v)) {} \
+    Struct(const Struct& f) : _v(f._v) {}       \
+    ~Struct() = default;                        \
+                                                \
+    template <typename T>                       \
+    bool holds() const {                        \
+        return std::holds_alternative<T>(_v);   \
+    }                                           \
+                                                \
+    template <typename T>                       \
+    T& get() {                                  \
+        return std::get<T>(_v);                 \
+    }                                           \
+                                                \
+    template <typename T>                       \
+    const T& get() const {                      \
+        return std::get<T>(_v);                 \
+    }                                           \
+                                                \
+private:                                        \
+    std::variant<Cases> _v
+
 namespace souffle::ast::transform {
 
 namespace {
 
-SymbolTableImpl symtable{"number", "unsigned", "float", "symbol"};
-
 using souffle::span;
+
+/// Symbol table used to intern identifiers into `Ident`.
+SymbolTableImpl symtable{"number", "unsigned", "float", "symbol"};
 
 /// identifier of an AST node
 using NodeId = std::size_t;
@@ -37,12 +69,14 @@ using NodeId = std::size_t;
 /// identifier of an definition
 using DefId = std::size_t;
 
-#define DEBUG_IDENT
 /// an interned identifier
 struct Ident {
     /// index in the symbol table
     const RamDomain idx;
+
+#define DEBUG_IDENT
 #ifdef DEBUG_IDENT
+    /// for debug purpose, points to the string data
     const std::string_view _str;
 
     static Ident from(const std::string& str) {
@@ -99,8 +133,6 @@ struct BindingKey {
     }
 };
 
-struct ModuleInstance;
-
 /// the kind of definitions
 enum class DefKind {
     // ADT Branch
@@ -121,40 +153,43 @@ enum class DefKind {
 
 NS toNS(const DefKind kind);
 
-/// a definition
-struct Def {
-    DefKind kind;
-    DefId def;
-};
-
-/// A module
-struct Module {
-    ModuleInstance* mod;
-};
+struct ModuleInstance;
 
 /// the four primary types of souffle
 enum class PrimaryType { Number, Unsigned, Float, Symbol };
 
-/// a primary type
-struct PrimTy {
-    PrimaryType ty;
-};
-
-/// resolution error indicator
-struct Err {};
-
 /// a resolution
-struct Res : std::variant<Def, PrimTy, Err> {
-    using variant::variant;
+struct Res {
+    /// a definition
+    struct Def {
+        DefKind kind;
+        DefId def;
+    };
+
+    /// a primary type
+    struct PrimTy {
+        PrimaryType ty;
+    };
+
+    /// resolution error indicator
+    struct Err {};
 
     DefId toDefId() const {
-        if (std::holds_alternative<Def>(*this)) {
-            return std::get<Def>(*this).def;
+        if (this->holds<Def>()) {
+            return this->get<Def>().def;
         } else {
             throw std::runtime_error("toDefId()");
         }
     }
+
+    struct_enum(Res, Def);
+    struct_enum(Res, PrimTy);
+    struct_enum(Res, Err);
+    struct_enum_body(Res, Def, PrimTy, Err);
 };
+
+using Def = Res::Def;
+using PrimTy = Res::PrimTy;
 
 /// the import of a definition
 struct Import {
@@ -182,16 +217,30 @@ struct Import {
 
 struct NameBinding;
 
-struct ResolvedImport {
-    /// the binding the import resolves to
-    NameBinding* binding;
-
-    /// the original import
-    Import* imptr;
-};
-
 /// either a resolution or a module or a resolved import
-using NameBindingKind = std::variant<Res, Module, ResolvedImport>;
+struct NameBindingKind {
+    struct Res {
+        souffle::ast::transform::Res res;
+    };
+
+    /// A module
+    struct Module {
+        ModuleInstance* mod;
+    };
+
+    struct Import {
+        /// the binding the import resolves to
+        NameBinding* binding;
+
+        /// the original import
+        souffle::ast::transform::Import* imptr;
+    };
+
+    struct_enum(NameBindingKind, Res);
+    struct_enum(NameBindingKind, Module);
+    struct_enum(NameBindingKind, Import);
+    struct_enum_body(NameBindingKind, Res, Module, Import);
+};
 
 struct NameBinding {
     NameBindingKind kind;
@@ -201,10 +250,10 @@ struct NameBinding {
 
     /// return the module instance if the name binding
     std::optional<ModuleInstance*> mod() {
-        if (std::holds_alternative<Module>(kind)) {
-            return std::get<Module>(kind).mod;
-        } else if (std::holds_alternative<ResolvedImport>(kind)) {
-            return std::get<ResolvedImport>(kind).binding->mod();
+        if (kind.holds<NameBindingKind::Module>()) {
+            return kind.get<NameBindingKind::Module>().mod;
+        } else if (kind.holds<NameBindingKind::Import>()) {
+            return kind.get<NameBindingKind::Import>().binding->mod();
         } else {
             return std::nullopt;
         }
@@ -245,6 +294,62 @@ struct ModuleInstance {
 
     /// AST nodes in this module
     std::vector<NodeId> nodes;
+};
+
+/// Possibly partial result of a path resolution.
+struct PartialRes {
+    /// resolution of the resolved part of the path
+    Res baseRes;
+
+    /// number of yet unresolved segments of the path
+    uint32_t unresolvedSegments;
+
+    std::optional<Res> fullRes() const {
+        if (unresolvedSegments == 0) {
+            return baseRes;
+        } else {
+            return std::nullopt;
+        }
+    }
+
+    const Res& expectFullRes() const {
+        if (unresolvedSegments == 0) {
+            return baseRes;
+        } else {
+            throw "unexpected unresolved segments";
+        }
+    }
+};
+
+/// The result of resolving a path
+struct PathResult {
+    /// resolution of a path to a module
+    struct Module {
+        ModuleInstance* mod;
+    };
+
+    /// resolution of a path to a non-module
+    struct NonModule {
+        PartialRes res;
+    };
+
+    /// not yet able to resolve to a module or a non-module
+    struct Indeterminate {};
+
+    /// The failed resolution of a path
+    struct Failed {};
+
+    /// A path rooted at a component instance
+    struct ComponentPath {
+        QualifiedName qname;
+    };
+
+    struct_enum(PathResult, Module);
+    struct_enum(PathResult, NonModule);
+    struct_enum(PathResult, Indeterminate);
+    struct_enum(PathResult, Failed);
+    struct_enum(PathResult, ComponentPath);
+    struct_enum_body(PathResult, Module, NonModule, Indeterminate, Failed, ComponentPath);
 };
 
 /// Visit and possibly mutate paths (qualified name + namespace)
@@ -341,10 +446,14 @@ private:
 
 struct TransformerImpl {
     explicit TransformerImpl(TranslationUnit& t) : tu(t) {
-        numberNameBinding = allocNameBinding(Res{PrimTy{PrimaryType::Number}}, SrcLocation{});
-        unsignedNameBinding = allocNameBinding(Res{PrimTy{PrimaryType::Unsigned}}, SrcLocation{});
-        floatNameBinding = allocNameBinding(Res{PrimTy{PrimaryType::Float}}, SrcLocation{});
-        symbolNameBinding = allocNameBinding(Res{PrimTy{PrimaryType::Symbol}}, SrcLocation{});
+        numberNameBinding =
+                allocNameBinding(NameBindingKind::Res{Res{PrimTy{PrimaryType::Number}}}, SrcLocation{});
+        unsignedNameBinding =
+                allocNameBinding(NameBindingKind::Res{Res{PrimTy{PrimaryType::Unsigned}}}, SrcLocation{});
+        floatNameBinding =
+                allocNameBinding(NameBindingKind::Res{Res{PrimTy{PrimaryType::Float}}}, SrcLocation{});
+        symbolNameBinding =
+                allocNameBinding(NameBindingKind::Res{Res{PrimTy{PrimaryType::Symbol}}}, SrcLocation{});
     }
 
 public:
@@ -379,13 +488,14 @@ public:
     QualifiedName expandPath(
             const QualifiedName& qname, const NS ns, const SrcLocation& loc, ModuleInstance& parent) {
         PathResult pathRes = resolveQualifiedName(qname, ns, loc, parent);
-        if (std::holds_alternative<Res>(pathRes)) {
-            const Res& res = std::get<Res>(pathRes);
-            if (std::holds_alternative<Def>(res)) {
+        if (pathRes.holds<PathResult::NonModule>()) {
+            const PartialRes& partialRes = pathRes.get<PathResult::NonModule>().res;
+            const Res res = partialRes.expectFullRes();
+            if (res.holds<Def>()) {
                 const DefId def = res.toDefId();
                 return qualifiedNameMap.at(def);
-            } else if (std::holds_alternative<PrimTy>(res)) {
-                const PrimTy primTy = std::get<PrimTy>(res);
+            } else if (res.holds<PrimTy>()) {
+                const PrimTy primTy = res.get<PrimTy>();
                 switch (primTy.ty) {
                     case PrimaryType::Number: return "number";
                     case PrimaryType::Unsigned: return "unsigned";
@@ -396,12 +506,14 @@ public:
             } else {
                 throw std::runtime_error("unexpected Res");
             }
-        } else if (std::holds_alternative<Module>(pathRes)) {
-            return std::get<Module>(pathRes).mod->name;
-        } else if (std::holds_alternative<ComponentPath>(pathRes)) {
-            return std::get<ComponentPath>(pathRes).qname;
-        } else if (std::holds_alternative<Failed>(pathRes)) {
-            // error already emitted by `resolveQualifiedName`
+        } else if (pathRes.holds<PathResult::Module>()) {
+            return pathRes.get<PathResult::Module>().mod->name;
+        } else if (pathRes.holds<PathResult::ComponentPath>()) {
+            return pathRes.get<PathResult::ComponentPath>().qname;
+        } else if (pathRes.holds<PathResult::Failed>()) {
+            Diagnostic err(Diagnostic::Type::ERROR,
+                    DiagnosticMessage("Unresolved qualified name: " + qname.toString()));
+            tu.getErrorReport().addDiagnostic(err);
             return qname;
         } else {
             throw "unexpected";
@@ -484,8 +596,8 @@ private:
         const ModuleApplication* mapp = (*mod->application);
         const QualifiedName& functorName = mapp->getSource();
         PathResult pathRes = resolveQualifiedName(functorName, NS::Type, mapp->getSrcLoc(), *mod->parent);
-        if (std::holds_alternative<Module>(pathRes)) {
-            ModuleInstance* master = std::get<Module>(pathRes).mod;
+        if (pathRes.holds<PathResult::Module>()) {
+            ModuleInstance* master = pathRes.get<PathResult::Module>().mod;
             assert(!master->application);
             const NodeId id = defNodeMap.at(master->def);
             const Node* ast = nodeMap.at(id);
@@ -642,7 +754,7 @@ private:
 
                 if (const ModuleStruct* mstruct = as<ModuleStruct>(moduleDef)) {
                     ModuleInstance* mod = createModule(def, qname, &inst, std::nullopt);
-                    NameBinding* binding = allocNameBinding(Module{mod}, md->getSrcLoc());
+                    NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod}, md->getSrcLoc());
                     define(&inst, Ident::from(name), NS::Type, binding);
                     if (!md->hasParameterList()) {
                         // non-generative module
@@ -670,7 +782,7 @@ private:
                     ModuleInstance* mod = createModule(def, qname, &inst, mapp);
                     newModules.emplace_back(mod, nullptr);
 
-                    NameBinding* binding = allocNameBinding(Module{mod}, mapp->getSrcLoc());
+                    NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod}, mapp->getSrcLoc());
                     define(&inst, Ident::from(name), NS::Type, binding);
                 } else {
                     throw "unexpected";
@@ -678,17 +790,20 @@ private:
             } else if (const Relation* rel = as<Relation>(n)) {
                 // @todo only allow non-qualified names?
                 const DefId def = createDef(id);
-                NameBinding* binding = allocNameBinding(Res{Def{DefKind::Rel, def}}, rel->getSrcLoc());
+                NameBinding* binding =
+                        allocNameBinding(NameBindingKind::Res{Def{DefKind::Rel, def}}, rel->getSrcLoc());
                 define(&inst, Ident::from(rel->getQualifiedName().toString()), NS::Value, binding);
             } else if (const FunctorDeclaration* fd = as<FunctorDeclaration>(n)) {
                 const DefId def = createDef(id);
-                NameBinding* binding = allocNameBinding(Res{Def{DefKind::UFun, def}}, fd->getSrcLoc());
+                NameBinding* binding =
+                        allocNameBinding(NameBindingKind::Res{Def{DefKind::UFun, def}}, fd->getSrcLoc());
                 define(&inst, Ident::from(fd->getName()), NS::UFun, binding);
             } else if (const Type* ty = as<Type>(n)) {
                 // @todo only allow non-qualified names?
                 // @todo TypeAlias !!
                 const DefId def = createDef(id);
-                NameBinding* binding = allocNameBinding(Res{Def{DefKind::Type, def}}, ty->getSrcLoc());
+                NameBinding* binding =
+                        allocNameBinding(NameBindingKind::Res{Def{DefKind::Type, def}}, ty->getSrcLoc());
                 define(&inst, Ident::from(ty->getQualifiedName().toString()), NS::Type, binding);
 
                 if (const AlgebraicDataType* adt = as<AlgebraicDataType>(ty)) {
@@ -696,20 +811,22 @@ private:
                     for (const BranchType* br : adt->getBranches()) {
                         const NodeId brId = nextNodeId++;
                         const DefId brDef = createDef(brId);
-                        NameBinding* brBinding =
-                                allocNameBinding(Res{Def{DefKind::Branch, brDef}}, br->getSrcLoc());
+                        NameBinding* brBinding = allocNameBinding(
+                                NameBindingKind::Res{Def{DefKind::Branch, brDef}}, br->getSrcLoc());
                         // @todo only allow non-qualified names?
                         define(&inst, Ident::from(br->getBranchName().toString()), NS::Branch, brBinding);
                     }
                 }
             } else if (const Component* cm = as<ast::Component>(n)) {
                 const DefId def = createDef(id);
-                NameBinding* binding = allocNameBinding(Res{Def{DefKind::Comp, def}}, cm->getSrcLoc());
+                NameBinding* binding =
+                        allocNameBinding(NameBindingKind::Res{Def{DefKind::Comp, def}}, cm->getSrcLoc());
                 define(&inst, Ident::from(cm->getComponentType()->getName()), NS::Comp, binding);
 
             } else if (const ComponentInit* ci = as<ast::ComponentInit>(n)) {
                 const DefId def = createDef(id);
-                NameBinding* binding = allocNameBinding(Res{Def{DefKind::Init, def}}, ci->getSrcLoc());
+                NameBinding* binding =
+                        allocNameBinding(NameBindingKind::Res{Def{DefKind::Init, def}}, ci->getSrcLoc());
                 define(&inst, Ident::from(ci->getInstanceName()), NS::Type, binding);
             }
         }
@@ -731,10 +848,10 @@ private:
         if (mod == nullptr) {
             // try to resolve the source module
             PathResult res = resolvePath(imprt->modulePath, ns, imprt->loc, *imprt->parent);
-            if (std::holds_alternative<Module>(res)) {
-                mod = std::get<Module>(res).mod;
+            if (res.holds<PathResult::Module>()) {
+                mod = res.get<PathResult::Module>().mod;
                 *imprt->importedModule = mod;
-            } else if (std::holds_alternative<Failed>(res)) {
+            } else if (res.holds<PathResult::Indeterminate>()) {
                 // cannot resolve the module yet, maybe later
                 return false;
             } else {
@@ -818,17 +935,6 @@ private:
         }
     }
 
-    /// The failed resolution of a path
-    struct Failed {};
-
-    /// A path rooted at a component instance
-    struct ComponentPath {
-        QualifiedName qname;
-    };
-
-    /// The result of resolving a path
-    using PathResult = std::variant<Module, Res, ComponentPath, Failed>;
-
     void expandRelation(const DefId def, Relation* rel, ModuleInstance& parent) {
         // expand attribute types
         rel->setQualifiedName(qualifiedNameMap.at(def));
@@ -865,13 +971,13 @@ private:
     }
 
     QualifiedName expectFullQualifiedName(const PathResult& pathRes) {
-        if (std::holds_alternative<Res>(pathRes)) {
-            const Res& res = std::get<Res>(pathRes);
-            if (std::holds_alternative<Def>(res)) {
+        if (pathRes.holds<PathResult::NonModule>()) {
+            const Res& res = pathRes.get<PathResult::NonModule>().res.expectFullRes();
+            if (res.holds<Def>()) {
                 const DefId def = res.toDefId();
                 return qualifiedNameMap.at(def);
-            } else if (std::holds_alternative<PrimTy>(res)) {
-                const PrimTy primTy = std::get<PrimTy>(res);
+            } else if (res.holds<PrimTy>()) {
+                const PrimTy primTy = res.get<PrimTy>();
                 switch (primTy.ty) {
                     case PrimaryType::Number: return "number";
                     case PrimaryType::Unsigned: return "unsigned";
@@ -882,10 +988,10 @@ private:
             } else {
                 throw std::runtime_error("unexpected Res");
             }
-        } else if (std::holds_alternative<Module>(pathRes)) {
-            return std::get<Module>(pathRes).mod->name;
-        } else if (std::holds_alternative<ComponentPath>(pathRes)) {
-            return std::get<ComponentPath>(pathRes).qname;
+        } else if (pathRes.holds<PathResult::Module>()) {
+            return pathRes.get<PathResult::Module>().mod->name;
+        } else if (pathRes.holds<PathResult::ComponentPath>()) {
+            return pathRes.get<PathResult::ComponentPath>().qname;
         } else {
             throw std::runtime_error("unresolved");
         }
@@ -897,12 +1003,18 @@ private:
         return resolvePath(qname.getQualifiers(), ns, loc, parent);
     }
 
+    /// Resolve a path.
+    ///
+    /// The segments of the path are arranged in this form: (module-segment)* (non-module-segment)*
+    /// Module segments comes before non-module segments.
+    ///
+    /// This function try to resolve the module segments and the first non-module segment.
     PathResult resolvePath(
             span<const std::string> segments, const NS ns, const SrcLocation& loc, ModuleInstance& parent) {
         if (segments.empty()) {
             Diagnostic err(Diagnostic::Type::ERROR, DiagnosticMessage("empty path", loc));
             tu.getErrorReport().addDiagnostic(err);
-            return Failed{};
+            return PathResult::Failed{};
         }
 
         ModuleInstance* mod = nullptr;
@@ -921,30 +1033,22 @@ private:
             }();
 
             if (!binding) {
-                Diagnostic err(
-                        Diagnostic::Type::ERROR, DiagnosticMessage("Cannot resolve " + segments[i], loc));
-                tu.getErrorReport().addDiagnostic(err);
-                return Failed{};
+                return PathResult::Indeterminate{};
             } else if (std::optional<ModuleInstance*> nextMod = (*binding)->mod()) {
                 mod = *nextMod;
             } else {
                 Res res = (*binding)->res();
-                if (isLast) {
-                    return res;
-                } else if (i == 0 && std::holds_alternative<Def>(res) &&
-                           std::get<Def>(res).kind == DefKind::Init) {
+                if (i == 0 && res.holds<Def>() && res.get<Def>().kind == DefKind::Init) {
                     // components are not mixed with modules
-                    return ComponentPath{QualifiedName(segments)};
+                    return PathResult::ComponentPath{QualifiedName(segments)};
                 } else {
-                    Diagnostic err(Diagnostic::Type::ERROR,
-                            DiagnosticMessage(segments[i] + " is not a module", loc));
-                    tu.getErrorReport().addDiagnostic(err);
-                    return Failed{};
+                    return PathResult::NonModule{
+                            PartialRes{res, static_cast<uint32_t>(segments.size() - i - 1)}};
                 }
             }
         }
 
-        return Module{mod};
+        return PathResult::Module{mod};
     }
 
     /// Try to resolve the name in the lexical scope of the module.
@@ -986,8 +1090,8 @@ private:
         return it->second.binding;
     }
 
-    NameBinding* import(NameBinding* const binding, Import* const imprt) {
-        return allocNameBinding(NameBindingKind{ResolvedImport{binding, imprt}}, imprt->loc);
+    NameBinding* import(NameBinding* binding, Import* imprt) {
+        return allocNameBinding(NameBindingKind::Import{binding, imprt}, imprt->loc);
     }
 
     /// Allocate a fresh `NameBinding`
@@ -998,12 +1102,12 @@ private:
 };
 
 Res NameBinding::res() const {
-    if (std::holds_alternative<Res>(kind)) {
-        return std::get<Res>(kind);
-    } else if (std::holds_alternative<Module>(kind)) {
-        return Def{DefKind::Mod, std::get<Module>(kind).mod->def};
-    } else if (std::holds_alternative<ResolvedImport>(kind)) {
-        return std::get<ResolvedImport>(kind).binding->res();
+    if (kind.holds<NameBindingKind::Res>()) {
+        return kind.get<NameBindingKind::Res>().res;
+    } else if (kind.holds<NameBindingKind::Module>()) {
+        return Def{DefKind::Mod, kind.get<NameBindingKind::Module>().mod->def};
+    } else if (kind.holds<NameBindingKind::Import>()) {
+        return kind.get<NameBindingKind::Import>().binding->res();
     } else {
         throw std::runtime_error("res()");
     }
