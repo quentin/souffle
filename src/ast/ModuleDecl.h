@@ -29,7 +29,7 @@ class ModuleStruct : public ModuleDef {
 public:
     explicit ModuleStruct(Items items, SrcLocation loc = {});
 
-    Items& getItems();
+    const Items& getItems() const;
 
     ModuleStruct& addItem(Own<Node> item);
 
@@ -127,7 +127,7 @@ public:
 
     std::optional<std::vector<QualifiedName>>& getParameterList();
 
-    ModuleDef& getDefinition();
+    const ModuleDef* getDefinition() const;
 
 protected:
     void print(std::ostream& os) const override;

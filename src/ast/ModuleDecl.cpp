@@ -43,7 +43,7 @@ bool ModuleApplication::equal(const Node& node) const {
 
 ModuleStruct::ModuleStruct(Items itms, SrcLocation loc) : ModuleDef(loc), items(std::move(itms)) {}
 
-Items& ModuleStruct::getItems() {
+const Items& ModuleStruct::getItems() const {
     return items;
 }
 
@@ -73,7 +73,7 @@ void ModuleStruct::apply(const NodeMapper& mapper) {
 }
 
 bool ModuleStruct::equal(const Node& node) const {
-    const auto& other = asAssert<ModuleStruct>(node);
+    [[maybe_unused]] const auto& other = asAssert<ModuleStruct>(node);
     throw "TODO";
 }
 
@@ -97,7 +97,7 @@ void ModuleAlias::print(std::ostream& os) const {
 }
 
 bool ModuleAlias::equal(const Node& node) const {
-    const auto& other = asAssert<ModuleAlias>(node);
+    [[maybe_unused]] const auto& other = asAssert<ModuleAlias>(node);
     throw "TODO";
 }
 
@@ -113,8 +113,8 @@ const std::string& ModuleDecl::getName() const {
     return name;
 }
 
-ModuleDef& ModuleDecl::getDefinition() {
-    return *def;
+const ModuleDef* ModuleDecl::getDefinition() const {
+    return def.get();
 }
 
 std::optional<std::vector<QualifiedName>>& ModuleDecl::getParameterList() {

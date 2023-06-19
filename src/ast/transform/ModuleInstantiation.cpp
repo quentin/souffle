@@ -203,9 +203,11 @@ struct NameBinding {
     std::optional<ModuleInstance*> mod() {
         if (std::holds_alternative<Module>(kind)) {
             return std::get<Module>(kind).mod;
+        } else if (std::holds_alternative<ResolvedImport>(kind)) {
+            return std::get<ResolvedImport>(kind).binding->mod();
+        } else {
+            return std::nullopt;
         }
-        // @todo Import ?
-        return std::nullopt;
     }
 };
 
@@ -234,23 +236,15 @@ struct ModuleInstance {
     /// parent module instance, may be nullptr for the top module
     ModuleInstance* parent;
 
+    /// the AST module application node that defines this module
+    /// if any.
+    std::optional<const ModuleApplication*> application;
+
     /// bindings from keys to resolution in this module instance
     std::map<BindingKey, NameResolution> resolutions;
 
     /// AST nodes in this module
     std::vector<NodeId> nodes;
-};
-
-/// A pending module
-struct PendingModule {
-    /// the parent of the module
-    ModuleInstance* parent;
-
-    /// the instance that have been booked for this module
-    ModuleInstance* instance;
-
-    /// the AST module application node that defines this module
-    ModuleApplication* application;
 };
 
 /// Visit and possibly mutate paths (qualified name + namespace)
@@ -355,8 +349,29 @@ struct TransformerImpl {
 
 public:
     bool transform() {
-        collectDefinitions();
-        resolveImports();
+        // create a module for the program that contains top-level items
+        Program& program = tu.getProgram();
+        ModuleInstance* top = createModule(createDef(0), QualifiedName(), nullptr, std::nullopt);
+        pendingModules.emplace_back(top, &program.getTopModule()->getItems());
+
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            changed |= collectDefinitions();
+            changed |= resolveImports();
+        }
+
+        if (!unresolvedImports.empty()) {
+            Diagnostic err(
+                    Diagnostic::Type::ERROR, DiagnosticMessage("Some definition could not be resolved"));
+            tu.getErrorReport().addDiagnostic(err);
+        }
+        if (!pendingModules.empty()) {
+            Diagnostic err(
+                    Diagnostic::Type::ERROR, DiagnosticMessage("Some modules could not be instantiated"));
+            tu.getErrorReport().addDiagnostic(err);
+        }
+
         expandModules();
         return true;
     }
@@ -408,9 +423,6 @@ private:
     /// mapping from an AST node identifier to its definition identifier
     std::map<NodeId, DefId> nodeDefMap;
 
-    /// store module instances
-    std::deque<ModuleInstance> moduleInstances;
-
     /// mapping the definition identifier of a module to the module instance
     std::map<DefId, ModuleInstance*> moduleInstanceMap;
 
@@ -418,13 +430,16 @@ private:
     std::map<DefId, QualifiedName> qualifiedNameMap;
 
     /// mapping from a node identifier to an AST node
-    std::map<NodeId, Node*> nodeMap;
+    std::map<NodeId, const Node*> nodeMap;
 
     /// imports not yet resolved
     std::list<Import*> unresolvedImports;
 
-    /// module applications not yet performed
-    std::list<PendingModule> pendingModules;
+    /// module not yet instantiated
+    std::list<std::pair<ModuleInstance*, const Items*>> pendingModules;
+
+    /// all the module instances
+    std::deque<ModuleInstance> moduleInstances;
 
     /// all the imports
     std::deque<Import> imports;
@@ -438,45 +453,74 @@ private:
     NameBinding* symbolNameBinding = nullptr;
 
     /// Recursively collect definitions and instantiate modules
-    void collectDefinitions() {
-        Program& program = tu.getProgram();
-
-        // create a module for the program that contains top-level items
-        ModuleInstance* top = createModule(createDef(0), QualifiedName(), nullptr);
+    bool collectDefinitions() {
+        bool changed = false;
 
         // collect definitions and more module instances
-        std::list<std::pair<ModuleInstance*, Items*>> modules;
-        modules.emplace_back(top, &program.getTopModule()->getItems());
+        std::list<std::pair<ModuleInstance*, const Items*>> modules = std::move(pendingModules);
+
         while (!modules.empty()) {
-            std::pair<ModuleInstance*, Items*> task = modules.front();
+            auto [moduleInstance, items] = modules.front();
             modules.pop_front();
-            auto [newModules, newPending] = collectDefinitions(*task.first, *task.second);
-            modules.splice(modules.end(), newModules);
-            pendingModules.splice(pendingModules.end(), newPending);
+
+            if (items == nullptr && moduleInstance->application != nullptr) {
+                // try to resolve module application
+                auto [resolved, newPending] = resolveApplication(moduleInstance);
+                pendingModules.splice(pendingModules.end(), newPending);
+                changed |= resolved;
+            } else {
+                // collect definitions
+                auto newPending = collectDefinitions(*moduleInstance, *items);
+                pendingModules.splice(pendingModules.end(), newPending);
+                changed = true;
+            }
         }
+
+        return changed;
+    }
+
+    std::pair<bool, std::list<std::pair<ModuleInstance*, const Items*>>> resolveApplication(
+            ModuleInstance* mod) {
+        const ModuleApplication* mapp = (*mod->application);
+        const QualifiedName& functorName = mapp->getSource();
+        PathResult pathRes = resolveQualifiedName(functorName, NS::Type, mapp->getSrcLoc(), *mod->parent);
+        if (std::holds_alternative<Module>(pathRes)) {
+            ModuleInstance* master = std::get<Module>(pathRes).mod;
+            assert(!master->application);
+            const NodeId id = defNodeMap.at(master->def);
+            const Node* ast = nodeMap.at(id);
+            if (const ModuleDecl* mdecl = as<ModuleDecl>(ast)) {
+                assert(mdecl->hasParameterList());
+                if (const ModuleStruct* mstruct = as<ModuleStruct>(mdecl->getDefinition())) {
+                    return {true, {{mod, &mstruct->getItems()}}};
+                }
+            } else {
+                throw "TODO";
+            }
+        }
+        return {false, {{mod, nullptr}}};
     }
 
     /// Resolve the imported definitions
-    void resolveImports() {
-        bool resolvedSome = true;
+    bool resolveImports() {
+        bool resolvedSome = false;
+
         // iterate as long as progress is made
-        while (resolvedSome) {
-            resolvedSome = false;
+        bool progressed = true;
+        while (progressed) {
+            progressed = false;
             auto it = unresolvedImports.begin();
             while (it != unresolvedImports.end()) {
                 if (resolveImport(*it)) {
                     resolvedSome = true;
+                    progressed = true;
                     it = unresolvedImports.erase(it);
                 } else {
                     ++it;
                 }
             }
         }
-        if (!unresolvedImports.empty()) {
-            Diagnostic err(
-                    Diagnostic::Type::ERROR, DiagnosticMessage("Some definition could not be resolved"));
-            tu.getErrorReport().addDiagnostic(err);
-        }
+        return resolvedSome;
     }
 
     /// Flatten the modules into a program
@@ -552,9 +596,10 @@ private:
     }
 
     /// Create a new module
-    ModuleInstance* createModule(const DefId def, QualifiedName name, ModuleInstance* parent) {
+    ModuleInstance* createModule(const DefId def, QualifiedName name, ModuleInstance* parent,
+            std::optional<const ModuleApplication*> application) {
         ModuleInstance& inst = moduleInstances.emplace_back(
-                ModuleInstance{def, name, parent, /*resolutions*/ {}, /*nodes*/ {}});
+                ModuleInstance{def, name, parent, application, /*resolutions*/ {}, /*nodes*/ {}});
         moduleInstanceMap.emplace(inst.def, &inst);
         return &inst;
     }
@@ -577,31 +622,34 @@ private:
     /// Collect definitions of a module
     ///
     /// Return the list of new module instances found in the current module.
-    std::tuple<std::list<std::pair<ModuleInstance*, Items*>>, std::list<PendingModule>> collectDefinitions(
-            ModuleInstance& inst, Items& items) {
-        std::list<std::pair<ModuleInstance*, Items*>> newModules;
-        std::list<PendingModule> newPendingModules;
+    std::list<std::pair<ModuleInstance*, const Items*>> collectDefinitions(
+            ModuleInstance& inst, const Items& items) {
+        std::list<std::pair<ModuleInstance*, const Items*>> newModules;
 
-        for (Own<Node>& item : items) {
+        for (const Own<Node>& item : items) {
             const NodeId id = nextNodeId++;
             inst.nodes.emplace_back(id);
 
-            Node* n = item.get();
+            const Node* n = item.get();
             nodeMap.emplace(id, n);
 
-            if (ModuleDecl* md = as<ModuleDecl>(n)) {
+            if (const ModuleDecl* md = as<ModuleDecl>(n)) {
                 const std::string name = md->getName();
                 ast::QualifiedName qname(inst.name);
                 qname.append(name);
                 const DefId def = createDef(id);
-                ModuleDef& moduleDef = md->getDefinition();
-                if (ModuleStruct* mstruct = as<ModuleStruct>(moduleDef)) {
-                    ModuleInstance* mod = createModule(def, qname, &inst);
-                    newModules.emplace_back(mod, &mstruct->getItems());
+                const ModuleDef* moduleDef = md->getDefinition();
+
+                if (const ModuleStruct* mstruct = as<ModuleStruct>(moduleDef)) {
+                    ModuleInstance* mod = createModule(def, qname, &inst, std::nullopt);
                     NameBinding* binding = allocNameBinding(Module{mod}, md->getSrcLoc());
                     define(&inst, Ident::from(name), NS::Type, binding);
+                    if (!md->hasParameterList()) {
+                        // non-generative module
+                        newModules.emplace_back(mod, &mstruct->getItems());
+                    }
 
-                } else if (ModuleAlias* malias = as<ModuleAlias>(moduleDef)) {
+                } else if (const ModuleAlias* malias = as<ModuleAlias>(moduleDef)) {
                     const Ident source = Ident::from(malias->getSource().getQualifiers().front());
                     const Ident target = Ident::from(name);
                     std::optional<ModuleInstance*> importedModule;
@@ -617,31 +665,35 @@ private:
                     addImport(
                             inst, source, target, DefKind::Mod, modPath, importedModule, malias->getSrcLoc());
 
-                } else if (ModuleApplication* mapp = as<ModuleApplication>(moduleDef)) {
-                    newPendingModules.emplace_back(
-                            PendingModule{&inst, createModule(createDef(id), qname, &inst), mapp});
+                } else if (const ModuleApplication* mapp = as<ModuleApplication>(moduleDef)) {
+                    // book a module instance for the resulting module
+                    ModuleInstance* mod = createModule(def, qname, &inst, mapp);
+                    newModules.emplace_back(mod, nullptr);
+
+                    NameBinding* binding = allocNameBinding(Module{mod}, mapp->getSrcLoc());
+                    define(&inst, Ident::from(name), NS::Type, binding);
                 } else {
                     throw "unexpected";
                 }
-            } else if (Relation* rel = as<Relation>(n)) {
+            } else if (const Relation* rel = as<Relation>(n)) {
                 // @todo only allow non-qualified names?
                 const DefId def = createDef(id);
                 NameBinding* binding = allocNameBinding(Res{Def{DefKind::Rel, def}}, rel->getSrcLoc());
                 define(&inst, Ident::from(rel->getQualifiedName().toString()), NS::Value, binding);
-            } else if (FunctorDeclaration* fd = as<FunctorDeclaration>(n)) {
+            } else if (const FunctorDeclaration* fd = as<FunctorDeclaration>(n)) {
                 const DefId def = createDef(id);
                 NameBinding* binding = allocNameBinding(Res{Def{DefKind::UFun, def}}, fd->getSrcLoc());
                 define(&inst, Ident::from(fd->getName()), NS::UFun, binding);
-            } else if (Type* ty = as<Type>(n)) {
+            } else if (const Type* ty = as<Type>(n)) {
                 // @todo only allow non-qualified names?
                 // @todo TypeAlias !!
                 const DefId def = createDef(id);
                 NameBinding* binding = allocNameBinding(Res{Def{DefKind::Type, def}}, ty->getSrcLoc());
                 define(&inst, Ident::from(ty->getQualifiedName().toString()), NS::Type, binding);
 
-                if (AlgebraicDataType* adt = as<AlgebraicDataType>(ty)) {
+                if (const AlgebraicDataType* adt = as<AlgebraicDataType>(ty)) {
                     // define each branch in the Value namespace
-                    for (BranchType* br : adt->getBranches()) {
+                    for (const BranchType* br : adt->getBranches()) {
                         const NodeId brId = nextNodeId++;
                         const DefId brDef = createDef(brId);
                         NameBinding* brBinding =
@@ -650,19 +702,19 @@ private:
                         define(&inst, Ident::from(br->getBranchName().toString()), NS::Branch, brBinding);
                     }
                 }
-            } else if (Component* cm = as<ast::Component>(n)) {
+            } else if (const Component* cm = as<ast::Component>(n)) {
                 const DefId def = createDef(id);
                 NameBinding* binding = allocNameBinding(Res{Def{DefKind::Comp, def}}, cm->getSrcLoc());
                 define(&inst, Ident::from(cm->getComponentType()->getName()), NS::Comp, binding);
 
-            } else if (ComponentInit* ci = as<ast::ComponentInit>(n)) {
+            } else if (const ComponentInit* ci = as<ast::ComponentInit>(n)) {
                 const DefId def = createDef(id);
                 NameBinding* binding = allocNameBinding(Res{Def{DefKind::Init, def}}, ci->getSrcLoc());
                 define(&inst, Ident::from(ci->getInstanceName()), NS::Type, binding);
             }
         }
 
-        return {newModules, newPendingModules};
+        return newModules;
     }
 
     /// Try to resolve the given import.
@@ -714,48 +766,48 @@ private:
     void expandModule(ModuleInstance& inst) {
         Program& program = tu.getProgram();
         for (const NodeId id : inst.nodes) {
-            Node* item = nodeMap.at(id);
+            const Node* item = nodeMap.at(id);
             if (isA<ModuleDecl>(item)) {
                 // nothing to do for module declaration they don't exist in the
                 // program after the expansion.
-            } else if (Relation* n = as<Relation>(item)) {
+            } else if (const Relation* n = as<Relation>(item)) {
                 const DefId def = nodeDefMap.at(id);
                 Own<Relation> rel = clone(n);
                 expandRelation(def, rel.get(), inst);
                 program.addRelation(std::move(rel));
 
-            } else if (Type* n = as<Type>(item)) {
+            } else if (const Type* n = as<Type>(item)) {
                 const DefId def = nodeDefMap.at(id);
                 Own<Type> ty = clone(n);
                 expandType(def, ty.get(), inst);
                 program.addType(std::move(ty));
 
-            } else if (Directive* n = as<Directive>(item)) {
+            } else if (const Directive* n = as<Directive>(item)) {
                 Own<Directive> dir = clone(n);
                 expandDirective(*dir, inst);
                 program.addDirective(std::move(dir));
 
-            } else if (Clause* n = as<Clause>(item)) {
+            } else if (const Clause* n = as<Clause>(item)) {
                 Own<Clause> cl = clone(n);
                 expandClause(*cl, inst);
                 program.addClause(std::move(cl));
 
-            } else if (Component* n = as<Component>(item)) {
+            } else if (const Component* n = as<Component>(item)) {
                 // we do not apply expansion to components
                 Own<Component> cmp = clone(n);
                 program.addComponent(std::move(cmp));
 
-            } else if (ComponentInit* n = as<ComponentInit>(item)) {
+            } else if (const ComponentInit* n = as<ComponentInit>(item)) {
                 // we do not apply expansion to components init
                 Own<ComponentInit> ini = clone(n);
                 program.addInstantiation(std::move(ini));
 
-            } else if (Pragma* n = as<Pragma>(item)) {
+            } else if (const Pragma* n = as<Pragma>(item)) {
                 // TODO
                 Own<Pragma> pr = clone(n);
                 program.addPragma(std::move(pr));
 
-            } else if (FunctorDeclaration* n = as<FunctorDeclaration>(item)) {
+            } else if (const FunctorDeclaration* n = as<FunctorDeclaration>(item)) {
                 Own<FunctorDeclaration> fd = clone(n);
                 expandFunctorDeclaration(*fd, inst);
                 program.addFunctorDeclaration(std::move(fd));
