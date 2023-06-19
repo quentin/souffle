@@ -1,0 +1,22 @@
+
+// F4 is an alias of F3 that is an alias of F2 that is an alias of F1
+.module F4 = F3
+
+.module F1 {
+  .decl f(s:symbol)
+}
+
+// F3 is an alias of F2 that is an alias of F1
+.module F3 = F2
+// F2 that is an alias of F1
+.module F2 = F1
+
+// using alias F3 to output F1.f
+.output F3.f()
+
+F1.f("F1").
+
+// using aliases
+F2.f("F2").
+F3.f("F3").
+F4.f("F4").

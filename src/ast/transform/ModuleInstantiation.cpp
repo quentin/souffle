@@ -31,31 +31,52 @@
     enum {}
 
 // helper to define rust-like structured enums
-#define struct_enum_body(Struct, Cases...)      \
-    Struct(Struct&& f) : _v(std::move(f._v)) {} \
-    Struct(const Struct& f) : _v(f._v) {}       \
-    ~Struct() = default;                        \
-                                                \
-    template <typename T>                       \
-    bool holds() const {                        \
-        return std::holds_alternative<T>(_v);   \
-    }                                           \
-                                                \
-    template <typename T>                       \
-    T& get() {                                  \
-        return std::get<T>(_v);                 \
-    }                                           \
-                                                \
-    template <typename T>                       \
-    const T& get() const {                      \
-        return std::get<T>(_v);                 \
-    }                                           \
-                                                \
-private:                                        \
+//
+// ```c++
+// struct Foo {
+//    struct Bar {
+//    };
+//    struct Baz {
+//    };
+//    struct_enum(Foo, Bar);
+//    struct_enum(Foo, Baz);
+//    struct_enum_body(Foo, Bar, Baz);
+// };
+// ```
+#define struct_enum_body(Struct, Cases...)       \
+    Struct(Struct&& f) : _v(std::move(f._v)) {}  \
+    Struct(const Struct& f) : _v(f._v) {}        \
+    ~Struct() = default;                         \
+                                                 \
+    template <typename T>                        \
+    bool holds() const {                         \
+        return std::holds_alternative<T>(_v);    \
+    }                                            \
+                                                 \
+    template <typename T>                        \
+    T& get() {                                   \
+        return std::get<T>(_v);                  \
+    }                                            \
+                                                 \
+    template <typename T>                        \
+    const T& get() const {                       \
+        return std::get<T>(_v);                  \
+    }                                            \
+                                                 \
+    template <typename T>                        \
+    std::add_pointer_t<const T> get_if() const { \
+        return std::get_if<T>(&_v);              \
+    }                                            \
+                                                 \
+    template <typename T>                        \
+    std::add_pointer_t<T> get_if() {             \
+        return std::get_if<T>(&_v);              \
+    }                                            \
+                                                 \
+private:                                         \
     std::variant<Cases> _v
 
 namespace souffle::ast::transform {
-
 namespace {
 
 using souffle::span;
@@ -250,10 +271,10 @@ struct NameBinding {
 
     /// return the module instance if the name binding
     std::optional<ModuleInstance*> mod() {
-        if (kind.holds<NameBindingKind::Module>()) {
-            return kind.get<NameBindingKind::Module>().mod;
-        } else if (kind.holds<NameBindingKind::Import>()) {
-            return kind.get<NameBindingKind::Import>().binding->mod();
+        if (NameBindingKind::Module* m = kind.get_if<NameBindingKind::Module>()) {
+            return m->mod;
+        } else if (NameBindingKind::Import* i = kind.get_if<NameBindingKind::Import>()) {
+            return i->binding->mod();
         } else {
             return std::nullopt;
         }
