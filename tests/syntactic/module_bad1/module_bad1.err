@@ -1,0 +1,4 @@
+Error: Cannot find module G in file module_bad1.dl at line 3
+.module F = G
+----------^---
+1 errors generated, evaluation aborted

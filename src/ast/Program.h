@@ -214,8 +214,8 @@ public:
     /** Add component instantiation */
     void addInstantiation(Own<ComponentInit> instantiation);
 
-    /// Add a module declaration
-    void addModule(Own<ModuleDecl> mod);
+    /// Add a module definition
+    void addModule(Own<ModuleDefinition> mod);
 
     /** Return components */
     std::vector<Component*> getComponents() const;
@@ -226,9 +226,9 @@ public:
     /** Remove components and components' instantiations */
     void clearComponents();
 
-    ModuleStruct* getTopModule();
+    Items& getItems();
 
-    void setTopModule(Own<ModuleStruct>);
+    void setItems(Items);
 
     void apply(const NodeMapper& map) override;
 
@@ -263,8 +263,8 @@ private:
     /** Pragmas */
     VecOwn<Pragma> pragmas;
 
-    /// The program module
-    Own<ModuleStruct> topModule;
+    /// The program items before flattening
+    Items items;
 
 #ifndef NDEBUG
     // SANCHECK - used to assert that the set of clauses isn't mutated mid visit

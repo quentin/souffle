@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <iterator>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -176,7 +177,7 @@ detail::joined_sequence<Iter, Printer> join(const Iter& a, const Iter& b, std::s
  *
  * For use cases see the test case {util_test.cpp}.
  */
-template <typename Iter, typename T = typename Iter::value_type>
+template <typename Iter, typename T = typename std::iterator_traits<Iter>::value_type>
 detail::joined_sequence<Iter, detail::print<id<T>>> join(
         const Iter& a, const Iter& b, const std::string& sep = ",") {
     return join(a, b, sep, detail::print<id<T>>());

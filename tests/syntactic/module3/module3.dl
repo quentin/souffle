@@ -1,6 +1,6 @@
 
 /// functor module: () -> module
-.module Foo () {
+.module Foo = functor () -> {
   .decl f(n:number)
   .output f()
 }

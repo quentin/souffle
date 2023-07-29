@@ -147,11 +147,11 @@ WS [ \t\r\v\f]
 ".override"/{WS}                      { return yy::parser::make_OVERRIDE(yylloc); }
 ".pragma"/{WS}                        { return yy::parser::make_PRAGMA(yylloc); }
 ".plan"/{WS}                          { return yy::parser::make_PLAN(yylloc); }
-".include"                            {
+".include"/{WS}                       {
                                         yyinfo.LastIncludeDirectiveLoc = yylloc;
                                         BEGIN(INCLUDE);
                                       }
-".once"                               {
+".once"/{WS}                          {
                                         if (!driver.canEnterOnce(yylloc)) {
                                           yypop_buffer_state(yyscanner);
                                           yyinfo.pop();
@@ -160,10 +160,10 @@ WS [ \t\r\v\f]
                                           }
                                         }
                                       }
-"debug_delta"                         { return yy::parser::make_DEBUG_DELTA(yylloc); }
-".module"                             {
+".module"/{WS}                        {
                                         return yy::parser::make_MODULE(yylloc);
                                       }
+"debug_delta"                         { return yy::parser::make_DEBUG_DELTA(yylloc); }
 "autoinc"                             { return yy::parser::make_AUTOINC(yylloc); }
 "band"                                { return yy::parser::make_BW_AND(yylloc); }
 "bor"                                 { return yy::parser::make_BW_OR(yylloc); }
@@ -213,6 +213,7 @@ WS [ \t\r\v\f]
 "to_unsigned"                         { return yy::parser::make_TOUNSIGNED(yylloc); }
 "choice-domain"                       { return yy::parser::make_CHOICEDOMAIN(yylloc); }
 "recursive_iteration_cnt"             { return yy::parser::make_ITERATION(yylloc); }
+"functor"                             { return yy::parser::make_MODULE_FUNCTOR(yylloc); }
 "__FILE__"                            {
                                         return yy::parser::make_STRING(yylloc.file->Reported, yylloc);
                                       }
@@ -265,6 +266,7 @@ WS [ \t\r\v\f]
 "<"                                   { return yy::parser::make_LT(yylloc); }
 ">"                                   { return yy::parser::make_GT(yylloc); }
 ":-"                                  { return yy::parser::make_IF(yylloc); }
+"->"                                  { return yy::parser::make_ARROW(yylloc); }
 [0-9]+"."[0-9]+"."[0-9]+"."[0-9]+     {
                                         try {
                                         char *token = std::strtok(yytext, ".");

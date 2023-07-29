@@ -1,0 +1,4 @@
+
+// cannot find G
+.module F = G
+

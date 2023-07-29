@@ -19,7 +19,6 @@
 #include <list>
 #include <map>
 #include <optional>
-#include <queue>
 #include <variant>
 #include <vector>
 
@@ -89,6 +88,9 @@ using NodeId = std::size_t;
 
 /// identifier of an definition
 using DefId = std::size_t;
+
+/// identifier of a module or functor
+using ModId = std::size_t;
 
 /// an interned identifier
 struct Ident {
@@ -174,6 +176,8 @@ enum class DefKind {
 
 NS toNS(const DefKind kind);
 
+std::string describe(const DefKind kind);
+
 struct ModuleInstance;
 
 /// the four primary types of souffle
@@ -236,6 +240,75 @@ struct Import {
     SrcLocation loc;
 };
 
+/// The progression of something
+struct Progress {
+    struct Stalled {};
+    struct Progressed {};
+    struct Completed {};
+    struct Error {
+        std::string message;
+    };
+
+    bool determinate() const {
+        return holds<Completed>() || holds<Error>();
+    }
+
+    bool indeterminate() const {
+        return holds<Stalled>() || holds<Progressed>();
+    }
+
+    bool stalled() const {
+        return holds<Stalled>();
+    }
+
+    struct_enum(Progress, Stalled);
+    struct_enum(Progress, Progressed);
+    struct_enum(Progress, Completed);
+    struct_enum(Progress, Error);
+    struct_enum_body(Progress, Stalled, Progressed, Completed, Error);
+};
+
+struct ModuleValue {
+    struct Instance {
+        ModuleInstance* mod;
+    };
+    struct Struct {
+        std::vector<NodeId> nodes;
+    };
+    struct Functor {
+        Ident arg;
+        ModuleValue* receiver;
+    };
+    struct Generator {
+        ModuleValue* receiver;
+    };
+    struct_enum(ModuleValue, Instance);
+    struct_enum(ModuleValue, Struct);
+    struct_enum(ModuleValue, Functor);
+    struct_enum(ModuleValue, Generator);
+    struct_enum_body(ModuleValue, Instance, Struct, Functor, Generator);
+};
+
+struct ModuleValueWithBindings {
+    ModuleValue value;
+    std::map<Ident, ModuleValue> bindings;
+};
+
+/// The evaluation of a module expression
+struct ModuleExprEval {
+    ModuleInstance* parent;
+
+    Ident target;
+
+    const souffle::ast::ModuleExpr* root;
+
+    std::vector<const souffle::ast::ModuleExpr*> postfix;
+
+    std::stack<ModuleValue> values;
+
+    std::size_t nextOp;
+};
+
 struct NameBinding;
 
 /// either a resolution or a module or a resolved import
@@ -244,9 +317,13 @@ struct NameBindingKind {
         souffle::ast::transform::Res res;
     };
 
-    /// A module
+    /// A module expression
     struct Module {
+        /// the module the expression resolves to
         ModuleInstance* mod;
+
+        /// the original module expression
+        const souffle::ast::ModuleExpr* expr;
     };
 
     struct Import {
@@ -263,6 +340,7 @@ struct NameBindingKind {
     struct_enum_body(NameBindingKind, Res, Module, Import);
 };
 
+/// A binding.
 struct NameBinding {
     NameBindingKind kind;
     SrcLocation loc;
@@ -281,10 +359,13 @@ struct NameBinding {
     }
 };
 
-/// The resolution of a name binding.
+/// The resolution of a name binding, possibly not yet resolved.
 struct NameResolution {
     /// imports that may resolve this name
     std::list<Import*> imports;
+
+    /// module expression evaluation that may resolve this name
+    std::optional<ModuleExprEval*> moduleExprEval;
 
     /// resolved binding when available
     std::optional<NameBinding*> binding;
@@ -300,21 +381,18 @@ struct ModuleInstance {
     /// identifier of this module instance
     DefId def;
 
-    /// qualified name of this module instance
-    ast::QualifiedName name;
-
-    /// parent module instance, may be nullptr for the top module
+    /// lexicographic parent module instance, may be nullptr for the top module
     ModuleInstance* parent;
-
-    /// the AST module application node that defines this module
-    /// if any.
-    std::optional<const ModuleApplication*> application;
 
     /// bindings from keys to resolution in this module instance
     std::map<BindingKey, NameResolution> resolutions;
 
     /// AST nodes in this module
     std::vector<NodeId> nodes;
+
+    std::string name() const {
+        return "__mod_" + std::to_string(def);
+    }
 };
 
 /// Possibly partial result of a path resolution.
@@ -373,6 +451,16 @@ struct PathResult {
     struct_enum_body(PathResult, Module, NonModule, Indeterminate, Failed, ComponentPath);
 };
 
+struct Module {
+    struct Struct {
+        const ModId id;
+        const BodyModuleExpr* expr;
+    };
+
+    struct_enum(Module, Struct);
+    struct_enum_body(Module, Struct);
+};
+
 /// Visit and possibly mutate paths (qualified name + namespace)
 struct PathMutVisitor : public Visitor<void, Node> {
     virtual ~PathMutVisitor() = default;
@@ -399,7 +487,7 @@ private:
         visitPath(n.getBranchName(), NS::Branch, n.getSrcLoc(), UPDATER(n.setBranchName));
     }
 
-    void visit_(type_identity<ComponentType>, ComponentType& n) override {
+    void visit_(type_identity<ComponentType>, [[maybe_unused]] ComponentType& n) override {
         throw "todo";
     }
 
@@ -446,9 +534,7 @@ private:
         visitPath(n.getType(), NS::Type, n.getSrcLoc(), UPDATER(n.setType));
     }
 
-    void visit_(type_identity<Component>, Component& c) override {
-        // TODO do not rewrite within components
-    }
+    void visit_(type_identity<Component>, [[maybe_unused]] Component& c) override {}
 #undef UPDATER
 };
 
@@ -481,29 +567,50 @@ public:
     bool transform() {
         // create a module for the program that contains top-level items
         Program& program = tu.getProgram();
-        ModuleInstance* top = createModule(createDef(0), QualifiedName(), nullptr, std::nullopt);
-        pendingModules.emplace_back(top, &program.getTopModule()->getItems());
+        ModuleInstance* top = createModule(createDef(0), nullptr);
+        pendingModules.emplace_back(top, &program.getItems());
 
+        // fixed-point that collect definitions in new modules and resolve imports
         bool changed = true;
         while (changed) {
             changed = false;
             changed |= collectDefinitions();
+            changed |= evaluateModuleExpressions();
             changed |= resolveImports();
         }
 
-        if (!unresolvedImports.empty()) {
-            Diagnostic err(
-                    Diagnostic::Type::ERROR, DiagnosticMessage("Some definition could not be resolved"));
-            tu.getErrorReport().addDiagnostic(err);
-        }
-        if (!pendingModules.empty()) {
-            Diagnostic err(
-                    Diagnostic::Type::ERROR, DiagnosticMessage("Some modules could not be instantiated"));
+        // produce errors for module expressions that did not evaluate fully
+        for (ModuleExprEval* eval : partialModuleExprEvals) {
+            const souffle::ast::ModuleExpr* root = eval->root;
+            std::stringstream ss;
+            ss << "Cannot evaluate module expression";
+            Diagnostic err(Diagnostic::Type::ERROR, DiagnosticMessage(ss.str(), root->getSrcLoc()));
             tu.getErrorReport().addDiagnostic(err);
         }
 
+        // produce errors for imports that could not be resolved
+        for (Import* imprt : unresolvedImports) {
+            if (!imprt->importedModule) {
+                std::stringstream ss;
+                ss << "Cannot find module ";
+                ss << join(imprt->modulePath.begin(), imprt->modulePath.end(), ".");
+                Diagnostic err(Diagnostic::Type::ERROR, DiagnosticMessage(ss.str(), imprt->loc));
+                tu.getErrorReport().addDiagnostic(err);
+            } else {
+                std::stringstream ss;
+                ss << "Cannot find " << describe(imprt->defKind) << " " << imprt->source.toString();
+                Diagnostic err(Diagnostic::Type::ERROR, DiagnosticMessage(ss.str(), imprt->loc));
+                tu.getErrorReport().addDiagnostic(err);
+            }
+        }
+
+        if (tu.getErrorReport().getNumErrors() > 0) {
+            return changed;
+        }
+
+        // expand modes into a flattened program
         expandModules();
-        return true;
+        return changed;
     }
 
     QualifiedName expandPath(
@@ -528,7 +635,7 @@ public:
                 throw std::runtime_error("unexpected Res");
             }
         } else if (pathRes.holds<PathResult::Module>()) {
-            return pathRes.get<PathResult::Module>().mod->name;
+            return QualifiedName("__mod_." + std::to_string(pathRes.get<PathResult::Module>().mod->def));
         } else if (pathRes.holds<PathResult::ComponentPath>()) {
             return pathRes.get<PathResult::ComponentPath>().qname;
         } else if (pathRes.holds<PathResult::Failed>()) {
@@ -549,6 +656,9 @@ private:
 
     /// next AST node identifier
     NodeId nextNodeId = 1;
+
+    /// next module identifier
+    ModId nextModId = 1;
 
     /// mapping from definition identifier to AST node identifier
     std::map<DefId, NodeId> defNodeMap;
@@ -571,6 +681,11 @@ private:
     /// module not yet instantiated
     std::list<std::pair<ModuleInstance*, const Items*>> pendingModules;
 
+    /// module expressions not fully evaluated
+    std::list<ModuleExprEval*> partialModuleExprEvals;
+
+    std::map<ModId, Module> modIdMap;
+
     /// all the module instances
     std::deque<ModuleInstance> moduleInstances;
 
@@ -578,7 +693,10 @@ private:
     std::deque<Import> imports;
 
     /// all the name bindings
-    std::queue<NameBinding> nameBindings;
+    std::deque<NameBinding> nameBindings;
+
+    /// all the module expression evaluations
+    std::deque<ModuleExprEval> moduleExprEvals;
 
     NameBinding* numberNameBinding = nullptr;
     NameBinding* unsignedNameBinding = nullptr;
@@ -593,46 +711,130 @@ private:
         std::list<std::pair<ModuleInstance*, const Items*>> modules = std::move(pendingModules);
 
         while (!modules.empty()) {
-            auto [moduleInstance, items] = modules.front();
-            modules.pop_front();
+            auto& [moduleInstance, items] = modules.front();
 
-            if (items == nullptr && moduleInstance->application != nullptr) {
-                // try to resolve module application
-                auto [resolved, newPending] = resolveApplication(moduleInstance);
-                pendingModules.splice(pendingModules.end(), newPending);
-                changed |= resolved;
-            } else {
-                // collect definitions
-                auto newPending = collectDefinitions(*moduleInstance, *items);
-                pendingModules.splice(pendingModules.end(), newPending);
-                changed = true;
-            }
+            // collect definitions
+            auto newPending = collectDefinitions(*moduleInstance, *items);
+            pendingModules.splice(pendingModules.end(), newPending);
+            modules.pop_front();
+            changed = true;
         }
 
         return changed;
     }
 
-    std::pair<bool, std::list<std::pair<ModuleInstance*, const Items*>>> resolveApplication(
-            ModuleInstance* mod) {
-        const ModuleApplication* mapp = (*mod->application);
-        const QualifiedName& functorName = mapp->getSource();
-        PathResult pathRes = resolveQualifiedName(functorName, NS::Type, mapp->getSrcLoc(), *mod->parent);
-        if (pathRes.holds<PathResult::Module>()) {
-            ModuleInstance* master = pathRes.get<PathResult::Module>().mod;
-            assert(!master->application);
-            const NodeId id = defNodeMap.at(master->def);
-            const Node* ast = nodeMap.at(id);
-            if (const ModuleDecl* mdecl = as<ModuleDecl>(ast)) {
-                assert(mdecl->hasParameterList());
-                if (const ModuleStruct* mstruct = as<ModuleStruct>(mdecl->getDefinition())) {
-                    return {true, {{mod, &mstruct->getItems()}}};
-                }
-            } else {
-                throw "TODO";
+    /// Continue evaluation of module expressions
+    bool evaluateModuleExpressions() {
+        bool changed = false;
+        std::list<ModuleExprEval*> evaluations = std::move(partialModuleExprEvals);
+        while (!evaluations.empty()) {
+            ModuleExprEval* evaluation = evaluations.front();
+            evaluations.pop_front();
+
+            const Progress progress = evaluateModuleExpression(evaluation);
+            if (progress.indeterminate()) {
+                partialModuleExprEvals.emplace_back(evaluation);
             }
+            changed |= !progress.stalled();
         }
-        return {false, {{mod, nullptr}}};
+        return changed;
     }
+
+    /// Continue evaluation of the module expression.
+    Progress evaluateModuleExpression(ModuleExprEval* eval) {
+        Progress progress = Progress::Stalled{};
+
+        while (eval->nextOp < eval->postfix.size()) {
+            const ModuleExpr* expr = eval->postfix.at(eval->nextOp);
+            if (const PathModuleExpr* e = as<PathModuleExpr>(expr)) {
+                PathResult res = resolveQualifiedName(e->getPath(), NS::Type, e->getSrcLoc(), eval->parent);
+                if (res.holds<PathResult::Indeterminated>()) {
+                    break;
+                }
+                if (!res.holds<PathResult::Module>()) {
+                    return Progress::Error{"Not a module"};
+                }
+                eval->values.push(ModuleValue::Instance{res.get<Module>().mod});
+            } else if (const ApplicationModuleExpr* app = as<ApplicationModuleExpr>(expr)) {
+                ModuleValue argument = eval->values.top();
+                eval->values.pop();
+                ModuleValue receiver = eval->values.top();
+                if (!receiver.holds<Functor>()) {
+                    return Progress::Error{"Not a functor"};
+                }
+                eval->values.pop();
+            } else if (const BodyModuleExpr* body = as<BodyModuleExpr>(eval->expr)) {
+                const NodeId id = nextNodeId++;
+                nodeMap.emplace(id, body);
+                ModuleInstance* mod = createModule(createDef(id), eval->parent);
+                pendingModules.emplace_back(mod, &body->getItems());
+
+            } else if (const FunctorModuleExpr* expr = as<FunctorModuleExpr>(eval->expr)) {
+                if (expr->isGenerative()) {
+                    eval->expr = expr->getExpr();
+                    const Progress res = evaluateModuleExpression(eval);
+                    eval->expr = expr;
+                    if (res.holds<Stalled>{}) {
+                        return Progress::Stalled{};
+                    }
+                }
+            }
+
+            progress = Progress::Progressed{};
+            ++eval->nextOp;
+        }
+
+        if (eval->nextOp == eval->postfix.size()) {
+            NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod, body}, body->getSrcLoc());
+            define(eval->parent, eval->target, NS::Type, binding);
+            progress = Progress::Completed{};
+        }
+
+        return progress;
+    }
+
+    /// Try to resolve a module functor application
+    // std::tuple<bool, std::list<std::pair<ModuleInstance*, const Items*>>,
+    // std::list<PendingApplication>> resolveApplication(PendingApplication pending) {
+    //     const ModuleApplication* mapp = pending.application;
+    //     if (!pending.argumentModule) {
+    //         // try to resolve the argument
+    //         const QualifiedName& argumentName = mapp->getArgument();
+    //         const PathResult pathRes =
+    //                 resolveQualifiedName(argumentName, NS::Type, mapp->getSrcLoc(), *pending.parent);
+    //         if (!pathRes.holds<PathResult::Module>()) {
+    //             return {false, {}, {std::move(pending)}};
+    //         }
+    //         ModuleInstance* argumentMod = pathRes.get<PathResult::Module>().mod;
+    //         pending.argumentModule = argumentMod;
+    //     }
+
+    //    assert(pending.argumentModule);
+    //    assert(!pending.sourceModule);
+
+    //    // try to resolve the source module
+    //    const QualifiedName& functorName = mapp->getSource();
+    //    const PathResult pathRes =
+    //            resolveQualifiedName(functorName, NS::Type, mapp->getSrcLoc(), *pending.parent);
+
+    //    if (!pathRes.holds<PathResult::Module>()) {
+    //        return {false, {}, {std::move(pending)}};
+    //    }
+    //    ModuleInstance* sourceMod = pathRes.get<PathResult::Module>().mod;
+    //    pending.sourceModule = sourceMod;
+
+    //    const NodeId id = defNodeMap.at(sourceMod->def);
+    //    const Node* ast = nodeMap.at(id);
+
+    //    if (const ModuleDecl* mdecl = as<ModuleDecl>(ast)) {
+    //        assert(mdecl->hasParameterList());
+    //        if (const ModuleStruct* mstruct = as<ModuleStruct>(mdecl->getDefinition())) {
+    //            return {true, {{pending.target, &mstruct->getItems()}}, {}};
+    //        }
+    //    } else {
+    //        throw "TODO";
+    //    }
+    //}
 
     /// Resolve the imported definitions
     bool resolveImports() {
@@ -666,7 +868,7 @@ private:
             expandModule(inst);
         }
 
-        program.setTopModule(nullptr);
+        program.setItems({});
     }
 
     /// Create a definition from a node
@@ -681,7 +883,8 @@ private:
     ///
     /// Create an unresolved binding if it does not exists yet.
     NameResolution& resolution(ModuleInstance& parent, const BindingKey& key) {
-        const auto inserted = parent.resolutions.try_emplace(key, NameResolution{{}, std::nullopt});
+        const auto inserted =
+                parent.resolutions.try_emplace(key, NameResolution{{}, std::nullopt, std::nullopt});
         return inserted.first->second;
     }
 
@@ -704,7 +907,7 @@ private:
 
         const DefId def = binding->res().toDefId();
 
-        QualifiedName qname(parent->name);
+        QualifiedName qname(parent->name());
         qname.append(ident.toString());
         qualifiedNameMap.emplace(def, std::move(qname));
     }
@@ -712,7 +915,7 @@ private:
     /// Define a binding if it does not have a definition yet, otherwise return the existing binding
     std::optional<NameBinding*> tryDefine(
             ModuleInstance* parent, const BindingKey& key, NameBinding* binding) {
-        const auto inserted = parent->resolutions.try_emplace(key, NameResolution{{}, binding});
+        const auto inserted = parent->resolutions.try_emplace(key, NameResolution{{}, {}, binding});
         if (!inserted.second) {
             // resolution already exists
             NameResolution& resolution = inserted.first->second;
@@ -729,12 +932,35 @@ private:
     }
 
     /// Create a new module
-    ModuleInstance* createModule(const DefId def, QualifiedName name, ModuleInstance* parent,
-            std::optional<const ModuleApplication*> application) {
-        ModuleInstance& inst = moduleInstances.emplace_back(
-                ModuleInstance{def, name, parent, application, /*resolutions*/ {}, /*nodes*/ {}});
+    ModuleInstance* createModule(const DefId def, ModuleInstance* parent) {
+        ModuleInstance& inst =
+                moduleInstances.emplace_back(ModuleInstance{def, parent, /*resolutions*/ {}, /*nodes*/ {}});
         moduleInstanceMap.emplace(inst.def, &inst);
         return &inst;
+    }
+
+    createModuleExprEval(ModuleInstance* parent, Ident target, const ModuleExpr* root) {
+        moduleExprEvals.emplace_back(ModuleExprEval{&inst, target, root, {}, {}, 0});
+        ModuleExprEval* modExprEval = &moduleExprEvals.back();
+
+        // convert expression tree to postfix
+        const auto toPostfix = [&](const ModuleExpr* expr) {
+            if (const PathModuleExpr* e = as<PathModuleExpr>(expr)) {
+                modExprEval->postfix.emplace_back(e);
+            } else if (const BodyModuleExpr* e = as<BodyModuleExpr>(expr)) {
+                modExprEval->postfix.emplace_back(e);
+            } else if (const FunctorModuleExpr* e = as<FunctorModuleExpr>(expr)) {
+                toPostfix(e->getExpr());
+                modExprEval->postfix.emplace_back(e);
+            } else if (const ApplicationModuleExpr* e = as<ApplicationModuleExpr>(expr)) {
+                toPostfix(e->getArgument());
+                toPostfix(e->getReceiver());
+                modExprEval->postfix.emplace_back(e);
+            } else if (const GenerationModuleExpr* e = as<GenerationModuleExpr>(expr)) {
+                toPostfix(e->getReceiver());
+                modExprEval->postfix.emplace_back(e);
+            }
+        }(root);
     }
 
     /// Add an import binding in `parent` module.
@@ -766,48 +992,49 @@ private:
             const Node* n = item.get();
             nodeMap.emplace(id, n);
 
-            if (const ModuleDecl* md = as<ModuleDecl>(n)) {
-                const std::string name = md->getName();
-                ast::QualifiedName qname(inst.name);
-                qname.append(name);
-                const DefId def = createDef(id);
-                const ModuleDef* moduleDef = md->getDefinition();
+            if (const ModuleDefinition* md = as<ModuleDefinition>(n)) {
+                const std::string& name = md->getName();
+                Ident target = Ident::from(name);
 
-                if (const ModuleStruct* mstruct = as<ModuleStruct>(moduleDef)) {
-                    ModuleInstance* mod = createModule(def, qname, &inst, std::nullopt);
-                    NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod}, md->getSrcLoc());
-                    define(&inst, Ident::from(name), NS::Type, binding);
-                    if (!md->hasParameterList()) {
-                        // non-generative module
-                        newModules.emplace_back(mod, &mstruct->getItems());
-                    }
+                ModuleExprEval* = createModuleExprEval(inst, target, md->getModuleExpr());
+                partialModuleExprEvals.emplace_back(modExprEval);
 
-                } else if (const ModuleAlias* malias = as<ModuleAlias>(moduleDef)) {
-                    const Ident source = Ident::from(malias->getSource().getQualifiers().front());
-                    const Ident target = Ident::from(name);
-                    std::optional<ModuleInstance*> importedModule;
-                    span<const std::string> modPath;
+                const BindingKey key{target, NS::Type};
+                resolution(inst, key).moduleExprEval = modExprEval;
 
-                    if (malias->getSource().getQualifiers().size() == 1) {
-                        importedModule = &inst;
-                    } else {
-                        modPath = span<const std::string>(malias->getSource().getQualifiers().data() + 1,
-                                malias->getSource().getQualifiers().size() - 1);
-                    }
+                // if (const BodyModuleExpr* mbody = as<BodyModuleExpr>(moduleExpr)) {
+                //     ModuleInstance* mod = createModule(def, qname, &inst, std::nullopt);
+                //     NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod},
+                //     md->getSrcLoc()); define(&inst, Ident::from(name), NS::Type, binding);
+                //     newModules.emplace_back(mod, &mbody->getItems());
 
-                    addImport(
-                            inst, source, target, DefKind::Mod, modPath, importedModule, malias->getSrcLoc());
+                //} else if (const ModuleAlias* malias = as<ModuleAlias>(moduleDef)) {
+                //    const Ident source = Ident::from(malias->getSource().getQualifiers().front());
+                //    const Ident target = Ident::from(name);
+                //    std::optional<ModuleInstance*> importedModule;
+                //    span<const std::string> modPath;
 
-                } else if (const ModuleApplication* mapp = as<ModuleApplication>(moduleDef)) {
-                    // book a module instance for the resulting module
-                    ModuleInstance* mod = createModule(def, qname, &inst, mapp);
-                    newModules.emplace_back(mod, nullptr);
+                //    if (malias->getSource().getQualifiers().size() == 1) {
+                //        importedModule = &inst;
+                //    } else {
+                //        modPath = span<const std::string>(malias->getSource().getQualifiers().data() + 1,
+                //                malias->getSource().getQualifiers().size() - 1);
+                //    }
 
-                    NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod}, mapp->getSrcLoc());
-                    define(&inst, Ident::from(name), NS::Type, binding);
-                } else {
-                    throw "unexpected";
-                }
+                //    addImport(
+                //            inst, source, target, DefKind::Mod, modPath, importedModule,
+                //            malias->getSrcLoc());
+
+                //} else if (const ModuleApplication* mapp = as<ModuleApplication>(moduleDef)) {
+                //    // book a module instance for the resulting module
+                //    ModuleInstance* mod = createModule(def, qname, &inst, mapp);
+                //    newApplications.emplace_back(mapp);
+
+                //    NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod},
+                //    mapp->getSrcLoc()); define(&inst, Ident::from(name), NS::Type, binding);
+                //} else {
+                //    throw "unexpected";
+                //}
             } else if (const Relation* rel = as<Relation>(n)) {
                 // @todo only allow non-qualified names?
                 const DefId def = createDef(id);
@@ -905,8 +1132,8 @@ private:
         Program& program = tu.getProgram();
         for (const NodeId id : inst.nodes) {
             const Node* item = nodeMap.at(id);
-            if (isA<ModuleDecl>(item)) {
-                // nothing to do for module declaration they don't exist in the
+            if (isA<ModuleDefinition>(item)) {
+                // nothing to do for module definitions they don't exist in the
                 // program after the expansion.
             } else if (const Relation* n = as<Relation>(item)) {
                 const DefId def = nodeDefMap.at(id);
@@ -967,7 +1194,7 @@ private:
         ty->setQualifiedName(qualifiedNameMap.at(def));
         if (AlgebraicDataType* adt = as<AlgebraicDataType>(ty)) {
             for (BranchType* br : adt->getBranches()) {
-                QualifiedName qname(parent.name);
+                QualifiedName qname(parent.name());
                 qname.append(br->getBranchName().toString());
                 br->setBranchName(qname);
             }
@@ -1010,7 +1237,7 @@ private:
                 throw std::runtime_error("unexpected Res");
             }
         } else if (pathRes.holds<PathResult::Module>()) {
-            return pathRes.get<PathResult::Module>().mod->name;
+            return pathRes.get<PathResult::Module>().mod->name();
         } else if (pathRes.holds<PathResult::ComponentPath>()) {
             return pathRes.get<PathResult::ComponentPath>().qname;
         } else {
@@ -1117,7 +1344,7 @@ private:
 
     /// Allocate a fresh `NameBinding`
     NameBinding* allocNameBinding(NameBindingKind kind, SrcLocation loc) {
-        nameBindings.emplace(NameBinding{kind, loc});
+        nameBindings.emplace_back(NameBinding{kind, loc});
         return &nameBindings.back();
     }
 };
@@ -1144,6 +1371,19 @@ NS toNS(const DefKind kind) {
         case DefKind::Mod: return NS::Type;
         case DefKind::Rel: return NS::Value;
         case DefKind::Type: return NS::Type;
+        default: throw "unexpected";
+    }
+}
+
+std::string describe(const DefKind kind) {
+    switch (kind) {
+        case DefKind::Branch: return "ADT branch";
+        case DefKind::Comp: return "component";
+        case DefKind::Init: return "instance";
+        case DefKind::UFun: return "user-defined functor";
+        case DefKind::Mod: return "module";
+        case DefKind::Rel: return "relation";
+        case DefKind::Type: return "type";
         default: throw "unexpected";
     }
 }

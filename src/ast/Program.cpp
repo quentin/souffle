@@ -253,12 +253,12 @@ void Program::clearComponents() {
     instantiations.clear();
 }
 
-ModuleStruct* Program::getTopModule() {
-    return topModule.get();
+Items& Program::getItems() {
+    return items;
 }
 
-void Program::setTopModule(Own<ModuleStruct> mod) {
-    topModule = std::move(mod);
+void Program::setItems(Items newItems) {
+    items = std::move(newItems);
 }
 
 void Program::apply(const NodeMapper& map) {
@@ -270,6 +270,7 @@ void Program::apply(const NodeMapper& map) {
     mapAll(relations, &RelationInfo::decls, map);
     mapAll(relations, &RelationInfo::clauses, map);
     mapAll(relations, &RelationInfo::directives, map);
+    mapAll(items, map);
 }
 
 Node::NodeVec Program::getChildren() const {
@@ -282,6 +283,7 @@ Node::NodeVec Program::getChildren() const {
     append(res, relations, &RelationInfo::decls);
     append(res, relations, &RelationInfo::clauses);
     append(res, relations, &RelationInfo::directives);
+    append(res, makePtrRange(items));
     return res;
 }
 
@@ -298,9 +300,7 @@ void Program::print(std::ostream& os) const {
     show(getRelations());
     show(getClauses(), "\n\n");
     show(getDirectives(), "\n\n");
-    if (topModule) {
-        show(topModule->getItems());
-    }
+    show(items);
 }
 
 bool Program::equal(const Node& node) const {
@@ -337,7 +337,7 @@ Program* Program::cloning() const {
     res->types = clone(types);
     res->functors = clone(functors);
     res->relations = clone(relations);
-    res->topModule = clone(topModule);
+    res->items = clone(items);
     return res;
 }
 

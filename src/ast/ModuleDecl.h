@@ -11,142 +11,160 @@
 
 namespace souffle::ast {
 
-/// The definition of a module.
-class ModuleDef : public Node {
+/// A module expression
+class ModuleExpr : public Node {
 public:
-    explicit ModuleDef(SrcLocation loc);
-    virtual ~ModuleDef() = default;
+    ModuleExpr(SrcLocation loc = {});
+    virtual ~ModuleExpr() = default;
 };
 
-/// Module structure, contains some module items.
-///
 /// ```
-/// ...module decl... {
-///   ...module items...
-/// }
+/// module-expr ::= module-path
 /// ```
-class ModuleStruct : public ModuleDef {
+class PathModuleExpr : public ModuleExpr {
 public:
-    explicit ModuleStruct(Items items, SrcLocation loc = {});
+    explicit PathModuleExpr(QualifiedName modulePath, SrcLocation loc = {});
+
+    const QualifiedName& getPath() const;
+
+protected:
+    void print(std::ostream& os) const override;
+
+private:
+    PathModuleExpr* cloning() const override;
+
+    QualifiedName path;
+};
+
+/// ```
+/// module-expr ::= "functor" "(" module-name ")" "->" module-expr
+///             |   "functor" "(" ")" "->" module-expr
+/// ```
+class FunctorModuleExpr : public ModuleExpr {
+public:
+    explicit FunctorModuleExpr(std::string moduleName, Own<ModuleExpr> moduleExpr, SrcLocation loc = {});
+    explicit FunctorModuleExpr(Own<ModuleExpr> moduleExpr, SrcLocation loc = {});
+
+    bool isGenerative() const;
+
+    bool isApplicative() const;
+
+    const ModuleExpr* getExpr() const;
+
+    const std::optional<std::string>& getParameter() const;
+
+protected:
+    void print(std::ostream& os) const override;
+
+    Node::NodeVec getChildren() const override;
+
+    void apply(const NodeMapper& mapper) override;
+
+private:
+    FunctorModuleExpr* cloning() const override;
+
+    std::optional<std::string> moduleName;
+    Own<ModuleExpr> moduleExpr;
+};
+
+/// ```
+/// module-expr ::= "{" module-item { module-item } "}"
+/// ```
+class BodyModuleExpr : public ModuleExpr {
+public:
+    explicit BodyModuleExpr(Items moduleItems, SrcLocation loc = {});
 
     const Items& getItems() const;
 
-    ModuleStruct& addItem(Own<Node> item);
+    BodyModuleExpr& addItem(Own<Node> item);
 
 protected:
     void print(std::ostream& os) const override;
 
-    NodeVec getChildren() const override;
+    Node::NodeVec getChildren() const override;
 
     void apply(const NodeMapper& mapper) override;
 
 private:
-    bool equal(const Node& node) const override;
+    BodyModuleExpr* cloning() const override;
 
-    ModuleStruct* cloning() const override;
-
+private:
     Items items;
 };
 
-/// Module alias, references an existing module or instantiate a functor
-/// module.
-///
 /// ```
-/// ...module decl... = M::N
-/// ...module decl... = F(a1, ..., aN)
+/// module-expr ::= module-expr "(" module-expr ")"
 /// ```
-///
-class ModuleAlias : public ModuleDef {
+class ApplicationModuleExpr : public ModuleExpr {
 public:
-    explicit ModuleAlias(const QualifiedName& source, SrcLocation loc = {});
-
-    const QualifiedName& getSource() const;
-
-    void setSource(const QualifiedName& src);
+    explicit ApplicationModuleExpr(
+            Own<ModuleExpr> moduleExpr, Own<ModuleExpr> argument, SrcLocation loc = {});
 
 protected:
     void print(std::ostream& os) const override;
 
+    Node::NodeVec getChildren() const override;
+
+    void apply(const NodeMapper& mapper) override;
+
+    const ModuleExpr* getArgument() const;
+
+    const ModuleExpr* getReceiver() const;
+
 private:
-    bool equal(const Node& node) const override;
+    ApplicationModuleExpr* cloning() const override;
 
-    ModuleAlias* cloning() const override;
-
-    QualifiedName source;
+    Own<ModuleExpr> expr;
+    Own<ModuleExpr> argument;
 };
 
-/// The application of a module functor
-///
-/// ## Example
-///
-/// ```souffle
-/// A()
-/// M::N(u, T::t)
 /// ```
-///
-class ModuleApplication : public ModuleDef {
+/// module-expr ::= module-expr "(" ")"
+/// ```
+class GenerationModuleExpr : public ModuleExpr {
 public:
-    explicit ModuleApplication(
-            ast::QualifiedName source, std::vector<QualifiedName> args, SrcLocation loc = {});
+    explicit GenerationModuleExpr(Own<ModuleExpr> moduleExpr, SrcLocation loc = {});
 
-    const QualifiedName& getSource() const;
-
-    void setSource(const QualifiedName&);
-
-    const std::vector<QualifiedName>& getArguments() const;
-
-    std::vector<QualifiedName>& getArguments();
-
-private:
+protected:
     void print(std::ostream& os) const override;
 
-    bool equal(const Node& node) const override;
+    Node::NodeVec getChildren() const override;
 
-    ModuleApplication* cloning() const override;
+    void apply(const NodeMapper& mapper) override;
 
-    QualifiedName source;
+    const ModuleExpr* getReceiver() const;
 
-    std::vector<QualifiedName> args;
+private:
+    GenerationModuleExpr* cloning() const override;
+
+    Own<ModuleExpr> expr;
 };
 
-/// The declaration of a module, possibly with some parameters.
+/// The definition of a module
 ///
 /// ```
-/// .module Name ...module-def...
-/// .module Name () ...module-def...
-/// .module Name (p1, ... , pN) ...module-def...
+/// module-item ::= ".module" module-name "=" module-expr
 /// ```
-class ModuleDecl : public Node {
+class ModuleDefinition : public Node {
 public:
-    explicit ModuleDecl(const std::string& name, std::optional<std::vector<QualifiedName>> params,
-            Own<ModuleDef> def, SrcLocation loc = {});
+    explicit ModuleDefinition(const std::string& name, Own<ModuleExpr> moduleExpr, SrcLocation loc = {});
 
     const std::string& getName() const;
 
-    bool hasParameterList() const;
-
-    std::optional<std::vector<QualifiedName>>& getParameterList();
-
-    const ModuleDef* getDefinition() const;
+    const ModuleExpr* getModuleExpr() const;
 
 protected:
     void print(std::ostream& os) const override;
 
-    NodeVec getChildren() const override;
+    Node::NodeVec getChildren() const override;
 
     void apply(const NodeMapper& mapper) override;
 
 private:
-    bool equal(const Node& node) const override;
-
-    ModuleDecl* cloning() const override;
+    ModuleDefinition* cloning() const override;
 
     std::string name;
 
-    std::optional<std::vector<QualifiedName>> params;
-
-    Own<ModuleDef> def;
-
-    Items items;
+    Own<ModuleExpr> expr;
 };
 }  // namespace souffle::ast

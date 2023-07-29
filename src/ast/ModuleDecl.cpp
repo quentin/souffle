@@ -15,153 +15,178 @@
 #include <string>
 
 namespace souffle::ast {
-ModuleApplication::ModuleApplication(
-        ast::QualifiedName source, std::vector<QualifiedName> args, SrcLocation loc)
-        : ModuleDef(loc), source(source), args(args) {}
 
-const QualifiedName& ModuleApplication::getSource() const {
-    return source;
+ModuleExpr::ModuleExpr(SrcLocation loc) : Node(std::move(loc)) {}
+
+PathModuleExpr::PathModuleExpr(QualifiedName modulePath, SrcLocation loc)
+        : ModuleExpr(std::move(loc)), path(std::move(modulePath)) {}
+
+const QualifiedName& PathModuleExpr::getPath() const {
+    return path;
 }
 
-void ModuleApplication::setSource(const QualifiedName& qn) {
-    source = qn;
+void PathModuleExpr::print(std::ostream& os) const {
+    os << path;
 }
 
-ModuleApplication* ModuleApplication::cloning() const {
-    return new ModuleApplication(source, args, getSrcLoc());
+PathModuleExpr* PathModuleExpr::cloning() const {
+    return new PathModuleExpr(path, getSrcLoc());
 }
 
-void ModuleApplication::print(std::ostream& os) const {
-    os << " = " << source;
-    os << "(" << join(args, ", ") << ")";
+FunctorModuleExpr::FunctorModuleExpr(std::string name, Own<ModuleExpr> expr, SrcLocation loc)
+        : ModuleExpr(loc), moduleName(name), moduleExpr(std::move(expr)) {}
+
+FunctorModuleExpr::FunctorModuleExpr(Own<ModuleExpr> expr, SrcLocation loc)
+        : ModuleExpr(loc), moduleName(std::nullopt), moduleExpr(std::move(expr)) {}
+
+void FunctorModuleExpr::print(std::ostream& os) const {
+    os << "functor (";
+    if (moduleName) {
+        os << *moduleName;
+    }
+    os << ") -> " << *moduleExpr;
 }
 
-bool ModuleApplication::equal(const Node& node) const {
-    const auto& other = asAssert<ModuleApplication>(node);
-    return source == other.source && args == other.args;
+void FunctorModuleExpr::apply(const NodeMapper& mapper) {
+    moduleExpr = mapper(std::move(moduleExpr));
 }
 
-ModuleStruct::ModuleStruct(Items itms, SrcLocation loc) : ModuleDef(loc), items(std::move(itms)) {}
+Node::NodeVec FunctorModuleExpr::getChildren() const {
+    std::vector<const Node*> res;
+    res.emplace_back(moduleExpr.get());
+    return res;
+}
 
-const Items& ModuleStruct::getItems() const {
+FunctorModuleExpr* FunctorModuleExpr::cloning() const {
+    if (moduleName) {
+        return new FunctorModuleExpr(*moduleName, clone(moduleExpr), getSrcLoc());
+    } else {
+        return new FunctorModuleExpr(clone(moduleExpr), getSrcLoc());
+    }
+}
+bool FunctorModuleExpr::isGenerative() const {
+    return !moduleName.has_value();
+}
+
+bool FunctorModuleExpr::isApplicative() const {
+    return moduleName.has_value();
+}
+
+const ModuleExpr* getExpr() const {
+    return moduleExpr;
+}
+
+const std::optional<std::string>& getParameter() const {
+    return moduleName;
+}
+
+BodyModuleExpr::BodyModuleExpr(Items moduleItems, SrcLocation loc)
+        : ModuleExpr(loc), items(std::move(moduleItems)) {}
+
+const Items& BodyModuleExpr::getItems() const {
     return items;
 }
 
-ModuleStruct& ModuleStruct::addItem(Own<Node> item) {
+BodyModuleExpr& BodyModuleExpr::addItem(Own<Node> item) {
     items.emplace_back(std::move(item));
     return *this;
 }
 
-void ModuleStruct::print(std::ostream& os) const {
-    const auto show = [&](auto&& xs, char const* sep = "\n") {
+void BodyModuleExpr::print(std::ostream& os) const {
+    auto show = [&](auto&& xs, char const* sep = "\n") {
         if (!xs.empty()) os << join(xs, sep) << "\n";
     };
 
     os << "{\n";
     show(items);
-    os << "}\n";
+    os << "}";
 }
 
-Node::NodeVec ModuleStruct::getChildren() const {
+void BodyModuleExpr::apply(const NodeMapper& mapper) {
+    mapAll(items, mapper);
+}
+
+Node::NodeVec BodyModuleExpr::getChildren() const {
     std::vector<const Node*> res;
     append(res, makePtrRange(items));
     return res;
 }
 
-void ModuleStruct::apply(const NodeMapper& mapper) {
-    mapAll(items, mapper);
+BodyModuleExpr* BodyModuleExpr::cloning() const {
+    return new BodyModuleExpr(clone(items), getSrcLoc());
 }
 
-bool ModuleStruct::equal(const Node& node) const {
-    [[maybe_unused]] const auto& other = asAssert<ModuleStruct>(node);
-    throw "TODO";
+ApplicationModuleExpr::ApplicationModuleExpr(
+        Own<ModuleExpr> moduleExpr, Own<ModuleExpr> moduleArg, SrcLocation loc)
+        : ModuleExpr(loc), expr(std::move(moduleExpr)), argument(std::move(moduleArg)) {}
+
+void ApplicationModuleExpr::print(std::ostream& os) const {
+    os << *expr << "(" << *argument << ")";
 }
 
-ModuleStruct* ModuleStruct::cloning() const {
-    ModuleStruct* res = new ModuleStruct(clone(items), getSrcLoc());
+Node::NodeVec ApplicationModuleExpr::getChildren() const {
+    std::vector<const Node*> res;
+    res.emplace_back(expr.get());
+    res.emplace_back(argument.get());
     return res;
 }
 
-ModuleAlias::ModuleAlias(const QualifiedName& source, SrcLocation loc) : ModuleDef(loc), source(source) {}
-
-const QualifiedName& ModuleAlias::getSource() const {
-    return source;
+void ApplicationModuleExpr::apply(const NodeMapper& mapper) {
+    expr = mapper(std::move(expr));
+    argument = mapper(std::move(argument));
 }
 
-void ModuleAlias::setSource(const QualifiedName& src) {
-    source = src;
+ApplicationModuleExpr* ApplicationModuleExpr::cloning() const {
+    return new ApplicationModuleExpr(clone(expr), clone(argument), getSrcLoc());
 }
 
-void ModuleAlias::print(std::ostream& os) const {
-    os << " = " << source;
+GenerationModuleExpr::GenerationModuleExpr(Own<ModuleExpr> moduleExpr, SrcLocation loc)
+        : ModuleExpr(loc), expr(std::move(moduleExpr)) {}
+
+void GenerationModuleExpr::print(std::ostream& os) const {
+    os << *expr << "()";
 }
 
-bool ModuleAlias::equal(const Node& node) const {
-    [[maybe_unused]] const auto& other = asAssert<ModuleAlias>(node);
-    throw "TODO";
+Node::NodeVec GenerationModuleExpr::getChildren() const {
+    std::vector<const Node*> res;
+    res.emplace_back(expr.get());
+    return res;
 }
 
-ModuleAlias* ModuleAlias::cloning() const {
-    return new ModuleAlias(source, getSrcLoc());
+void GenerationModuleExpr::apply(const NodeMapper& mapper) {
+    expr = mapper(std::move(expr));
 }
 
-ModuleDecl::ModuleDecl(const std::string& name, std::optional<std::vector<QualifiedName>> params,
-        Own<ModuleDef> def, SrcLocation loc)
-        : Node(loc), name(name), params(std::move(params)), def(std::move(def)) {}
+GenerationModuleExpr* GenerationModuleExpr::cloning() const {
+    return new GenerationModuleExpr(clone(expr), getSrcLoc());
+}
 
-const std::string& ModuleDecl::getName() const {
+ModuleDefinition::ModuleDefinition(const std::string& name, Own<ModuleExpr> moduleExpr, SrcLocation loc)
+        : Node(loc), name(name), expr(std::move(moduleExpr)) {}
+
+void ModuleDefinition::print(std::ostream& os) const {
+    os << ".module " << name << " = " << *expr;
+}
+
+Node::NodeVec ModuleDefinition::getChildren() const {
+    std::vector<const Node*> res;
+    res.emplace_back(expr.get());
+    return res;
+}
+
+void ModuleDefinition::apply(const NodeMapper& mapper) {
+    expr = mapper(std::move(expr));
+}
+
+ModuleDefinition* ModuleDefinition::cloning() const {
+    return new ModuleDefinition(name, clone(expr), getSrcLoc());
+}
+
+const std::string& ModuleDefinition::getName() const {
     return name;
 }
 
-const ModuleDef* ModuleDecl::getDefinition() const {
-    return def.get();
+const ModuleExpr* ModuleDefinition::getModuleExpr() const {
+    return expr.get();
 }
-
-std::optional<std::vector<QualifiedName>>& ModuleDecl::getParameterList() {
-    return params;
-}
-
-bool ModuleDecl::hasParameterList() const {
-    return (bool)params;
-}
-
-void ModuleDecl::apply(const NodeMapper& mapper) {
-    def = mapper(std::move(def));
-}
-
-bool ModuleDecl::equal(const Node&) const {
-    throw "TODO";
-}
-
-ModuleDecl* ModuleDecl::cloning() const {
-    ModuleDecl* res = new ModuleDecl(name, params, clone(def), getSrcLoc());
-    return res;
-}
-
-void ModuleDecl::print(std::ostream& os) const {
-    os << ".module " << name;
-    if (hasParameterList()) {
-        os << "(" << join(*params, ", ") << ")";
-    }
-    os << *def;
-}
-
-Node::NodeVec ModuleDecl::getChildren() const {
-    std::vector<const Node*> res;
-    res.push_back(def.get());
-    return res;
-}
-
-ModuleDef::ModuleDef(SrcLocation loc) : Node(loc) {}
-
-// void ModuleStruct::print(std::ostream& os) const {
-//     const auto show = [&](auto&& xs, char const* sep = "\n") {
-//         if (!xs.empty()) os << join(xs, sep) << "\n";
-//     };
-//
-//     os << ".module " << getName() << " " << *moduleType << " {\n";
-//     show(items);
-//     os << "}\n";
-// }
-
 }  // namespace souffle::ast

@@ -175,7 +175,8 @@
 %token TYPE                      "type declaration"
 %token COMPONENT                 "component declaration"
 %token INSTANTIATE               "component instantiation"
-%token MODULE                    "module declaration"
+%token MODULE                    "module"
+%token MODULE_FUNCTOR            "functor"
 %token NUMBER_TYPE               "numeric type declaration"
 %token SYMBOL_TYPE               "symbolic type declaration"
 %token TOFLOAT                   "convert to float"
@@ -231,6 +232,7 @@
 %token L_XOR                     "lxor"
 %token L_NOT                     "lnot"
 %token FOLD                      "fold"
+%token ARROW                     "->"
 
 /* -- Non-Terminal Types -- */
 %type <Mov<ast::Items>>                        unit
@@ -246,13 +248,6 @@
 %type <Mov<Own<ast::Component>>>               component_decl
 %type <Mov<Own<ast::Component>>>               component_body
 %type <Mov<Own<ast::Component>>>               component_head
-%type <Mov<Own<ast::ModuleDecl>>>              module_decl
-%type <Mov<Own<ast::ModuleDef>>>               module_def
-%type <Mov<std::vector<ast::QualifiedName>>>   module_arg_list
-%type <Mov<std::vector<ast::QualifiedName>>>   non_empty_module_arg_list
-%type <Mov<std::optional<std::vector<ast::QualifiedName>>>>   opt_module_params
-%type <Mov<std::vector<ast::QualifiedName>>>   module_param_list
-%type <Mov<std::vector<ast::QualifiedName>>>   non_empty_module_param_list
 %type <Mov<RuleBody>>                          conjunction
 %type <Mov<Own<ast::Constraint>>>              constraint
 %type <Mov<Own<ast::FunctionalConstraint>>>    dependency
@@ -297,8 +292,14 @@
 %type <Mov<std::vector<ast::QualifiedName>>>   union_type_list
 %type <Mov<VecOwn<ast::BranchType>>>    adt_branch_list
 %type <Mov<Own<ast::BranchType>>>       adt_branch
+/* module non-terminals */
+%type <Mov<Own<ast::ModuleDefinition>>>       module_def
+%type <Mov<Own<ast::ModuleExpr>>>             module_expr
+%type <Mov<Own<ast::ModuleExpr>>>             module_body
 
 /* -- Operator precedence -- */
+%precedence ARROW
+%precedence LPAREN
 %left L_OR
 %left L_XOR
 %left L_AND
@@ -322,8 +323,7 @@
 program
   : unit
     {
-      Own<ast::ModuleStruct> mstruct = std::make_unique<ast::ModuleStruct>(std::move($1), @$);
-      driver.getProgram().setTopModule(std::move(mstruct));
+      driver.getProgram().setItems(std::move($1));
     }
   ;
 
@@ -387,7 +387,7 @@ unit
         $$.push_back(std::move(rel));
       }
     }
-  | unit module_decl
+  | unit module_def
     {
       auto &uni = $1;
       $$ = uni;
@@ -1415,88 +1415,56 @@ component_init
   ;
 
 /**
- * Module declaration
- */
-module_decl
-  : MODULE IDENT opt_module_params module_def
-    {
-      $$ = mk<ast::ModuleDecl>($IDENT, $opt_module_params, $module_def, @$);
-    }
-  ;
-
-/**
  * Module definition
  */
 module_def
-  : LBRACE unit RBRACE
+  : MODULE IDENT EQUALS module_expr
     {
-      $$ = mk<ast::ModuleStruct>($unit, @$);
+      $$ = mk<ast::ModuleDefinition>($IDENT, $module_expr, @$);
     }
-  | EQUALS qualified_name LPAREN module_arg_list RPAREN
-    {
-      $$ = mk<ast::ModuleApplication>($qualified_name, $module_arg_list, @$);
-    }
-  | EQUALS qualified_name
-    {
-      $$ = mk<ast::ModuleAlias>($qualified_name, @$);
-    }
-  ;
-
-module_arg_list
-  : %empty
-    {
-    }
-  | non_empty_module_arg_list
-    {
-      $$ = $1;
-    }
-  ;
-
-non_empty_module_arg_list
-  : qualified_name
-    {
-      $$.push_back($qualified_name);
-    }
-  | non_empty_module_arg_list COMMA qualified_name
-    {
-      $$ = $1;
-      $$.push_back($qualified_name);
+  | MODULE IDENT module_body
+    { // syntact sugar
+      $$ = mk<ast::ModuleDefinition>($IDENT, $module_body, @$);
     }
   ;
 
 /**
- * Parameter list of a functor module
+ * Module expression
  */
-opt_module_params
-  : %empty
-    {
-      $$ = std::nullopt;
+module_expr :
+    module_body {
+      $$ = $1;
     }
-  | LPAREN module_param_list RPAREN
+  | qualified_name
     {
-      $$ = $module_param_list;
+      $$ = mk<ast::PathModuleExpr>($qualified_name, @$);
+    }
+  | module_expr[expr] LPAREN module_expr[arg] RPAREN
+    {
+      $$ = mk<ast::ApplicationModuleExpr>($expr, $arg, @$);
+    }
+  | module_expr[expr] LPAREN RPAREN %prec PLUS
+    {
+      $$ = mk<ast::GenerationModuleExpr>($expr, @$);
+    }
+  | LPAREN module_expr[expr] RPAREN
+    {
+      $$ = $expr;
+    }
+  | MODULE_FUNCTOR LPAREN RPAREN ARROW module_expr[expr]
+    {
+      $$ = mk<ast::FunctorModuleExpr>($expr, @$);
+    }
+  | MODULE_FUNCTOR LPAREN IDENT RPAREN ARROW module_expr[expr]
+    {
+      $$ = mk<ast::FunctorModuleExpr>($IDENT, $expr, @$);
     }
   ;
 
-module_param_list
-  : %empty
+module_body
+  : LBRACE unit RBRACE
     {
-    }
-  | non_empty_module_param_list
-    {
-      $$ = $1;
-    }
-  ;
-
-non_empty_module_param_list
-  : qualified_name
-    {
-      $$.push_back($qualified_name);
-    }
-  | non_empty_module_param_list COMMA qualified_name
-    {
-      $$ = $1;
-      $$.push_back($qualified_name);
+      $$ = mk<ast::BodyModuleExpr>($unit, @$);
     }
   ;
 
