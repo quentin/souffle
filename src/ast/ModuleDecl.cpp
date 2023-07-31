@@ -72,11 +72,11 @@ bool FunctorModuleExpr::isApplicative() const {
     return moduleName.has_value();
 }
 
-const ModuleExpr* getExpr() const {
-    return moduleExpr;
+const ModuleExpr* FunctorModuleExpr::getExpr() const {
+    return moduleExpr.get();
 }
 
-const std::optional<std::string>& getParameter() const {
+const std::optional<std::string>& FunctorModuleExpr::getParameter() const {
     return moduleName;
 }
 
@@ -140,6 +140,14 @@ ApplicationModuleExpr* ApplicationModuleExpr::cloning() const {
     return new ApplicationModuleExpr(clone(expr), clone(argument), getSrcLoc());
 }
 
+const ModuleExpr* ApplicationModuleExpr::getArgument() const {
+    return argument.get();
+}
+
+const ModuleExpr* ApplicationModuleExpr::getReceiver() const {
+    return expr.get();
+}
+
 GenerationModuleExpr::GenerationModuleExpr(Own<ModuleExpr> moduleExpr, SrcLocation loc)
         : ModuleExpr(loc), expr(std::move(moduleExpr)) {}
 
@@ -151,6 +159,10 @@ Node::NodeVec GenerationModuleExpr::getChildren() const {
     std::vector<const Node*> res;
     res.emplace_back(expr.get());
     return res;
+}
+
+const ModuleExpr* GenerationModuleExpr::getReceiver() const {
+    return expr.get();
 }
 
 void GenerationModuleExpr::apply(const NodeMapper& mapper) {

@@ -40,9 +40,14 @@ bool processArgs(souffle::Global& glb, int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    souffle::Global glb;
+    try {
+        souffle::Global glb;
 
-    processArgs(glb, argc, argv);
+        processArgs(glb, argc, argv);
 
-    return souffle::main(glb, argv[0]);
+        return souffle::main(glb, argv[0]);
+    } catch (const char* err) {
+        std::cerr << "Error: " << err << "\n";
+        return -1;
+    }
 }

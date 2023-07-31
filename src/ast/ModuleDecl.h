@@ -100,16 +100,16 @@ public:
     explicit ApplicationModuleExpr(
             Own<ModuleExpr> moduleExpr, Own<ModuleExpr> argument, SrcLocation loc = {});
 
+    const ModuleExpr* getArgument() const;
+
+    const ModuleExpr* getReceiver() const;
+
 protected:
     void print(std::ostream& os) const override;
 
     Node::NodeVec getChildren() const override;
 
     void apply(const NodeMapper& mapper) override;
-
-    const ModuleExpr* getArgument() const;
-
-    const ModuleExpr* getReceiver() const;
 
 private:
     ApplicationModuleExpr* cloning() const override;
@@ -125,14 +125,14 @@ class GenerationModuleExpr : public ModuleExpr {
 public:
     explicit GenerationModuleExpr(Own<ModuleExpr> moduleExpr, SrcLocation loc = {});
 
+    const ModuleExpr* getReceiver() const;
+
 protected:
     void print(std::ostream& os) const override;
 
     Node::NodeVec getChildren() const override;
 
     void apply(const NodeMapper& mapper) override;
-
-    const ModuleExpr* getReceiver() const;
 
 private:
     GenerationModuleExpr* cloning() const override;

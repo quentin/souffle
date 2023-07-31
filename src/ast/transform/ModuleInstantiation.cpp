@@ -46,6 +46,8 @@
     Struct(Struct&& f) : _v(std::move(f._v)) {}  \
     Struct(const Struct& f) : _v(f._v) {}        \
     ~Struct() = default;                         \
+    Struct& operator=(Struct&&) = default;       \
+    Struct& operator=(const Struct&) = default;  \
                                                  \
     template <typename T>                        \
     bool holds() const {                         \
@@ -273,25 +275,27 @@ struct ModuleValue {
         ModuleInstance* mod;
     };
     struct Struct {
-        std::vector<NodeId> nodes;
+        //std::vector<NodeId> nodes;
+        const BodyModuleExpr* body;
     };
     struct Functor {
-        Ident arg;
+        Ident param;
         ModuleValue* receiver;
     };
     struct Generator {
         ModuleValue* receiver;
     };
+    struct Binding {
+        ModuleValue* receiver;
+        Ident param;
+        ModuleValue* argument;
+    };
     struct_enum(ModuleValue, Instance);
     struct_enum(ModuleValue, Struct);
     struct_enum(ModuleValue, Functor);
     struct_enum(ModuleValue, Generator);
-    struct_enum_body(ModuleValue, Instance, Struct, Functor, Generator);
-};
-
-struct ModuleValueWithBindings {
-    ModuleValue value;
-    std::map<Ident, ModuleValue> bindings;
+    struct_enum(ModuleValue, Binding);
+    struct_enum_body(ModuleValue, Instance, Struct, Functor, Generator, Binding);
 };
 
 /// The evaluation of a module expression
@@ -304,7 +308,7 @@ struct ModuleExprEval {
 
     std::vector<const souffle::ast::ModuleExpr*> postfix;
 
-    std::stack<ModuleValue> values;
+    std::stack<ModuleValue*> values;
 
     std::size_t nextOp;
 };
@@ -698,6 +702,9 @@ private:
     /// all the module expression evaluations
     std::deque<ModuleExprEval> moduleExprEvals;
 
+    /// all the module values
+    std::deque<ModuleValue> moduleValues;
+
     NameBinding* numberNameBinding = nullptr;
     NameBinding* unsignedNameBinding = nullptr;
     NameBinding* floatNameBinding = nullptr;
@@ -747,36 +754,43 @@ private:
         while (eval->nextOp < eval->postfix.size()) {
             const ModuleExpr* expr = eval->postfix.at(eval->nextOp);
             if (const PathModuleExpr* e = as<PathModuleExpr>(expr)) {
-                PathResult res = resolveQualifiedName(e->getPath(), NS::Type, e->getSrcLoc(), eval->parent);
-                if (res.holds<PathResult::Indeterminated>()) {
+                PathResult res = resolveQualifiedName(e->getPath(), NS::Type, e->getSrcLoc(), *eval->parent);
+                if (res.holds<PathResult::Indeterminate>()) {
                     break;
                 }
                 if (!res.holds<PathResult::Module>()) {
                     return Progress::Error{"Not a module"};
                 }
-                eval->values.push(ModuleValue::Instance{res.get<Module>().mod});
+                ModuleValue* val =
+                        createModuleValue(ModuleValue::Instance{res.get<PathResult::Module>().mod});
+                eval->values.push(val);
             } else if (const ApplicationModuleExpr* app = as<ApplicationModuleExpr>(expr)) {
-                ModuleValue argument = eval->values.top();
+                (void)app;
+                ModuleValue* argument = eval->values.top();
                 eval->values.pop();
-                ModuleValue receiver = eval->values.top();
-                if (!receiver.holds<Functor>()) {
+                ModuleValue* functor = eval->values.top();
+                if (!functor->holds<ModuleValue::Functor>()) {
                     return Progress::Error{"Not a functor"};
                 }
                 eval->values.pop();
-            } else if (const BodyModuleExpr* body = as<BodyModuleExpr>(eval->expr)) {
-                const NodeId id = nextNodeId++;
-                nodeMap.emplace(id, body);
-                ModuleInstance* mod = createModule(createDef(id), eval->parent);
-                pendingModules.emplace_back(mod, &body->getItems());
+                ModuleValue* val =
+                        createModuleValue(ModuleValue::Binding{functor->get<ModuleValue::Functor>().receiver,
+                                functor->get<ModuleValue::Functor>().param, argument});
+                eval->values.push(val);
+            } else if (const BodyModuleExpr* body = as<BodyModuleExpr>(expr)) {
+                ModuleValue* val = createModuleValue(ModuleValue::Struct{body});
+                eval->values.push(val);
 
-            } else if (const FunctorModuleExpr* expr = as<FunctorModuleExpr>(eval->expr)) {
+            } else if (const FunctorModuleExpr* expr = as<FunctorModuleExpr>(expr)) {
+                ModuleValue* receiver = eval->values.top();
+                eval->values.pop();
                 if (expr->isGenerative()) {
-                    eval->expr = expr->getExpr();
-                    const Progress res = evaluateModuleExpression(eval);
-                    eval->expr = expr;
-                    if (res.holds<Stalled>{}) {
-                        return Progress::Stalled{};
-                    }
+                    Ident param = Ident::from(*expr->getParameter());
+                    ModuleValue* val = createModuleValue(ModuleValue::Functor{param, receiver});
+                    eval->values.push(val);
+                } else {
+                    ModuleValue* val = createModuleValue(ModuleValue::Generator{receiver});
+                    eval->values.push(val);
                 }
             }
 
@@ -785,8 +799,20 @@ private:
         }
 
         if (eval->nextOp == eval->postfix.size()) {
-            NameBinding* binding = allocNameBinding(NameBindingKind::Module{mod, body}, body->getSrcLoc());
-            define(eval->parent, eval->target, NS::Type, binding);
+            ModuleValue* val = eval->values.top();
+            eval->values.pop();
+            if (val->holds<ModuleValue::Struct>()) {
+                const BodyModuleExpr* body = val->get<ModuleValue::Struct>().body;
+                const NodeId id = nextNodeId++;
+                nodeMap.emplace(id, body);
+                ModuleInstance* mod = createModule(createDef(id), eval->parent);
+                pendingModules.emplace_back(mod, &body->getItems());
+                NameBinding* binding =
+                        allocNameBinding(NameBindingKind::Module{mod, body}, body->getSrcLoc());
+                define(eval->parent, eval->target, NS::Type, binding);
+            } else {
+                throw "todo";
+            }
             progress = Progress::Completed{};
         }
 
@@ -939,18 +965,25 @@ private:
         return &inst;
     }
 
-    createModuleExprEval(ModuleInstance* parent, Ident target, const ModuleExpr* root) {
-        moduleExprEvals.emplace_back(ModuleExprEval{&inst, target, root, {}, {}, 0});
+    ModuleValue* createModuleValue(ModuleValue val) {
+      moduleValues.emplace_back(std::move(val));
+      return &moduleValues.back();
+    }
+
+    ModuleExprEval* createModuleExprEval(ModuleInstance* parent, Ident target, const ModuleExpr* root) {
+        moduleExprEvals.emplace_back(ModuleExprEval{parent, target, root, {}, {}, 0});
         ModuleExprEval* modExprEval = &moduleExprEvals.back();
 
         // convert expression tree to postfix
-        const auto toPostfix = [&](const ModuleExpr* expr) {
+        const std::function<void(const ModuleExpr*)> toPostfix = [&](const ModuleExpr* expr) -> void {
             if (const PathModuleExpr* e = as<PathModuleExpr>(expr)) {
                 modExprEval->postfix.emplace_back(e);
             } else if (const BodyModuleExpr* e = as<BodyModuleExpr>(expr)) {
                 modExprEval->postfix.emplace_back(e);
             } else if (const FunctorModuleExpr* e = as<FunctorModuleExpr>(expr)) {
-                toPostfix(e->getExpr());
+                if (e->isGenerative()) {
+                    toPostfix(e->getExpr());
+                }
                 modExprEval->postfix.emplace_back(e);
             } else if (const ApplicationModuleExpr* e = as<ApplicationModuleExpr>(expr)) {
                 toPostfix(e->getArgument());
@@ -960,7 +993,11 @@ private:
                 toPostfix(e->getReceiver());
                 modExprEval->postfix.emplace_back(e);
             }
-        }(root);
+        };
+
+        toPostfix(root);
+
+        return modExprEval;
     }
 
     /// Add an import binding in `parent` module.
@@ -996,7 +1033,7 @@ private:
                 const std::string& name = md->getName();
                 Ident target = Ident::from(name);
 
-                ModuleExprEval* = createModuleExprEval(inst, target, md->getModuleExpr());
+                ModuleExprEval* modExprEval = createModuleExprEval(&inst, target, md->getModuleExpr());
                 partialModuleExprEvals.emplace_back(modExprEval);
 
                 const BindingKey key{target, NS::Type};
