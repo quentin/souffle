@@ -24,6 +24,7 @@
 #include "interpreter/ViewContext.h"
 #include "ram/Aggregate.h"
 #include "ram/Aggregator.h"
+#include "ram/Assign.h"
 #include "ram/AutoIncrement.h"
 #include "ram/Break.h"
 #include "ram/Call.h"
@@ -82,6 +83,7 @@
 #include "ram/UnpackRecord.h"
 #include "ram/UserDefinedAggregator.h"
 #include "ram/UserDefinedOperator.h"
+#include "ram/Variable.h"
 #include "ram/utility/Visitor.h"
 #include "souffle/BinaryConstraintOps.h"
 #include "souffle/RamTypes.h"
@@ -586,6 +588,10 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
         CASE(NumericConstant)
             return cur.getConstant();
         ESAC(NumericConstant)
+
+        CASE(Variable)
+            return ctxt.getVariable(cur.getName());
+        ESAC(Variable)
 
         CASE(StringConstant)
             return shadow.getConstant();
@@ -1510,6 +1516,13 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             swapRelation(shadow.getSourceId(), shadow.getTargetId());
             return true;
         ESAC(Swap)
+
+        CASE(Assign)
+            const std::string& name = cur.getVariable().getName();
+            const RamDomain val = execute(shadow.getRhs(), ctxt);
+            ctxt.setVariable(name, val);
+            return true;
+        ESAC(Assign)
     }
 
     UNREACHABLE_BAD_CASE_ANALYSIS

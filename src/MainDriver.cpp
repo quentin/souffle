@@ -27,6 +27,7 @@
 #include "ast/transform/ComponentChecker.h"
 #include "ast/transform/ComponentInstantiation.h"
 #include "ast/transform/Conditional.h"
+#include "ast/transform/DebugDeltaRelation.h"
 #include "ast/transform/ExecutionPlanChecker.h"
 #include "ast/transform/ExpandEqrels.h"
 #include "ast/transform/Fixpoint.h"
@@ -219,7 +220,7 @@ void compileToBinary(
 #endif
     auto exit = execute(interpreter, argv);
     if (!exit) throw std::invalid_argument(tfm::format("unable to execute tool <python3 %s>", command));
-    if (exit != 0) throw std::invalid_argument("failed to compile C++ sources");
+    if (*exit != 0) throw std::invalid_argument("failed to compile C++ sources");
 }
 
 class InputProvider {
@@ -356,7 +357,7 @@ public:
             std::cerr << "Failed to close pre-processor pipe\n";
             return false;
         } else if (Status != 0) {
-            std::cerr << "Pre-processors command failed with code " << Status << ": '" << Cmd.str() << "'\n";
+            std::cerr << "Pre-processor command failed with code " << Status << ": '" << Cmd.str() << "'\n";
             return false;
         }
         return true;
@@ -478,6 +479,7 @@ Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb) 
     // Main pipeline
     auto pipeline = mk<ast::transform::PipelineTransformer>(mk<ast::transform::ComponentChecker>(),
             mk<ast::transform::ComponentInstantiationTransformer>(),
+            mk<ast::transform::DebugDeltaRelationTransformer>(),
             mk<ast::transform::IODefaultsTransformer>(),
             mk<ast::transform::SimplifyAggregateTargetExpressionTransformer>(),
             mk<ast::transform::UniqueAggregationVariablesTransformer>(),

@@ -566,6 +566,17 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_END_COMMENT(out);
         }
 
+        void visit_(type_identity<Assign>, const Assign& assign, std::ostream& out) override {
+            if (assign.isInit()) {
+                out << "auto ";
+            }
+            dispatch(assign.getVariable(), out);
+            out << " = ";
+            dispatch(assign.getValue(), out);
+            assign.getValue();
+            out << ";\n";
+        }
+
         void visit_(type_identity<Swap>, const Swap& swap, std::ostream& out) override {
             PRINT_BEGIN_COMMENT(out);
             const std::string& deltaKnowledge =
@@ -834,7 +845,11 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             if (!keys.empty()) {
                 indexNumber = isa->getIndexSelection(estimateJoinSize.getRelation()).getLexOrderNum(keys);
             }
-            auto indexName = relName + "->ind_" + std::to_string(indexNumber);
+
+            auto relationType =
+                    Relation::getSynthesiserRelation(*rel, isa->getIndexSelection(rel->getName()));
+            const std::string& type = relationType->getTypeName();
+            auto indexName = relName + (type == "t_eqrel" ? "->ind" : "->ind_" + std::to_string(indexNumber));
 
             bool onlyConstants = true;
             for (auto col : estimateJoinSize.getKeyColumns()) {
@@ -2050,6 +2065,10 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_BEGIN_COMMENT(out);
             out << "RamSigned(" << synthesiser.convertSymbol2Idx(constant.getConstant()) << ")";
             PRINT_END_COMMENT(out);
+        }
+
+        void visit_(type_identity<Variable>, const Variable& v, std::ostream& out) override {
+            out << v.getName();
         }
 
         void visit_(type_identity<TupleElement>, const TupleElement& access, std::ostream& out) override {

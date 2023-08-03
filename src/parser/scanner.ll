@@ -153,13 +153,15 @@ WS [ \t\r\v\f]
                                       }
 ".once"                               {
                                         if (!driver.canEnterOnce(yylloc)) {
+                                          auto loc = yylloc;
                                           yypop_buffer_state(yyscanner);
                                           yyinfo.pop();
                                           if (!YY_CURRENT_BUFFER) {
-                                            return yy::parser::make_END(yylloc);
+                                            return yy::parser::make_END(loc);
                                           }
                                         }
                                       }
+"debug_delta"                         { return yy::parser::make_DEBUG_DELTA(yylloc); }
 "autoinc"                             { return yy::parser::make_AUTOINC(yylloc); }
 "band"                                { return yy::parser::make_BW_AND(yylloc); }
 "bor"                                 { return yy::parser::make_BW_OR(yylloc); }
@@ -209,6 +211,7 @@ WS [ \t\r\v\f]
 "to_string"                           { return yy::parser::make_TOSTRING(yylloc); }
 "to_unsigned"                         { return yy::parser::make_TOUNSIGNED(yylloc); }
 "choice-domain"                       { return yy::parser::make_CHOICEDOMAIN(yylloc); }
+"recursive_iteration_cnt"             { return yy::parser::make_ITERATION(yylloc); }
 "__FILE__"                            {
                                         return yy::parser::make_STRING(yylloc.file->Reported, yylloc);
                                       }
@@ -410,10 +413,11 @@ WS [ \t\r\v\f]
 \n                                    { }
 {WS}+                                 { }
 <<EOF>>                               {
+                                        auto loc = yylloc;
                                         yypop_buffer_state(yyscanner);
                                         yyinfo.pop();
                                         if (!YY_CURRENT_BUFFER) {
-                                          return yy::parser::make_END(yylloc);
+                                          return yy::parser::make_END(loc);
                                         }
                                       }
 .                                     { driver.error(yylloc, std::string("unexpected ") + yytext); }
