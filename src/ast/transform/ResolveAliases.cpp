@@ -426,7 +426,6 @@ VecOwn<Literal> removeTrivialEquality(const std::vector<Literal*> body) {
         visit(literal, [&](Aggregator& agg) { removeTrivialEquality(agg.bodyLiterals()); });
         newBody.push_back(std::move(clone(literal)));
     }
-
     return newBody;
 }
 }  // namespace
