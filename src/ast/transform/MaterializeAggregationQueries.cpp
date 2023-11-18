@@ -298,6 +298,7 @@ bool MaterializeAggregationQueriesTransformer::materializeAggregationQueries(
 
             // begin materialisation process
             auto aggregateBodyRelationName = analysis::findUniqueRelationName(program, "__agg_subclause");
+
             // quickly copy in all the literals from the aggregate body
             auto aggClause = mk<Clause>(QualifiedName::fromString(aggregateBodyRelationName));
             aggClause->setBodyLiterals(clone(agg.getBodyLiterals()));
@@ -306,6 +307,7 @@ bool MaterializeAggregationQueriesTransformer::materializeAggregationQueries(
                     instantiateUnnamedVariables(*aggClause);
                 }
             }
+
             // pull in any necessary grounding atoms
             groundInjectedParameters(translationUnit, *aggClause, clause, agg);
             // the head must contain all injected/local variables, but not variables
@@ -353,6 +355,13 @@ bool MaterializeAggregationQueriesTransformer::materializeAggregationQueries(
                 const auto* targetExpressionVariable = as<Variable>(agg.getTargetExpression());
                 localVariables.erase(targetExpressionVariable->getName());
             }
+            for (const auto& arg : agg.getOrderByExpressions()) {
+                if (const auto* var = as<ast::Variable>(arg.get())) {
+                    localVariables.erase(var->getName());
+                } else {
+                    throw "TODO: generate the argument in the aggregate clause";
+                }
+            }
             VecOwn<Argument> args;
             for (auto arg : aggClauseHead->getArguments()) {
                 if (auto* var = as<ast::Variable>(arg)) {
@@ -383,6 +392,7 @@ bool MaterializeAggregationQueriesTransformer::materializeAggregationQueries(
 }
 
 bool MaterializeAggregationQueriesTransformer::needsMaterializedRelation(const Aggregator& agg) {
+
     // everything with more than 1 atom  => materialize
     int countAtoms = 0;
     const Atom* atom = nullptr;
@@ -392,10 +402,9 @@ bool MaterializeAggregationQueriesTransformer::needsMaterializedRelation(const A
             ++countAtoms;
             atom = currentAtom;
         }
-    }
-
-    if (countAtoms > 1) {
-        return true;
+        if (countAtoms > 1) {
+            return true;
+        }
     }
 
     bool seenInnerAggregate = false;
@@ -434,7 +443,20 @@ bool MaterializeAggregationQueriesTransformer::needsMaterializedRelation(const A
 
     // If there are duplicates a materialization is required
     // for all others the materialization can be skipped
-    return duplicates;
+    if (duplicates) {
+        return true;
+    }
+
+    // If a variable appears in the orderby term and is not in the atom => materialize
+    for (const auto& lit : agg.getOrderByExpressions()) {
+        if (const auto* var = as<Variable>(lit.get())) {
+            if (vars.count(var->getName()) == 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 }  // namespace souffle::ast::transform

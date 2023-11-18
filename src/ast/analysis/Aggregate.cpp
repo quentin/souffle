@@ -53,8 +53,7 @@ std::set<std::string> getLocalVariables(
     std::set<std::string> witnessVariables = getWitnessVariables(tu, clause, aggregate);
     std::set<std::string> localVariables;
     for (const std::string& name : allVariablesInAggregate) {
-        if (injectedVariables.find(name) == injectedVariables.end() &&
-                witnessVariables.find(name) == witnessVariables.end()) {
+        if (injectedVariables.count(name) == 0 && witnessVariables.count(name) == 0) {
             localVariables.insert(name);
         }
     }
@@ -356,6 +355,15 @@ std::set<std::string> getInjectedVariables(
     }
 
     return injectedVariables;
+}
+
+std::set<std::string> getOrderByVariables(
+        const TranslationUnit&, const Clause&, const Aggregator& aggregate) {
+  std::set<std::string> vars;
+  for (const auto& arg : aggregate.getOrderByExpressions()) {
+        visit(*arg, [&](const Variable& v) { vars.emplace(v.getName()); });
+  }
+  return vars;
 }
 
 }  // namespace souffle::ast::analysis

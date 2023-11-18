@@ -152,6 +152,10 @@ private:
             const Aggregate& aggregate, const Shadow& shadow, const Iter& ranges, Context& ctxt);
 
     template <typename Rel>
+    RamDomain evalSimpleAggregate(const Rel& rel, const ram::Aggregate& cur,
+            const Aggregate& shadow, Context& ctxt);
+
+    template <typename Rel>
     RamDomain evalParallelAggregate(const Rel& rel, const ram::ParallelAggregate& cur,
             const ParallelAggregate& shadow, Context& ctxt);
 

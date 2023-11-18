@@ -644,7 +644,9 @@ NullableVector<Argument*> getInlinedArgument(Program& program, const Argument* a
                             case AggregateOp::FSUM:
                             case AggregateOp::USUM:
                             case AggregateOp::COUNT: return "+";
-                            case AggregateOp::MEAN: fatal("no translation");
+                            case AggregateOp::CONCAT:
+                            case AggregateOp::MEAN:
+                            case AggregateOp::STRICTCONCAT: fatal("no translation");
                         }
 
                         UNREACHABLE_BAD_CASE_ANALYSIS

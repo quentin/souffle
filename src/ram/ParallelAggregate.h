@@ -49,13 +49,13 @@ namespace souffle::ram {
 class ParallelAggregate : public Aggregate, public AbstractParallel {
 public:
     ParallelAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Condition> condition, std::size_t ident)
-            : Aggregate(NK_ParallelAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
-                      std::move(condition), ident) {}
+            Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
+            : Aggregate(NK_ParallelAggregate, std::move(nested), std::move(fun), rel, std::move(expression), std::move(condition),
+                      std::move(orderBy), ident) {}
 
     ParallelAggregate* cloning() const override {
         return new ParallelAggregate(clone(getOperation()), clone(function), relation, clone(expression),
-                clone(condition), identifier);
+                clone(condition), clone(orderBy), identifier);
     }
 
     static bool classof(const Node* n) {
@@ -70,6 +70,16 @@ protected:
         os << "FOR ALL t" << getTupleId() << " IN " << relation;
         if (!isTrue(condition.get())) {
             os << " WHERE " << getCondition();
+        }
+        if (!orderBy.empty()) {
+          os << " ORDER BY (";
+          for (size_t i = 0; i < orderBy.size(); ++i) {
+            if (i > 0) {
+              os << ", ";
+            }
+            os << *orderBy.at(i);
+          }
+          os << ")";
         }
         os << std::endl;
         RelationOperation::print(os, tabpos + 1);

@@ -40,7 +40,7 @@ namespace souffle::ast {
 class IntrinsicAggregator : public Aggregator {
 public:
     IntrinsicAggregator(AggregateOp baseOperator, Own<Argument> expr = {}, VecOwn<Literal> body = {},
-            SrcLocation loc = {});
+            VecOwn<Argument> orderby = {}, SrcLocation loc = {});
 
     /** Return the (base type) operator of the aggregator */
     AggregateOp getBaseOperator() const {

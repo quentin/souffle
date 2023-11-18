@@ -88,7 +88,7 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                     return mk<ParallelAggregate>(clone(aggregate->getOperation()),
                             clone(aggregate->getAggregator()), aggregate->getRelation(),
                             clone(aggregate->getExpression()), clone(aggregate->getCondition()),
-                            aggregate->getTupleId());
+                            clone(aggregate->getOrderByExpressions()), aggregate->getTupleId());
                 }
             } else if (const IndexAggregate* indexAggregate = as<IndexAggregate>(node)) {
                 const Relation& rel = relAnalysis->lookup(indexAggregate->getRelation());
@@ -101,7 +101,8 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                     return mk<ParallelIndexAggregate>(clone(indexAggregate->getOperation()),
                             clone(indexAggregate->getAggregator()), indexAggregate->getRelation(),
                             clone(indexAggregate->getExpression()), clone(indexAggregate->getCondition()),
-                            std::move(queryPattern), indexAggregate->getTupleId());
+                            clone(indexAggregate->getOrderByExpressions()), std::move(queryPattern),
+                            indexAggregate->getTupleId());
                 }
             }
 

@@ -1238,7 +1238,7 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
 #define AGGREGATE(Structure, Arity, AuxiliaryArity, ...)                \
     CASE(Aggregate, Structure, Arity, AuxiliaryArity)                   \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
-        return evalAggregate(cur, shadow, rel.scan(), ctxt);            \
+        return evalSimpleAggregate(rel, cur, shadow, ctxt);      \
     ESAC(Aggregate)
 
         FOR_EACH(AGGREGATE)
@@ -1928,7 +1928,9 @@ RamDomain Engine::initValue(const ram::Aggregator& aggregator, const Shadow& sha
             case AggregateOp::USUM: return ramBitCast(static_cast<RamUnsigned>(0));
             case AggregateOp::FSUM: return ramBitCast(static_cast<RamFloat>(0));
             case AggregateOp::MEAN: return 0;
+            case AggregateOp::CONCAT: return 0;
             case AggregateOp::COUNT: return 0;
+            case AggregateOp::STRICTCONCAT: return 0;
         }
     } else if (isA<ram::UserDefinedAggregator>(aggregator)) {
         return execute(shadow.getInit(), ctxt);
@@ -1939,10 +1941,13 @@ RamDomain Engine::initValue(const ram::Aggregator& aggregator, const Shadow& sha
 bool runNested(const ram::Aggregator& aggregator) {
     if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
         switch (ia->getFunction()) {
+            // aggregate functions that always hold
             case AggregateOp::COUNT:
             case AggregateOp::FSUM:
             case AggregateOp::USUM:
-            case AggregateOp::SUM: return true;
+            case AggregateOp::SUM:
+            case AggregateOp::CONCAT:
+                return true;
             default: return false;
         }
     } else if (isA<ram::UserDefinedAggregator>(aggregator)) {
@@ -1973,87 +1978,140 @@ RamDomain Engine::evalAggregate(
     // Use for calculating mean.
     std::pair<RamFloat, RamFloat> accumulateMean = {0, 0};
 
+    // Use for string concatenation.
+    std::stringstream accumulateSymbol;
+
     const ram::Aggregator& aggregator = aggregate.getAggregator();
     res = initValue(aggregator, shadow, ctxt);
     shouldRunNested = runNested(aggregator);
 
-    for (const auto& tuple : ranges) {
-        ctxt[aggregate.getTupleId()] = tuple.data();
+    const std::size_t tupleId = aggregate.getTupleId();
 
-        if (!execute(&filter, ctxt)) {
-            continue;
-        }
+    // concatenation with optional order by
+    if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
+        if (ia->getFunction() == AggregateOp::CONCAT) {
+            const auto& orderByElements = shadow.getOrderByElements();
+            std::vector<RamDomain> data;
+            size_t count = 0;
+            for (const auto& tuple : ranges) {
+                ctxt[tupleId] = tuple.data();
 
-        shouldRunNested = true;
+                if (!execute(&filter, ctxt)) {
+                    continue;
+                }
 
-        bool isCount = false;
-        ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
+                shouldRunNested = true;
 
-        // count is a special case.
-        if (isCount) {
-            ++res;
-            continue;
-        }
+                for (const auto& obe: orderByElements) {
+                    data.push_back(execute(obe.expr.get(), ctxt));
+                }
 
-        // eval target expression
-        assert(expression);  // only case where this is null is `COUNT`
-        RamDomain val = execute(expression, ctxt);
+                const RamDomain val = execute(expression, ctxt);
+                data.push_back(val);
 
-        if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
-            switch (ia->getFunction()) {
-                case AggregateOp::MIN: res = std::min(res, val); break;
-                case AggregateOp::FMIN:
-                    res = ramBitCast(std::min(ramBitCast<RamFloat>(res), ramBitCast<RamFloat>(val)));
-                    break;
-                case AggregateOp::UMIN:
-                    res = ramBitCast(std::min(ramBitCast<RamUnsigned>(res), ramBitCast<RamUnsigned>(val)));
-                    break;
-
-                case AggregateOp::MAX: res = std::max(res, val); break;
-                case AggregateOp::FMAX:
-                    res = ramBitCast(std::max(ramBitCast<RamFloat>(res), ramBitCast<RamFloat>(val)));
-                    break;
-                case AggregateOp::UMAX:
-                    res = ramBitCast(std::max(ramBitCast<RamUnsigned>(res), ramBitCast<RamUnsigned>(val)));
-                    break;
-
-                case AggregateOp::SUM: res += val; break;
-                case AggregateOp::FSUM:
-                    res = ramBitCast(ramBitCast<RamFloat>(res) + ramBitCast<RamFloat>(val));
-                    break;
-                case AggregateOp::USUM:
-                    res = ramBitCast(ramBitCast<RamUnsigned>(res) + ramBitCast<RamUnsigned>(val));
-                    break;
-
-                case AggregateOp::MEAN:
-                    accumulateMean.first += ramBitCast<RamFloat>(val);
-                    accumulateMean.second++;
-                    break;
-
-                case AggregateOp::COUNT: fatal("This should never be executed");
+                ++count;
             }
-        } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
-            auto userFunctorPtr = reinterpret_cast<void (*)()>(shadow.getFunctionPointer());
-            if (uda->isStateful() && userFunctorPtr) {
-                res = callStatefulAggregate(userFunctorPtr, &getSymbolTable(), &getRecordTable(), res, val);
+            const RamDomain* datap = data.data();
+            const size_t arity = orderByElements.size() + 1;
+            std::vector<size_t> sorted(count);
+            std::iota(std::begin(sorted), std::end(sorted), 0);
+            std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
+                const RamDomain* lp = datap + left * arity;
+                const RamDomain* rp = datap + right * arity;
+                return std::lexicographical_compare(lp, lp + arity, rp, rp + arity);
+            });
+
+            for (size_t index : sorted) {
+                accumulateSymbol << symbolTable.decode(data.at(index * arity + (arity - 1)));
+            }
+        }
+        res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));
+
+    } else {
+        for (const auto& tuple : ranges) {
+            ctxt[tupleId] = tuple.data();
+
+            if (!execute(&filter, ctxt)) {
+                continue;
+            }
+
+            shouldRunNested = true;
+
+            bool isCount = false;
+            ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
+
+            // count is a special case.
+            if (isCount) {
+                ++res;
+                continue;
+            }
+
+            // eval target expression
+            assert(expression);  // only case where this is null is `COUNT`
+            RamDomain val = execute(expression, ctxt);
+
+            if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
+                switch (ia->getFunction()) {
+                    case AggregateOp::MIN: res = std::min(res, val); break;
+                    case AggregateOp::FMIN:
+                        res = ramBitCast(std::min(ramBitCast<RamFloat>(res), ramBitCast<RamFloat>(val)));
+                        break;
+                    case AggregateOp::UMIN:
+                        res = ramBitCast(
+                                std::min(ramBitCast<RamUnsigned>(res), ramBitCast<RamUnsigned>(val)));
+                        break;
+
+                    case AggregateOp::MAX: res = std::max(res, val); break;
+                    case AggregateOp::FMAX:
+                        res = ramBitCast(std::max(ramBitCast<RamFloat>(res), ramBitCast<RamFloat>(val)));
+                        break;
+                    case AggregateOp::UMAX:
+                        res = ramBitCast(
+                                std::max(ramBitCast<RamUnsigned>(res), ramBitCast<RamUnsigned>(val)));
+                        break;
+
+                    case AggregateOp::SUM: res += val; break;
+                    case AggregateOp::FSUM:
+                        res = ramBitCast(ramBitCast<RamFloat>(res) + ramBitCast<RamFloat>(val));
+                        break;
+                    case AggregateOp::USUM:
+                        res = ramBitCast(ramBitCast<RamUnsigned>(res) + ramBitCast<RamUnsigned>(val));
+                        break;
+
+                    case AggregateOp::MEAN:
+                        accumulateMean.first += ramBitCast<RamFloat>(val);
+                        accumulateMean.second++;
+                        break;
+
+                    case AggregateOp::STRICTCONCAT:
+                    case AggregateOp::CONCAT: accumulateSymbol << symbolTable.decode(val); break;
+
+                    case AggregateOp::COUNT: fatal("This should never be executed");
+                }
+            } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
+                auto userFunctorPtr = reinterpret_cast<void (*)()>(shadow.getFunctionPointer());
+                if (uda->isStateful() && userFunctorPtr) {
+                    res = callStatefulAggregate(
+                            userFunctorPtr, &getSymbolTable(), &getRecordTable(), res, val);
+                } else {
+                    fatal("stateless functors not supported in user-defined aggregates");
+                }
             } else {
-                fatal("stateless functors not supported in user-defined aggregates");
+                fatal("Unhandled aggregator");
             }
-        } else {
-            fatal("Unhandled aggregator");
         }
-    }
 
-    ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() {
-        if (accumulateMean.second != 0) {
-            res = ramBitCast(accumulateMean.first / accumulateMean.second);
-        }
-    });
+        ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() {
+            if (accumulateMean.second != 0) {
+                res = ramBitCast(accumulateMean.first / accumulateMean.second);
+            }
+        });
+    }
 
     // write result to environment
     souffle::Tuple<RamDomain, 1> tuple;
     tuple[0] = res;
-    ctxt[aggregate.getTupleId()] = tuple.data();
+    ctxt[tupleId] = tuple.data();
 
     if (!shouldRunNested) {
         return true;
@@ -2061,6 +2119,13 @@ RamDomain Engine::evalAggregate(
         return execute(&nestedOperation, ctxt);
     }
 }
+
+template <typename Rel>
+RamDomain Engine::evalSimpleAggregate(
+        const Rel& rel, const ram::Aggregate& cur, const Aggregate& shadow, Context& ctxt) {
+    return evalAggregate(cur, shadow, rel.scan(), ctxt);
+}
+
 template <typename Rel>
 RamDomain Engine::evalParallelAggregate(
         const Rel& rel, const ram::ParallelAggregate& cur, const ParallelAggregate& shadow, Context& ctxt) {

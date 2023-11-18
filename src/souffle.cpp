@@ -42,7 +42,12 @@ bool processArgs(souffle::Global& glb, int argc, char** argv) {
 int main(int argc, char** argv) {
     souffle::Global glb;
 
-    processArgs(glb, argc, argv);
+    try {
+        processArgs(glb, argc, argv);
 
-    return souffle::main(glb, argv[0]);
+        return souffle::main(glb, argv[0]);
+    } catch (const char* msg) {
+        std::cerr << "Error: " << msg << "\n";
+        return -1;
+    }
 }

@@ -38,16 +38,13 @@ namespace souffle::ast {
  */
 class Aggregator : public Argument {
 public:
-    Aggregator(NodeKind Kind, Own<Argument> expr = {}, VecOwn<Literal> body = {}, SrcLocation loc = {});
+    Aggregator(NodeKind kind, Own<Argument> expr = {}, VecOwn<Literal> body = {}, VecOwn<Argument> orderby = {},
+            SrcLocation loc = {});
 
     /** Return target expression */
-    const Argument* getTargetExpression() const {
-        return targetExpression.get();
-    }
+    const Argument* getTargetExpression() const;
 
-    Argument* getTargetExpression() {
-        return targetExpression.get();
-    }
+    Argument* getTargetExpression();
 
     /** Return body literals */
     std::vector<Literal*> getBodyLiterals() const;
@@ -61,6 +58,8 @@ public:
 
     static bool classof(const Node*);
 
+    const VecOwn<Argument>& getOrderByExpressions() const;
+
 protected:
     NodeVec getChildren() const override;
 
@@ -69,6 +68,9 @@ protected:
 
     /** Body literal of sub-query */
     VecOwn<Literal> body;
+
+    /** Order-by expressions */
+    VecOwn<Argument> orderBy;
 };
 
 }  // namespace souffle::ast

@@ -405,7 +405,6 @@ Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& claus
                 }
             }
         }
-
         res->addToBody(clone(literal));
     }
 

@@ -17,9 +17,9 @@
 #include <utility>
 
 namespace souffle::ast {
-UserDefinedAggregator::UserDefinedAggregator(
-        std::string name, Own<Argument> init, Own<Argument> expr, VecOwn<Literal> body, SrcLocation loc)
-        : Aggregator(NK_UserDefinedAggregator, std::move(expr), std::move(body), std::move(loc)), name(name),
+UserDefinedAggregator::UserDefinedAggregator(std::string name, Own<Argument> init, Own<Argument> expr,
+        VecOwn<Literal> body, VecOwn<Argument> orderby, SrcLocation loc)
+        : Aggregator(NK_UserDefinedAggregator, std::move(expr), std::move(body), std::move(orderby), std::move(loc)), name(name),
           initValue(std::move(init)) {}
 
 void UserDefinedAggregator::apply(const NodeMapper& map) {
@@ -39,6 +39,16 @@ void UserDefinedAggregator::print(std::ostream& os) const {
         os << ", " << *targetExpression;
     }
     os << " : { " << join(body) << " }";
+    if (!orderBy.empty()) {
+        os << " orderby (";
+        for (size_t i = 0; i < orderBy.size(); ++i) {
+            if (i > 0) {
+                os << ", ";
+            }
+            os << *orderBy.at(i);
+        }
+        os << ")";
+    }
 }
 
 bool UserDefinedAggregator::equal(const Node& node) const {
@@ -49,7 +59,7 @@ bool UserDefinedAggregator::equal(const Node& node) const {
 
 UserDefinedAggregator* UserDefinedAggregator::cloning() const {
     return new UserDefinedAggregator(
-            name, clone(initValue), clone(targetExpression), clone(body), getSrcLoc());
+            name, clone(initValue), clone(targetExpression), clone(body), clone(orderBy), getSrcLoc());
 }
 
 bool UserDefinedAggregator::classof(const Node* n) {

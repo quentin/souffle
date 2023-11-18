@@ -207,6 +207,9 @@ WS [ \t\r\v\f]
 "nil"                                 { return yy::parser::make_NIL(yylloc); }
 "_"                                   { return yy::parser::make_UNDERSCORE(yylloc); }
 "count"                               { return yy::parser::make_COUNT(yylloc); }
+"concat"                              { return yy::parser::make_CONCAT(yylloc); }
+"strictconcat"                        { return yy::parser::make_STRICTCONCAT(yylloc); }
+"orderby"                             { return yy::parser::make_ORDERBY(yylloc); }
 "sum"                                 { return yy::parser::make_SUM(yylloc); }
 "true"                                { return yy::parser::make_TRUELIT(yylloc); }
 "false"                               { return yy::parser::make_FALSELIT(yylloc); }

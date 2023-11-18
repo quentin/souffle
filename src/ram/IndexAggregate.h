@@ -46,9 +46,9 @@ namespace souffle::ram {
 class IndexAggregate : public IndexOperation, public AbstractAggregate {
 public:
     IndexAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Condition> condition, RamPattern queryPattern, std::size_t ident)
+            Own<Condition> condition, VecOwn<Expression> orderBy, RamPattern queryPattern, std::size_t ident)
             : IndexAggregate(NK_IndexAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
-                      std::move(condition), std::move(queryPattern), ident) {}
+                      std::move(condition), std::move(orderBy), std::move(queryPattern), ident) {}
 
     IndexAggregate* cloning() const override {
         RamPattern pattern;
@@ -59,7 +59,7 @@ public:
             pattern.second.emplace_back(i->cloning());
         }
         return new IndexAggregate(NK_IndexAggregate, clone(getOperation()), clone(function), relation,
-                clone(expression), clone(condition), std::move(pattern), getTupleId());
+                clone(expression), clone(condition), clone(orderBy), std::move(pattern), getTupleId());
     }
 
     void apply(const NodeMapper& map) override {
@@ -67,6 +67,7 @@ public:
         condition = map(std::move(condition));
         expression = map(std::move(expression));
         function->apply(map);
+        mapAll(orderBy, map);
     }
 
     static bool classof(const Node* n) {
@@ -76,9 +77,9 @@ public:
 
 protected:
     IndexAggregate(NodeKind kind, Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Condition> condition, RamPattern queryPattern, std::size_t ident)
+            Own<Expression> expression, Own<Condition> condition, VecOwn<Expression> orderBy, RamPattern queryPattern, std::size_t ident)
             : IndexOperation(kind, rel, ident, std::move(queryPattern), std::move(nested)),
-              AbstractAggregate(std::move(fun), std::move(expression), std::move(condition)) {
+              AbstractAggregate(std::move(fun), std::move(expression), std::move(condition), std::move(orderBy)) {
         assert(kind >= NK_IndexAggregate && kind < NK_LastIndexAggregate);
     }
 
@@ -90,6 +91,16 @@ protected:
         printIndex(os);
         if (!isTrue(condition.get())) {
             os << " WHERE " << getCondition();
+        }
+        if (!orderBy.empty()) {
+          os << " ORDER BY (";
+          for (size_t i = 0; i < orderBy.size(); ++i) {
+            if (i > 0) {
+              os << ", ";
+            }
+            os << *orderBy.at(i);
+          }
+          os << ")";
         }
         os << std::endl;
         IndexOperation::print(os, tabpos + 1);

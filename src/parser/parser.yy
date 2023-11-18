@@ -161,7 +161,10 @@
 %token MIN                       "min aggregator"
 %token MAX                       "max aggregator"
 %token COUNT                     "count aggregator"
+%token CONCAT                    "concat aggregator"
+%token STRICTCONCAT              "strictconcat aggregator"
 %token SUM                       "sum aggregator"
+%token ORDERBY                   "orderby"
 %token TRUELIT                   "true literal constraint"
 %token FALSELIT                  "false literal constraint"
 %token PLAN                      "plan keyword"
@@ -294,6 +297,7 @@
 %type <std::vector<ast::QualifiedName>>   union_type_list
 %type <VecOwn<ast::BranchType>>    adt_branch_list
 %type <Own<ast::BranchType>>       adt_branch
+%type <Mov<VecOwn<ast::Argument>>>      opt_orderby
 %type <Own<ast::Lattice>>                 lattice_decl
 %type <std::pair<ast::LatticeOperator, Own<ast::Argument>>>                 lattice_operator
 %type <std::map<ast::LatticeOperator, Own<ast::Argument>>>      lattice_operator_list
@@ -1241,14 +1245,17 @@ arg
       auto rest = $rest;
       auto expr = rest.empty() ? nullptr : std::move(rest[0]);
       auto body = (bodies.size() == 1) ? clone(bodies[0]->getBodyLiterals()) : VecOwn<ast::Literal> {};
-      $$ = mk<ast::UserDefinedAggregator>($IDENT, std::move($first), std::move(expr), std::move(body), @$);
+      VecOwn<ast::Argument> orderBy /*TODO*/;
+      $$ = mk<ast::UserDefinedAggregator>(
+              $IDENT, std::move($first), std::move(expr), std::move(body), std::move(orderBy), @$);
     }
     /* -- aggregators -- */
-  | aggregate_func arg_list COLON aggregate_body
+  | aggregate_func arg_list COLON aggregate_body opt_orderby
     {
       auto aggregate_func = $aggregate_func;
       auto arg_list = $arg_list;
       auto bodies = $aggregate_body.toClauseBodies();
+      auto opt_orderby =$opt_orderby;
       if (bodies.size() != 1) {
         driver.error("ERROR: disjunctions in aggregation clauses are currently not supported");
       }
@@ -1260,7 +1267,7 @@ arg
       }
       auto expr = arg_list.empty() ? nullptr : std::move(arg_list[0]);
       auto body = (bodies.size() == 1) ? clone(bodies[0]->getBodyLiterals()) : VecOwn<ast::Literal> {};
-      $$ = mk<ast::IntrinsicAggregator>(aggregate_func, std::move(expr), std::move(body), @$);
+      $$ = mk<ast::IntrinsicAggregator>(aggregate_func, std::move(expr), std::move(body), std::move(opt_orderby), @$);
     }
   ;
 
@@ -1304,7 +1311,11 @@ functor_built_in
   ;
 
 aggregate_func
-  : COUNT
+  : CONCAT
+    {
+      $$ = AggregateOp::CONCAT;
+    }
+  | COUNT
     {
       $$ = AggregateOp::COUNT;
     }
@@ -1319,6 +1330,10 @@ aggregate_func
   | MIN
     {
       $$ = AggregateOp::MIN;
+    }
+  | STRICTCONCAT
+    {
+      $$ = AggregateOp::STRICTCONCAT;
     }
   | SUM
     {
@@ -1336,6 +1351,15 @@ aggregate_body
       $$ = RuleBody::atom($atom);
     }
   ;
+
+opt_orderby
+  : %empty
+    {
+    }
+  | ORDERBY LPAREN non_empty_arg_list RPAREN
+    {
+      $$ = $3;
+    }
 
 /**
  * Query Plan

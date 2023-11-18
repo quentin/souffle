@@ -399,6 +399,13 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Aggregate>, const ram::Aggregat
     NodePtr init = mkInit(aggregate);
     NodePtr expr = dispatch(aggregate.getExpression());
     NodePtr cond = dispatch(aggregate.getCondition());
+
+    std::vector<Aggregate::OrderByElement> orderByElements;
+    for (const auto& e : aggregate.getOrderByExpressions()) {
+        NodePtr obexpr = dispatch(*e);
+        orderByElements.emplace_back(Aggregate::OrderByElement{std::move(obexpr),'i'});
+    }
+
     orderingContext.addNewTuple(aggregate.getTupleId(), 1);
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), aggregate);
     std::size_t relId = encodeRelation(aggregate.getRelation());
@@ -409,7 +416,7 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Aggregate>, const ram::Aggregat
     void* functionPtr = resolveFunctionPointers(aggregate);
 
     return mk<Aggregate>(type, &aggregate, rel, std::move(expr), std::move(cond), std::move(nested),
-            std::move(init), functionPtr);
+            std::move(init), std::move(orderByElements), functionPtr);
 }
 
 NodePtr NodeGenerator::visit_(
@@ -418,15 +425,23 @@ NodePtr NodeGenerator::visit_(
     NodePtr init = mkInit(pAggregate);
     NodePtr expr = dispatch(pAggregate.getExpression());
     NodePtr cond = dispatch(pAggregate.getCondition());
+
+    std::vector<Aggregate::OrderByElement> orderByElements;
+    for (const auto& e : pAggregate.getOrderByExpressions()) {
+        NodePtr obexpr = dispatch(*e);
+        orderByElements.emplace_back(Aggregate::OrderByElement{std::move(obexpr),'i'});
+    }
+
     orderingContext.addNewTuple(pAggregate.getTupleId(), 1);
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), pAggregate);
     std::size_t relId = encodeRelation(pAggregate.getRelation());
     auto rel = getRelationHandle(relId);
     NodeType type = constructNodeType(global, "ParallelAggregate", lookup(pAggregate.getRelation()));
+
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(pAggregate);
     auto res = mk<ParallelAggregate>(type, &pAggregate, rel, std::move(expr), std::move(cond),
-            std::move(nested), std::move(init), functionPtr);
+            std::move(nested), std::move(init), std::move(orderByElements), functionPtr);
     res->setViewContext(parentQueryViewContext);
 
     return res;
@@ -438,15 +453,24 @@ NodePtr NodeGenerator::visit_(type_identity<ram::IndexAggregate>, const ram::Ind
     NodePtr init = mkInit(iAggregate);
     NodePtr expr = dispatch(iAggregate.getExpression());
     NodePtr cond = dispatch(iAggregate.getCondition());
+
+    std::vector<Aggregate::OrderByElement> orderByElements;
+    for (const auto& e : iAggregate.getOrderByExpressions()) {
+        NodePtr obexpr = dispatch(*e);
+        orderByElements.emplace_back(Aggregate::OrderByElement{std::move(obexpr),'i'});
+    }
+
     orderingContext.addNewTuple(iAggregate.getTupleId(), 1);
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), iAggregate);
     std::size_t relId = encodeRelation(iAggregate.getRelation());
     auto rel = getRelationHandle(relId);
     NodeType type = constructNodeType(global, "IndexAggregate", lookup(iAggregate.getRelation()));
+
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(iAggregate);
     return mk<IndexAggregate>(type, &iAggregate, rel, std::move(expr), std::move(cond), std::move(nested),
-            std::move(init), functionPtr, encodeView(&iAggregate), std::move(indexOperation));
+            std::move(init), std::move(orderByElements), functionPtr, encodeView(&iAggregate),
+            std::move(indexOperation));
 }
 
 NodePtr NodeGenerator::visit_(
@@ -456,16 +480,24 @@ NodePtr NodeGenerator::visit_(
     NodePtr init = mkInit(piAggregate);
     NodePtr expr = dispatch(piAggregate.getExpression());
     NodePtr cond = dispatch(piAggregate.getCondition());
+
+    std::vector<Aggregate::OrderByElement> orderByElements;
+    for (const auto& e : piAggregate.getOrderByExpressions()) {
+        NodePtr obexpr = dispatch(*e);
+        orderByElements.emplace_back(Aggregate::OrderByElement{std::move(obexpr),'i'});
+    }
+
     orderingContext.addNewTuple(piAggregate.getTupleId(), 1);
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), piAggregate);
     std::size_t relId = encodeRelation(piAggregate.getRelation());
     auto rel = getRelationHandle(relId);
     NodeType type = constructNodeType(global, "ParallelIndexAggregate", lookup(piAggregate.getRelation()));
+
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(piAggregate);
     auto res = mk<ParallelIndexAggregate>(type, &piAggregate, rel, std::move(expr), std::move(cond),
-            std::move(nested), std::move(init), functionPtr, encodeView(&piAggregate),
-            std::move(indexOperation));
+            std::move(nested), std::move(init), std::move(orderByElements), functionPtr,
+            encodeView(&piAggregate), std::move(indexOperation));
     res->setViewContext(parentQueryViewContext);
     return res;
 }

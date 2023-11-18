@@ -64,4 +64,7 @@ std::string findUniqueVariableName(const Clause& clause, std::string base);
 std::set<std::string> getInjectedVariables(
         const TranslationUnit& tu, const Clause& clause, const Aggregator& aggregate);
 
+std::set<std::string> getOrderByVariables(
+        const TranslationUnit& tu, const Clause& clause, const Aggregator& aggregate);
+
 }  // namespace souffle::ast::analysis

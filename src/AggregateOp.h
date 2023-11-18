@@ -39,11 +39,16 @@ enum class AggregateOp {
     UMIN,
     USUM,
 
+    CONCAT,
     COUNT,
+    STRICTCONCAT,
 };
 
 inline std::ostream& operator<<(std::ostream& os, AggregateOp op) {
     switch (op) {
+        case AggregateOp::CONCAT: return os << "concat";
+        case AggregateOp::STRICTCONCAT: return os << "strictconcat";
+
         case AggregateOp::COUNT: return os << "count";
 
         case AggregateOp::MEAN: return os << "mean";
@@ -69,12 +74,14 @@ inline std::pair<uint8_t, uint8_t> aggregateArity(AggregateOp op) {
     switch (op) {
         case AggregateOp::COUNT: return {0, 0};
 
+        case AggregateOp::CONCAT:
         case AggregateOp::FMAX:
         case AggregateOp::FMIN:
         case AggregateOp::FSUM:
         case AggregateOp::MAX:
         case AggregateOp::MEAN:
         case AggregateOp::MIN:
+        case AggregateOp::STRICTCONCAT:
         case AggregateOp::SUM:
         case AggregateOp::UMAX:
         case AggregateOp::UMIN:
@@ -102,6 +109,9 @@ inline TypeAttribute getTypeAttributeAggregate(const AggregateOp op) {
         case AggregateOp::UMAX:
         case AggregateOp::UMIN:
         case AggregateOp::USUM: return TypeAttribute::Unsigned;
+
+        case AggregateOp::CONCAT:
+        case AggregateOp::STRICTCONCAT: return TypeAttribute::Symbol;
     }
 
     UNREACHABLE_BAD_CASE_ANALYSIS
@@ -114,6 +124,8 @@ inline bool isOverloadedAggregator(const AggregateOp op) {
         case AggregateOp::SUM: return true;
 
         case AggregateOp::MEAN:
+        case AggregateOp::CONCAT:
+        case AggregateOp::STRICTCONCAT:
         case AggregateOp::COUNT: return false;
 
         default: return false;

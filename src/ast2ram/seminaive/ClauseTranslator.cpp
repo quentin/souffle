@@ -400,9 +400,17 @@ Own<ram::Operation> ClauseTranslator::instantiateAggregator(Own<ram::Operation> 
         }
     }();
 
+    // translate order by variables
+    VecOwn<ram::Expression> orderBy;
+    for (const auto& by : agg->getOrderByExpressions()) {
+        Own<ram::Expression> expr = context.translateValue(*valueIndex, by.get());
+        orderBy.emplace_back(expr.release());
+    }
+
     // add Ram-Aggregation layer
     return mk<ram::Aggregate>(std::move(op), std::move(aggregator), getClauseAtomName(clause, aggAtom),
             expr ? std::move(expr) : mk<ram::UndefValue>(), aggCond ? std::move(aggCond) : mk<ram::True>(),
+            std::move(orderBy),
             curLevel);
 }
 

@@ -40,7 +40,7 @@ namespace souffle::ast {
 class UserDefinedAggregator : public Aggregator {
 public:
     UserDefinedAggregator(std::string name, Own<Argument> init = {}, Own<Argument> expr = {},
-            VecOwn<Literal> body = {}, SrcLocation loc = {});
+            VecOwn<Literal> body = {}, VecOwn<Argument> orderby = {}, SrcLocation loc = {});
 
     std::string getBaseOperatorName() const override {
         return name;

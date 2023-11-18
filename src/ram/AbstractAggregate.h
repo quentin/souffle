@@ -18,6 +18,7 @@
 #include "ram/Condition.h"
 #include "ram/Expression.h"
 #include "ram/Node.h"
+#include "ram/TupleElement.h"
 #include "souffle/utility/ContainerUtil.h"
 #include "souffle/utility/MiscUtil.h"
 #include <cassert>
@@ -38,8 +39,10 @@ namespace souffle::ram {
  */
 class AbstractAggregate {
 public:
-    AbstractAggregate(Own<Aggregator> op, Own<Expression> expr, Own<Condition> cond)
-            : function(std::move(op)), expression(std::move(expr)), condition(std::move(cond)) {
+    AbstractAggregate(
+            Own<Aggregator> op, Own<Expression> expr, Own<Condition> cond, VecOwn<Expression> orderBy)
+            : function(std::move(op)), expression(std::move(expr)), condition(std::move(cond)),
+              orderBy(std::move(orderBy)) {
         assert(condition != nullptr && "Condition is a null-pointer");
         assert(expression != nullptr && "Expression is a null-pointer");
     }
@@ -61,6 +64,10 @@ public:
     const Expression& getExpression() const {
         assert(expression != nullptr && "Expression of aggregate is a null-pointer");
         return *expression;
+    }
+
+    const VecOwn<Expression>& getOrderByExpressions() const {
+        return orderBy;
     }
 
     Node::ConstChildNodes getChildNodes() const {
@@ -100,6 +107,9 @@ protected:
 
     /** Aggregation tuple condition */
     Own<Condition> condition;
+
+    /** Order by tuple elements*/
+    VecOwn<Expression> orderBy;
 };
 
 }  // namespace souffle::ram
