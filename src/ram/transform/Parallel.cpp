@@ -87,8 +87,9 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                     changed = true;
                     return mk<ParallelAggregate>(clone(aggregate->getOperation()),
                             clone(aggregate->getAggregator()), aggregate->getRelation(),
-                            clone(aggregate->getExpression()), clone(aggregate->getCondition()),
-                            clone(aggregate->getOrderByExpressions()), aggregate->getTupleId());
+                            clone(aggregate->getExpression()), clone(aggregate->getSecondaryExpression()),
+                            clone(aggregate->getCondition()), clone(aggregate->getOrderByExpressions()),
+                            aggregate->getTupleId());
                 }
             } else if (const IndexAggregate* indexAggregate = as<IndexAggregate>(node)) {
                 const Relation& rel = relAnalysis->lookup(indexAggregate->getRelation());
@@ -100,7 +101,9 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                     RamPattern queryPattern = clone(indexAggregate->getRangePattern());
                     return mk<ParallelIndexAggregate>(clone(indexAggregate->getOperation()),
                             clone(indexAggregate->getAggregator()), indexAggregate->getRelation(),
-                            clone(indexAggregate->getExpression()), clone(indexAggregate->getCondition()),
+                            clone(indexAggregate->getExpression()),
+                            clone(indexAggregate->getSecondaryExpression()),
+                            clone(indexAggregate->getCondition()),
                             clone(indexAggregate->getOrderByExpressions()), std::move(queryPattern),
                             indexAggregate->getTupleId());
                 }

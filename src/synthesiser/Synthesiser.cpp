@@ -1127,10 +1127,12 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     case AggregateOp::MAX: return "MIN_RAM_SIGNED";
                     case AggregateOp::FMAX: return "MIN_RAM_FLOAT";
                     case AggregateOp::UMAX: return "MIN_RAM_UNSIGNED";
+                    case AggregateOp::CONCAT:
                     case AggregateOp::COUNT:
                     case AggregateOp::MEAN:
                     case AggregateOp::FSUM:
                     case AggregateOp::USUM:
+                    case AggregateOp::STRICTCONCAT:
                     case AggregateOp::SUM: return "0";
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
@@ -1179,6 +1181,11 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                         out << ");\n";
                         out << "++res1;\n";
                         break;
+
+                    case AggregateOp::CONCAT:
+                    case AggregateOp::STRICTCONCAT:
+                        throw "Not implemented";
+                        break;
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
                 out << "res0 = " << uda->getName() << "(";
@@ -1197,7 +1204,8 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     case AggregateOp::COUNT:
                     case AggregateOp::FSUM:
                     case AggregateOp::USUM:
-                    case AggregateOp::SUM: return true;
+                    case AggregateOp::SUM:
+                    case AggregateOp::CONCAT: return true;
                     default: return false;
                 }
             } else if (isA<ram::UserDefinedAggregator>(aggregator)) {
@@ -1662,6 +1670,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             bool isCount = false;
             ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
+
+            ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { throw "Not implemented"; });
+            ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { throw "Not implemented"; });
 
             // special case: counting number elements over an unrestricted predicate
             if (isCount && isTrue(&aggregate.getCondition())) {

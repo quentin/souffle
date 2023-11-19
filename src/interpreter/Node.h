@@ -767,14 +767,19 @@ public:
     };
 
     Aggregate(enum NodeType ty, const ram::Node* sdw, RelationHandle* relHandle, Own<Node> expr,
-            Own<Node> filter, Own<Node> nested, Own<Node> init, std::vector<OrderByElement> orderByElements,
-            void*& functorPtr)
+            Own<Node> second, Own<Node> filter, Own<Node> nested, Own<Node> init,
+            std::vector<OrderByElement> orderByElements, void*& functorPtr)
             : Node(ty, sdw), ConditionalOperation(std::move(filter)), NestedOperation(std::move(nested)),
               RelationalOperation(relHandle), FunctorNode(functorPtr), expr(std::move(expr)),
-              init(std::move(init)), orderByElements(std::move(orderByElements)) {}
+              second(std::move(second)), init(std::move(init)), orderByElements(std::move(orderByElements)) {
+    }
 
     inline const Node* getExpr() const {
         return expr.get();
+    }
+
+    inline const Node* getSecondary() const {
+        return second.get();
     }
 
     inline const Node* getInit() const {
@@ -787,6 +792,7 @@ public:
 
 protected:
     Own<Node> expr;
+    Own<Node> second;
     Own<Node> init;
     std::vector<OrderByElement> orderByElements;
 };
@@ -804,10 +810,11 @@ class ParallelAggregate : public Aggregate, public AbstractParallel {
 class IndexAggregate : public Aggregate, public SuperOperation, public ViewOperation {
 public:
     IndexAggregate(enum NodeType ty, const ram::Node* sdw, RelationHandle* relHandle, Own<Node> expr,
-            Own<Node> filter, Own<Node> nested, Own<Node> init, std::vector<OrderByElement> orderByTupleElements,
-            void*& functorPtr, std::size_t viewId, SuperInstruction superInst)
-            : Aggregate(ty, sdw, relHandle, std::move(expr), std::move(filter), std::move(nested),
-                      std::move(init), std::move(orderByTupleElements), functorPtr),
+            Own<Node> second, Own<Node> filter, Own<Node> nested, Own<Node> init,
+            std::vector<OrderByElement> orderByTupleElements, void*& functorPtr, std::size_t viewId,
+            SuperInstruction superInst)
+            : Aggregate(ty, sdw, relHandle, std::move(expr), std::move(second), std::move(filter),
+                      std::move(nested), std::move(init), std::move(orderByTupleElements), functorPtr),
               SuperOperation(std::move(superInst)), ViewOperation(viewId) {}
 };
 

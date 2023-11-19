@@ -82,8 +82,9 @@ Aggregator* SimplifyAggregateTargetExpressionTransformer::simplifyTargetExpressi
 
     // Create the new simplified aggregator
     if (auto* intrinsicAgg = as<IntrinsicAggregator>(aggregator)) {
-        return new IntrinsicAggregator(
-                intrinsicAgg->getBaseOperator(), std::move(newTargetExpression), std::move(newBody));
+        return new IntrinsicAggregator(intrinsicAgg->getBaseOperator(), std::move(newTargetExpression),
+                clone(intrinsicAgg->getSecondaryExpression()), std::move(newBody),
+                clone(intrinsicAgg->getOrderByExpressions()), intrinsicAgg->getSrcLoc());
     } else {
         assert(false && "todo");
         return nullptr;

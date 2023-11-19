@@ -1971,6 +1971,7 @@ RamDomain Engine::evalAggregate(
 
     const Node& filter = *shadow.getCondition();
     const Node* expression = shadow.getExpr();
+    const Node* secondary = shadow.getSecondary();
     const Node& nestedOperation = *shadow.getNestedOperation();
     // initialize result
     RamDomain res = 0;
@@ -1978,52 +1979,68 @@ RamDomain Engine::evalAggregate(
     // Use for calculating mean.
     std::pair<RamFloat, RamFloat> accumulateMean = {0, 0};
 
-    // Use for string concatenation.
-    std::stringstream accumulateSymbol;
-
     const ram::Aggregator& aggregator = aggregate.getAggregator();
     res = initValue(aggregator, shadow, ctxt);
     shouldRunNested = runNested(aggregator);
 
     const std::size_t tupleId = aggregate.getTupleId();
 
-    // concatenation with optional order by
-    if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
-        if (ia->getFunction() == AggregateOp::CONCAT) {
-            const auto& orderByElements = shadow.getOrderByElements();
-            std::vector<RamDomain> data;
-            size_t count = 0;
-            for (const auto& tuple : ranges) {
-                ctxt[tupleId] = tuple.data();
+    bool isConcat = false;
+    ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { isConcat = true; });
+    ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { isConcat = true; });
+    if(isConcat) {
+        // concatenation with optional order by
 
-                if (!execute(&filter, ctxt)) {
-                    continue;
-                }
+        // Use for string concatenation.
+        std::stringstream accumulateSymbol;
 
-                shouldRunNested = true;
+        std::optional<RamDomain> separator = std::nullopt;
+        if (secondary) {
+            separator = execute(secondary, ctxt);
+        }
 
-                for (const auto& obe: orderByElements) {
-                    data.push_back(execute(obe.expr.get(), ctxt));
-                }
+        const auto& orderByElements = shadow.getOrderByElements();
+        std::vector<RamDomain> data;
+        size_t count = 0;
+        for (const auto& tuple : ranges) {
+            ctxt[tupleId] = tuple.data();
 
-                const RamDomain val = execute(expression, ctxt);
-                data.push_back(val);
-
-                ++count;
+            if (!execute(&filter, ctxt)) {
+                continue;
             }
-            const RamDomain* datap = data.data();
-            const size_t arity = orderByElements.size() + 1;
-            std::vector<size_t> sorted(count);
-            std::iota(std::begin(sorted), std::end(sorted), 0);
-            std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
-                const RamDomain* lp = datap + left * arity;
-                const RamDomain* rp = datap + right * arity;
-                return std::lexicographical_compare(lp, lp + arity, rp, rp + arity);
-            });
 
-            for (size_t index : sorted) {
-                accumulateSymbol << symbolTable.decode(data.at(index * arity + (arity - 1)));
+            shouldRunNested = true;
+
+            for (const auto& obe : orderByElements) {
+                data.push_back(execute(obe.expr.get(), ctxt));
             }
+
+            const RamDomain val = execute(expression, ctxt);
+            data.push_back(val);
+
+            ++count;
+        }
+        const RamDomain* datap = data.data();
+        const size_t arity = orderByElements.size() + 1;
+        std::vector<size_t> sorted(count);
+        std::iota(std::begin(sorted), std::end(sorted), 0);
+        std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
+            const RamDomain* lp = datap + left * arity;
+            const RamDomain* rp = datap + right * arity;
+            return std::lexicographical_compare(lp, lp + arity, rp, rp + arity);
+        });
+
+        bool first = true;
+        std::string sep;
+        if (separator) {
+            sep = symbolTable.decode(*separator);
+        }
+        for (size_t index : sorted) {
+            if (separator && !first) {
+                accumulateSymbol << sep;
+            }
+            accumulateSymbol << symbolTable.decode(data.at(index * arity + (arity - 1)));
+            first = false;
         }
         res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));
 
@@ -2084,8 +2101,7 @@ RamDomain Engine::evalAggregate(
                         break;
 
                     case AggregateOp::STRICTCONCAT:
-                    case AggregateOp::CONCAT: accumulateSymbol << symbolTable.decode(val); break;
-
+                    case AggregateOp::CONCAT:
                     case AggregateOp::COUNT: fatal("This should never be executed");
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {

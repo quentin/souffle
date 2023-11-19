@@ -49,15 +49,15 @@ namespace souffle::ram {
 class Aggregate : public RelationOperation, public AbstractAggregate {
 public:
     Aggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
-            : Aggregate(NK_Aggregate, std::move(nested), std::move(fun), rel, std::move(expression),
+            Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
+            : Aggregate(NK_Aggregate, std::move(nested), std::move(fun), rel, std::move(second), std::move(expression),
                       std::move(condition), std::move(orderBy), ident) {}
 
     ~Aggregate() override = default;
 
     Aggregate* cloning() const override {
         return new Aggregate(NK_Aggregate, clone(getOperation()), clone(function), relation, clone(expression),
-                clone(condition), clone(orderBy), getTupleId());
+                clone(second), clone(condition), clone(orderBy), getTupleId());
     }
 
     void apply(const NodeMapper& map) override {
@@ -65,6 +65,9 @@ public:
         condition = map(std::move(condition));
         expression = map(std::move(expression));
         function->apply(map);
+        if (second) {
+          second = map(std::move(second));
+        }
         mapAll(orderBy, map);
     }
 
@@ -75,9 +78,9 @@ public:
 
 protected:
     Aggregate(NodeKind kind, Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
+            Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
             : RelationOperation(kind, rel, ident, std::move(nested)),
-              AbstractAggregate(std::move(fun), std::move(expression), std::move(condition), std::move(orderBy)) {
+              AbstractAggregate(std::move(fun), std::move(expression), std::move(condition), std::move(condition), std::move(orderBy)) {
         assert(kind >= NK_Aggregate && kind < NK_LastAggregate);
     }
 
@@ -88,16 +91,6 @@ protected:
         os << "FOR ALL t" << getTupleId() << " IN " << getRelation();
         if (!isTrue(condition.get())) {
             os << " WHERE " << getCondition();
-        }
-        if (!orderBy.empty()) {
-          os << " ORDER BY (";
-          for (size_t i = 0; i < orderBy.size(); ++i) {
-            if (i > 0) {
-              os << ", ";
-            }
-            os << *orderBy.at(i);
-          }
-          os << ")";
         }
         os << std::endl;
         RelationOperation::print(os, tabpos + 1);

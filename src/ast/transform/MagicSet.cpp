@@ -541,7 +541,10 @@ bool NormaliseDatabaseTransformer::normaliseArguments(TranslationUnit& translati
                         return mk<IntrinsicAggregator>(intrinsicAggr->getBaseOperator(),
                                 (aggr->getTargetExpression() != nullptr ? clone(aggr->getTargetExpression())
                                                                         : nullptr),
-                                std::move(newBodyLiterals));
+                                (aggr->getSecondaryExpression() != nullptr
+                                                ? clone(aggr->getSecondaryExpression())
+                                                : nullptr),
+                                std::move(newBodyLiterals), clone(aggr->getOrderByExpressions()));
                     } else {
                         auto* uda = as<UserDefinedAggregator>(aggr);
                         return mk<UserDefinedAggregator>(uda->getBaseOperatorName(), clone(uda->getInit()),

@@ -16,9 +16,10 @@
 #include <utility>
 
 namespace souffle::ast {
-Aggregator::Aggregator(NodeKind kind, Own<Argument> expr, VecOwn<Literal> body, VecOwn<Argument> orderby, SrcLocation loc)
-        : Argument(kind, std::move(loc)), targetExpression(std::move(expr)), body(std::move(body)),
-          orderBy(std::move(orderby)) {
+Aggregator::Aggregator(NodeKind kind, Own<Argument> expr, Own<Argument> second, VecOwn<Literal> body,
+        VecOwn<Argument> orderby, SrcLocation loc)
+        : Argument(kind, std::move(loc)), targetExpression(std::move(expr)), second(std::move(second)),
+          body(std::move(body)), orderBy(std::move(orderby)) {
     // NOTE: targetExpression can be nullptr - it's used e.g. when aggregator
     // has no parameters, such as count: { body }
     assert(allValidPtrs(this->body));
@@ -31,6 +32,14 @@ const Argument* Aggregator::getTargetExpression() const {
 
 Argument* Aggregator::getTargetExpression() {
     return targetExpression.get();
+}
+
+Argument* Aggregator::getSecondaryExpression() {
+    return second.get();
+}
+
+const Argument* Aggregator::getSecondaryExpression() const {
+    return second.get();
 }
 
 std::vector<Literal*> Aggregator::getBodyLiterals() const {
@@ -52,6 +61,9 @@ void Aggregator::apply(const NodeMapper& map) {
     if (targetExpression) {
         targetExpression = map(std::move(targetExpression));
     }
+    if (second) {
+        second = map(std::move(second));
+    }
 
     mapAll(body, map);
     mapAll(orderBy, map);
@@ -66,6 +78,9 @@ Node::NodeVec Aggregator::getChildren() const {
     auto res = Argument::getChildren();
     if (targetExpression) {
         res.push_back(targetExpression.get());
+    }
+    if (second) {
+        res.push_back(second.get());
     }
     append(res, makePtrRange(body));
     append(res, makePtrRange(orderBy));

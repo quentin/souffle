@@ -48,10 +48,10 @@ namespace souffle::ram {
 class ParallelIndexAggregate : public IndexAggregate, public AbstractParallel {
 public:
     ParallelIndexAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Condition> condition, VecOwn<Expression> orderBy,
+            Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy,
             RamPattern queryPattern, std::size_t ident)
             : IndexAggregate(NK_ParallelIndexAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
-                      std::move(condition), std::move(orderBy), std::move(queryPattern), ident) {}
+                      std::move(second), std::move(condition), std::move(orderBy), std::move(queryPattern), ident) {}
 
     ParallelIndexAggregate* cloning() const override {
         RamPattern pattern;
@@ -62,7 +62,7 @@ public:
             pattern.second.emplace_back(i->cloning());
         }
         return new ParallelIndexAggregate(clone(getOperation()), clone(function), relation, clone(expression),
-                clone(condition), clone(orderBy), std::move(pattern), getTupleId());
+                clone(second), clone(condition), clone(orderBy), std::move(pattern), getTupleId());
     }
 
     static bool classof(const Node* n) {
@@ -78,16 +78,6 @@ protected:
         printIndex(os);
         if (!isTrue(condition.get())) {
             os << " WHERE " << getCondition();
-        }
-        if (!orderBy.empty()) {
-          os << " ORDER BY (";
-          for (size_t i = 0; i < orderBy.size(); ++i) {
-            if (i > 0) {
-              os << ", ";
-            }
-            os << *orderBy.at(i);
-          }
-          os << ")";
         }
         os << std::endl;
         IndexOperation::print(os, tabpos + 1);

@@ -19,7 +19,7 @@
 namespace souffle::ast {
 UserDefinedAggregator::UserDefinedAggregator(std::string name, Own<Argument> init, Own<Argument> expr,
         VecOwn<Literal> body, VecOwn<Argument> orderby, SrcLocation loc)
-        : Aggregator(NK_UserDefinedAggregator, std::move(expr), std::move(body), std::move(orderby), std::move(loc)), name(name),
+        : Aggregator(NK_UserDefinedAggregator, std::move(expr), nullptr, std::move(body), std::move(orderby), std::move(loc)), name(name),
           initValue(std::move(init)) {}
 
 void UserDefinedAggregator::apply(const NodeMapper& map) {

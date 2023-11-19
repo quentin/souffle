@@ -39,10 +39,10 @@ namespace souffle::ram {
  */
 class AbstractAggregate {
 public:
-    AbstractAggregate(
-            Own<Aggregator> op, Own<Expression> expr, Own<Condition> cond, VecOwn<Expression> orderBy)
-            : function(std::move(op)), expression(std::move(expr)), condition(std::move(cond)),
-              orderBy(std::move(orderBy)) {
+    AbstractAggregate(Own<Aggregator> op, Own<Expression> expr, Own<Expression> second, Own<Condition> cond,
+            VecOwn<Expression> orderBy)
+            : function(std::move(op)), expression(std::move(expr)), second(std::move(second)),
+              condition(std::move(cond)), orderBy(std::move(orderBy)) {
         assert(condition != nullptr && "Condition is a null-pointer");
         assert(expression != nullptr && "Expression is a null-pointer");
     }
@@ -66,6 +66,10 @@ public:
         return *expression;
     }
 
+    const Expression* getSecondaryExpression() const {
+        return second.get();
+    }
+
     const VecOwn<Expression>& getOrderByExpressions() const {
         return orderBy;
     }
@@ -83,19 +87,37 @@ protected:
         function->print(os, tabpos);
         if (expression) {
             os << *expression << " ";
+            if (second) {
+                os << ", " << *second << " ";
+            }
+        }
+        if (!orderBy.empty()) {
+            os << " ORDER BY (";
+            for (size_t i = 0; i < orderBy.size(); ++i) {
+                if (i > 0) {
+                    os << ", ";
+                }
+                os << *orderBy.at(i);
+            }
+            os << ")";
         }
     }
 
     bool equal(const Node& node) const {
         const auto& other = asAssert<AbstractAggregate, AllowCrossCast>(node);
         return equal_ptr(function, other.function) && equal_ptr(expression, other.expression) &&
-               equal_ptr(condition, other.condition);
+               equal_ptr(second, other.second) && equal_ptr(condition, other.condition) &&
+               equal_targets(orderBy, other.orderBy);
     }
 
     std::vector<const Node*> getChildren() const {
         std::vector<const Node*> res = function->getChildren();
         res.push_back(expression.get());
+        if (second) {
+          res.push_back(second.get());
+        }
         res.push_back(condition.get());
+        append(res, makePtrRange(orderBy));
         return res;
     }
 
@@ -104,6 +126,8 @@ protected:
 
     /** Aggregation expression */
     Own<Expression> expression;
+
+    Own<Expression> second;
 
     /** Aggregation tuple condition */
     Own<Condition> condition;

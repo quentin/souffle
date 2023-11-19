@@ -397,6 +397,8 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Aggregate>, const ram::Aggregat
     // runtime.
     orderingContext.addTupleWithDefaultOrder(aggregate.getTupleId(), aggregate);
     NodePtr init = mkInit(aggregate);
+    NodePtr second =
+            (aggregate.getSecondaryExpression() ? dispatch(*aggregate.getSecondaryExpression()) : nullptr);
     NodePtr expr = dispatch(aggregate.getExpression());
     NodePtr cond = dispatch(aggregate.getCondition());
 
@@ -415,14 +417,16 @@ NodePtr NodeGenerator::visit_(type_identity<ram::Aggregate>, const ram::Aggregat
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(aggregate);
 
-    return mk<Aggregate>(type, &aggregate, rel, std::move(expr), std::move(cond), std::move(nested),
-            std::move(init), std::move(orderByElements), functionPtr);
+    return mk<Aggregate>(type, &aggregate, rel, std::move(expr), std::move(second), std::move(cond),
+            std::move(nested), std::move(init), std::move(orderByElements), functionPtr);
 }
 
 NodePtr NodeGenerator::visit_(
         type_identity<ram::ParallelAggregate>, const ram::ParallelAggregate& pAggregate) {
     orderingContext.addTupleWithDefaultOrder(pAggregate.getTupleId(), pAggregate);
     NodePtr init = mkInit(pAggregate);
+    NodePtr second =
+            (pAggregate.getSecondaryExpression() ? dispatch(*pAggregate.getSecondaryExpression()) : nullptr);
     NodePtr expr = dispatch(pAggregate.getExpression());
     NodePtr cond = dispatch(pAggregate.getCondition());
 
@@ -440,8 +444,8 @@ NodePtr NodeGenerator::visit_(
 
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(pAggregate);
-    auto res = mk<ParallelAggregate>(type, &pAggregate, rel, std::move(expr), std::move(cond),
-            std::move(nested), std::move(init), std::move(orderByElements), functionPtr);
+    auto res = mk<ParallelAggregate>(type, &pAggregate, rel, std::move(expr), std::move(second),
+            std::move(cond), std::move(nested), std::move(init), std::move(orderByElements), functionPtr);
     res->setViewContext(parentQueryViewContext);
 
     return res;
@@ -451,6 +455,8 @@ NodePtr NodeGenerator::visit_(type_identity<ram::IndexAggregate>, const ram::Ind
     orderingContext.addTupleWithIndexOrder(iAggregate.getTupleId(), iAggregate);
     SuperInstruction indexOperation = getIndexSuperInstInfo(iAggregate);
     NodePtr init = mkInit(iAggregate);
+    NodePtr second =
+            (iAggregate.getSecondaryExpression() ? dispatch(*iAggregate.getSecondaryExpression()) : nullptr);
     NodePtr expr = dispatch(iAggregate.getExpression());
     NodePtr cond = dispatch(iAggregate.getCondition());
 
@@ -468,9 +474,9 @@ NodePtr NodeGenerator::visit_(type_identity<ram::IndexAggregate>, const ram::Ind
 
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(iAggregate);
-    return mk<IndexAggregate>(type, &iAggregate, rel, std::move(expr), std::move(cond), std::move(nested),
-            std::move(init), std::move(orderByElements), functionPtr, encodeView(&iAggregate),
-            std::move(indexOperation));
+    return mk<IndexAggregate>(type, &iAggregate, rel, std::move(expr), std::move(second), std::move(cond),
+            std::move(nested), std::move(init), std::move(orderByElements), functionPtr,
+            encodeView(&iAggregate), std::move(indexOperation));
 }
 
 NodePtr NodeGenerator::visit_(
@@ -478,6 +484,8 @@ NodePtr NodeGenerator::visit_(
     orderingContext.addTupleWithIndexOrder(piAggregate.getTupleId(), piAggregate);
     SuperInstruction indexOperation = getIndexSuperInstInfo(piAggregate);
     NodePtr init = mkInit(piAggregate);
+    NodePtr second =
+            (piAggregate.getSecondaryExpression() ? dispatch(*piAggregate.getSecondaryExpression()) : nullptr);
     NodePtr expr = dispatch(piAggregate.getExpression());
     NodePtr cond = dispatch(piAggregate.getCondition());
 
@@ -495,8 +503,8 @@ NodePtr NodeGenerator::visit_(
 
     /* Resolve functor to actual function pointer now */
     void* functionPtr = resolveFunctionPointers(piAggregate);
-    auto res = mk<ParallelIndexAggregate>(type, &piAggregate, rel, std::move(expr), std::move(cond),
-            std::move(nested), std::move(init), std::move(orderByElements), functionPtr,
+    auto res = mk<ParallelIndexAggregate>(type, &piAggregate, rel, std::move(expr), std::move(second),
+            std::move(cond), std::move(nested), std::move(init), std::move(orderByElements), functionPtr,
             encodeView(&piAggregate), std::move(indexOperation));
     res->setViewContext(parentQueryViewContext);
     return res;

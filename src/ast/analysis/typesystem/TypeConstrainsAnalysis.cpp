@@ -245,10 +245,12 @@ void TypeConstraintsAnalysis::visit_(type_identity<IntrinsicAggregator>, const I
         addConstraint(isSubtypeOf(getVar(agg), typeEnv.getConstantType(TypeAttribute::Signed)));
     } else if (agg.getBaseOperator() == AggregateOp::MEAN) {
         addConstraint(isSubtypeOf(getVar(agg), typeEnv.getConstantType(TypeAttribute::Float)));
-    } else if (agg.getBaseOperator() == AggregateOp::CONCAT) {
+    } else if (agg.getBaseOperator() == AggregateOp::CONCAT || agg.getBaseOperator() == AggregateOp::STRICTCONCAT) {
         addConstraint(isSubtypeOf(getVar(agg), typeEnv.getConstantType(TypeAttribute::Symbol)));
-    } else if (agg.getBaseOperator() == AggregateOp::STRICTCONCAT) {
-        addConstraint(isSubtypeOf(getVar(agg), typeEnv.getConstantType(TypeAttribute::Symbol)));
+        if (const Argument* second = agg.getSecondaryExpression()) {
+            // if there is a secondary expression it should be of the Symbol type
+            addConstraint(isSubtypeOf(getVar(*second), typeEnv.getConstantType(TypeAttribute::Symbol)));
+        }
     } else {
         addConstraint(hasSuperTypeInSet(getVar(agg), typeEnv.getConstantNumericTypes()));
     }

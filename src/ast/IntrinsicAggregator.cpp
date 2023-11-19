@@ -17,15 +17,18 @@
 #include <utility>
 
 namespace souffle::ast {
-IntrinsicAggregator::IntrinsicAggregator(AggregateOp baseOperator, Own<Argument> expr, VecOwn<Literal> body,
-        VecOwn<Argument> orderby, SrcLocation loc)
-        : Aggregator(NK_IntrinsicAggregator, std::move(expr), std::move(body), std::move(orderby), std::move(loc)),
+IntrinsicAggregator::IntrinsicAggregator(AggregateOp baseOperator, Own<Argument> expr, Own<Argument> second,
+        VecOwn<Literal> body, VecOwn<Argument> orderby, SrcLocation loc)
+        : Aggregator(NK_IntrinsicAggregator, std::move(expr), std::move(second), std::move(body), std::move(orderby), std::move(loc)),
           baseOperator(baseOperator) {}
 
 void IntrinsicAggregator::print(std::ostream& os) const {
     os << baseOperator;
     if (targetExpression) {
         os << " " << *targetExpression;
+    }
+    if (second) {
+        os << ", " << *second;
     }
     os << " : { " << join(body) << " }";
     if (!orderBy.empty()) {
@@ -48,7 +51,7 @@ bool IntrinsicAggregator::equal(const Node& node) const {
 
 IntrinsicAggregator* IntrinsicAggregator::cloning() const {
     return new IntrinsicAggregator(
-            baseOperator, clone(targetExpression), clone(body), clone(orderBy), getSrcLoc());
+            baseOperator, clone(targetExpression), clone(second), clone(body), clone(orderBy), getSrcLoc());
 }
 
 bool IntrinsicAggregator::classof(const Node* n) {

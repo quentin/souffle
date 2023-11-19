@@ -387,6 +387,9 @@ Own<ram::Operation> ClauseTranslator::instantiateAggregator(Own<ram::Operation> 
     const auto* aggExpr = agg->getTargetExpression();
     auto expr = aggExpr ? context.translateValue(*valueIndex, aggExpr) : nullptr;
 
+    const auto* aggSecond = agg->getSecondaryExpression();
+    auto second = aggSecond ? context.translateValue(*valueIndex, aggSecond) : nullptr;
+
     auto aggregator = [&]() -> Own<ram::Aggregator> {
         if (const auto* ia = as<ast::IntrinsicAggregator>(agg)) {
             return mk<ram::IntrinsicAggregator>(context.getOverloadedAggregatorOperator(*ia));
@@ -409,9 +412,8 @@ Own<ram::Operation> ClauseTranslator::instantiateAggregator(Own<ram::Operation> 
 
     // add Ram-Aggregation layer
     return mk<ram::Aggregate>(std::move(op), std::move(aggregator), getClauseAtomName(clause, aggAtom),
-            expr ? std::move(expr) : mk<ram::UndefValue>(), aggCond ? std::move(aggCond) : mk<ram::True>(),
-            std::move(orderBy),
-            curLevel);
+            expr ? std::move(expr) : mk<ram::UndefValue>(), std::move(second),
+            aggCond ? std::move(aggCond) : mk<ram::True>(), std::move(orderBy), curLevel);
 }
 
 Own<ram::Operation> ClauseTranslator::instantiateMultiResultFunctor(
