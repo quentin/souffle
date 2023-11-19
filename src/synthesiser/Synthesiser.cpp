@@ -1773,6 +1773,9 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             bool isCount = false;
             ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
+
+            ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { throw "Not implemented"; });
+            ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { throw "Not implemented"; });
             // special case: counting number elements over an unrestricted predicate
             if (isCount && isTrue(&aggregate.getCondition())) {
                 // shortcut: use relation size

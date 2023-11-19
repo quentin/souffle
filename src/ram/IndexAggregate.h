@@ -95,16 +95,6 @@ protected:
         if (!isTrue(condition.get())) {
             os << " WHERE " << getCondition();
         }
-        if (!orderBy.empty()) {
-          os << " ORDER BY (";
-          for (size_t i = 0; i < orderBy.size(); ++i) {
-            if (i > 0) {
-              os << ", ";
-            }
-            os << *orderBy.at(i);
-          }
-          os << ")";
-        }
         os << std::endl;
         IndexOperation::print(os, tabpos + 1);
     }

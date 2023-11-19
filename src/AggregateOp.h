@@ -83,7 +83,6 @@ inline std::pair<uint8_t, uint8_t> aggregateArity(AggregateOp op) {
         case AggregateOp::MAX:
         case AggregateOp::MEAN:
         case AggregateOp::MIN:
-        case AggregateOp::STRICTCONCAT:
         case AggregateOp::SUM:
         case AggregateOp::UMAX:
         case AggregateOp::UMIN:

@@ -1979,9 +1979,6 @@ RamDomain Engine::evalAggregate(
     // Use for calculating mean.
     std::pair<RamFloat, RamFloat> accumulateMean = {0, 0};
 
-    // Use for string concatenation.
-    std::stringstream accumulateSymbol;
-
     const ram::Aggregator& aggregator = aggregate.getAggregator();
     res = initValue(aggregator, shadow, ctxt);
     shouldRunNested = runNested(aggregator);
@@ -2104,8 +2101,7 @@ RamDomain Engine::evalAggregate(
                         break;
 
                     case AggregateOp::STRICTCONCAT:
-                    case AggregateOp::CONCAT: accumulateSymbol << symbolTable.decode(val); break;
-
+                    case AggregateOp::CONCAT:
                     case AggregateOp::COUNT: fatal("This should never be executed");
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
