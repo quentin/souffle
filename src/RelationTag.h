@@ -122,7 +122,7 @@ inline RelationRepresentation getRelationRepresentationFromTag(const RelationTag
         default: fatal("invalid relation tag");
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 inline std::ostream& operator<<(std::ostream& os, RelationTag qualifier) {
@@ -142,7 +142,7 @@ inline std::ostream& operator<<(std::ostream& os, RelationTag qualifier) {
         case RelationTag::EQREL: return os << "eqrel";
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 inline std::ostream& operator<<(std::ostream& os, RelationQualifier qualifier) {
@@ -158,7 +158,7 @@ inline std::ostream& operator<<(std::ostream& os, RelationQualifier qualifier) {
         case RelationQualifier::SUPPRESSED: return os << "suppressed";
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 inline std::ostream& operator<<(std::ostream& os, RelationRepresentation representation) {
@@ -171,7 +171,7 @@ inline std::ostream& operator<<(std::ostream& os, RelationRepresentation represe
         case RelationRepresentation::DEFAULT: return os;
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 }  // namespace souffle

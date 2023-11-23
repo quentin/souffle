@@ -17,6 +17,7 @@
 #pragma once
 
 #include "souffle/RamTypes.h"
+#include "souffle/utility/MiscUtil.h"
 #include "souffle/utility/StringUtil.h"
 #include "souffle/utility/tinyformat.h"
 #include <csignal>
@@ -78,9 +79,7 @@ A symbol2numeric(const std::string& src) {
         }
 
     } catch (...) {
-        tfm::format(std::cerr, "error: wrong string provided by `to_number(\"%s\")` functor.\n", src);
-        raise(SIGFPE);
-        abort();  // UNREACHABLE: `raise` lacks a no-return attribute
+        fatal("Wrong string provided by `to_number(\"%s\")` functor.\n", src);
     }
 };
 

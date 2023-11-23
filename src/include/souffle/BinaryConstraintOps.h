@@ -296,7 +296,7 @@ inline BinaryConstraintOp convertOverloadedConstraint(
         default: fatal("invalid constraint conversion: constraint = %s", constraintOp);
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 
 #undef COMPARE_CONSTRAINT_FLOAT_OR_RAW
 #undef COMPARE_CONSTRAINT
@@ -340,7 +340,7 @@ inline BinaryConstraintOp negatedConstraintOp(const BinaryConstraintOp op) {
         case BinaryConstraintOp::NOT_CONTAINS: return BinaryConstraintOp::CONTAINS;
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 /**
@@ -374,7 +374,7 @@ inline char const* toBinaryConstraintSymbol(const BinaryConstraintOp op) {
         case BinaryConstraintOp::NOT_CONTAINS: return "not_contains";
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 /**
@@ -428,7 +428,7 @@ inline bool isOrderedBinaryConstraintOp(const BinaryConstraintOp op) {
         case BinaryConstraintOp::NOT_CONTAINS: return false;
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 /**
@@ -477,7 +477,7 @@ inline std::vector<TypeAttribute> getBinaryConstraintTypes(const BinaryConstrain
         case BinaryConstraintOp::NOT_CONTAINS: return {TypeAttribute::Symbol};
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 
 #undef COMPARE_EQUALS
 #undef COMPARE_OP

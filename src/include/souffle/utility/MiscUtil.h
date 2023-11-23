@@ -26,6 +26,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -239,15 +240,17 @@ bool equal_ptr(const Own<T>& a, const Own<T>& b) {
 // -------------------------------------------------------------------------------
 
 template <typename... Args>
-[[noreturn]] void fatal(const char* format, const Args&... args) {
-    tfm::format(std::cerr, format, args...);
-    std::cerr << "\n";
-    assert(false && "fatal error; see std err");
-    abort();
+[[noreturn]] void fatal(const char* format, Args&&... args) {
+    std::string msg = tfm::format(format, std::forward<Args>(args)...);
+#ifndef NDEBUG
+    std::cerr << "Error: " << msg << "\n";
+    assert("error: see stderr\n");
+#endif
+    throw std::runtime_error(msg);
 }
 
 // HACK:  Workaround to suppress spurious reachability warnings.
-#define UNREACHABLE_BAD_CASE_ANALYSIS fatal("unhandled switch branch");
+#define UNREACHABLE_BAD_CASE_ANALYSIS() fatal("unhandled switch branch")
 
 // -------------------------------------------------------------------------------
 //                               Other Utilities

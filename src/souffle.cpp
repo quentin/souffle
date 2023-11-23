@@ -49,5 +49,11 @@ int main(int argc, char** argv) {
     } catch (const char* msg) {
         std::cerr << "Error: " << msg << "\n";
         return -1;
+    } catch (const std::string& msg) {
+        std::cerr << "Error: " << msg << "\n";
+        return -1;
+    } catch(std::exception& ex) {
+        std::cerr << "Error: " << ex.what() << "\n";
+        return -1;
     }
 }

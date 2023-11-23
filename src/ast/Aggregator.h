@@ -51,6 +51,9 @@ public:
     Argument* getSecondaryExpression();
 
     /** Return body literals */
+    VecOwn<Literal>& bodyLiterals();
+
+    /** Return body literals */
     std::vector<Literal*> getBodyLiterals() const;
 
     /** Set body literals, returns previous body literals */

@@ -392,11 +392,29 @@ Own<Clause> ResolveAliasesTransformer::resolveAliases(const Clause& clause) {
     return substitution(clone(clause));
 }
 
-Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& clause) {
-    auto res = Own<Clause>(clause.cloneHead());
+namespace {
+void removeTrivialEquality(VecOwn<Literal>& body) {
+  auto it = body.begin();
+  while (it != body.end()) {
+      Literal* literal = it->get();
+      if (auto* constraint = as<BinaryConstraint>(literal)) {
+          // TODO: don't filter out `FEQ` constraints, since `x = x` can fail when `x` is a NaN
+          if (isEqConstraint(constraint->getBaseOperator())) {
+              if (*constraint->getLHS() == *constraint->getRHS()) {
+                  it = body.erase(it);  // skip this one
+                  continue;
+              }
+          }
+      }
+      visit(literal, [&](Aggregator& agg) { removeTrivialEquality(agg.bodyLiterals()); });
+      ++it;
+  }
+}
+VecOwn<Literal> removeTrivialEquality(const std::vector<Literal*> body) {
+    VecOwn<Literal> newBody;
 
     // add all literals, except filtering out t = t constraints
-    for (Literal* literal : clause.getBodyLiterals()) {
+    for (Literal* literal : body) {
         if (auto* constraint = as<BinaryConstraint>(literal)) {
             // TODO: don't filter out `FEQ` constraints, since `x = x` can fail when `x` is a NaN
             if (isEqConstraint(constraint->getBaseOperator())) {
@@ -405,8 +423,20 @@ Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& claus
                 }
             }
         }
-        res->addToBody(clone(literal));
+        visit(literal, [&](Aggregator& agg) { removeTrivialEquality(agg.bodyLiterals()); });
+        newBody.push_back(std::move(clone(literal)));
     }
+
+    return newBody;
+}
+}  // namespace
+
+Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& clause) {
+    auto res = Own<Clause>(clause.cloneHead());
+
+
+    auto newBody = transform::removeTrivialEquality(clause.getBodyLiterals());
+    res->setBodyLiterals(std::move(newBody));
 
     // done
     return res;

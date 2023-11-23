@@ -649,7 +649,7 @@ NullableVector<Argument*> getInlinedArgument(Program& program, const Argument* a
                             case AggregateOp::STRICTCONCAT: fatal("no translation");
                         }
 
-                        UNREACHABLE_BAD_CASE_ANALYSIS
+                        UNREACHABLE_BAD_CASE_ANALYSIS();
                     };
                     // Create the actual overall aggregator that ties the replacement aggregators together.
                     // example: min x : { a(x) }. <=> min ( min x : { a1(x) }, min x : { a2(x) }, ... )

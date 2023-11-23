@@ -84,12 +84,16 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                         !rel.isNullary()
                         // We can only parallelize intrinsic aggregators for
                         && isA<ram::IntrinsicAggregator>(aggregate->getAggregator())) {
-                    changed = true;
-                    return mk<ParallelAggregate>(clone(aggregate->getOperation()),
-                            clone(aggregate->getAggregator()), aggregate->getRelation(),
-                            clone(aggregate->getExpression()), clone(aggregate->getSecondaryExpression()),
-                            clone(aggregate->getCondition()), clone(aggregate->getOrderByExpressions()),
-                            aggregate->getTupleId());
+                    const auto op = as<ram::IntrinsicAggregator>(aggregate->getAggregator())->getFunction();
+                    // TODO support parallel CONCAT/STRICTCONCAT
+                    if (op != AggregateOp::CONCAT && op != AggregateOp::STRICTCONCAT) {
+                        changed = true;
+                        return mk<ParallelAggregate>(clone(aggregate->getOperation()),
+                                clone(aggregate->getAggregator()), aggregate->getRelation(),
+                                clone(aggregate->getExpression()), clone(aggregate->getSecondaryExpression()),
+                                clone(aggregate->getCondition()), clone(aggregate->getOrderByExpressions()),
+                                aggregate->getTupleId());
+                    }
                 }
             } else if (const IndexAggregate* indexAggregate = as<IndexAggregate>(node)) {
                 const Relation& rel = relAnalysis->lookup(indexAggregate->getRelation());
@@ -97,15 +101,19 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                         !rel.isNullary()
                         // We can only parallelize intrinsic aggregators
                         && isA<ram::IntrinsicAggregator>(indexAggregate->getAggregator())) {
-                    changed = true;
-                    RamPattern queryPattern = clone(indexAggregate->getRangePattern());
-                    return mk<ParallelIndexAggregate>(clone(indexAggregate->getOperation()),
-                            clone(indexAggregate->getAggregator()), indexAggregate->getRelation(),
-                            clone(indexAggregate->getExpression()),
-                            clone(indexAggregate->getSecondaryExpression()),
-                            clone(indexAggregate->getCondition()),
-                            clone(indexAggregate->getOrderByExpressions()), std::move(queryPattern),
-                            indexAggregate->getTupleId());
+                    const auto op = as<ram::IntrinsicAggregator>(indexAggregate->getAggregator())->getFunction();
+                    // TODO support parallel CONCAT/STRICTCONCAT
+                    if (op != AggregateOp::CONCAT && op != AggregateOp::STRICTCONCAT) {
+                        changed = true;
+                        RamPattern queryPattern = clone(indexAggregate->getRangePattern());
+                        return mk<ParallelIndexAggregate>(clone(indexAggregate->getOperation()),
+                                clone(indexAggregate->getAggregator()), indexAggregate->getRelation(),
+                                clone(indexAggregate->getExpression()),
+                                clone(indexAggregate->getSecondaryExpression()),
+                                clone(indexAggregate->getCondition()),
+                                clone(indexAggregate->getOrderByExpressions()), std::move(queryPattern),
+                                indexAggregate->getTupleId());
+                    }
                 }
             }
 

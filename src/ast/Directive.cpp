@@ -22,7 +22,7 @@ std::ostream& operator<<(std::ostream& os, DirectiveType e) {
         case DirectiveType::limitsize: return os << "limitsize";
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 Directive::Directive(DirectiveType type, QualifiedName name, SrcLocation loc)

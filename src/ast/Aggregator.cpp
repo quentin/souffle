@@ -42,6 +42,10 @@ const Argument* Aggregator::getSecondaryExpression() const {
     return second.get();
 }
 
+VecOwn<Literal>& Aggregator::bodyLiterals() {
+    return body;
+}
+
 std::vector<Literal*> Aggregator::getBodyLiterals() const {
     return toPtrVector(body);
 }

@@ -66,7 +66,7 @@ inline std::ostream& operator<<(std::ostream& os, AggregateOp op) {
         case AggregateOp::FSUM: return os << "sum";
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 // `[min, max]` # of arguments for each function
@@ -89,7 +89,7 @@ inline std::pair<uint8_t, uint8_t> aggregateArity(AggregateOp op) {
         case AggregateOp::USUM: return {1, 1};
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 /**
@@ -115,7 +115,7 @@ inline TypeAttribute getTypeAttributeAggregate(const AggregateOp op) {
         case AggregateOp::STRICTCONCAT: return TypeAttribute::Symbol;
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 inline bool isOverloadedAggregator(const AggregateOp op) {

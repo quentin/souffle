@@ -262,7 +262,7 @@ public:
     //   - and a single iter type is expected (see Relation::iterator e.g.) (i think)
     class iterator {
     public:
-        typedef std::forward_iterator_tag iterator_category;
+        using iterator_category = std::forward_iterator_tag;
         using value_type = TupleType;
         using difference_type = ptrdiff_t;
         using pointer = value_type*;

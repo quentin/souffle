@@ -101,7 +101,7 @@ char const* functorOpNameLegacy(FunctorOp op) {
         case FunctorOp::SUBSTR: return "substr";
     }
 
-    UNREACHABLE_BAD_CASE_ANALYSIS
+    UNREACHABLE_BAD_CASE_ANALYSIS();
 }
 
 char const* functorOpNameSymbol(FunctorOp op) {

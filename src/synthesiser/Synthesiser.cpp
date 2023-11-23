@@ -1144,7 +1144,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             fatal("Unhandled aggregate operation");
         }
 
-        void updateRes(std::ostream& out, const AbstractAggregate& aggregate) {
+        void updateRes(std::ostream& out, const AbstractAggregate& aggregate, std::string aggExpr) {
             const auto& aggregator = aggregate.getAggregator();
             if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
                 AggregateOp aggregateFun = ia->getFunction();
@@ -1153,38 +1153,37 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     case AggregateOp::FMIN:
                     case AggregateOp::UMIN:
                     case AggregateOp::MIN:
-                        out << "res0 = std::min(res0,ramBitCast<" << type << ">(";
-                        dispatch(aggregate.getExpression(), out);
-                        out << "));\n";
+                        out << "res0 = std::min(res0,ramBitCast<" << type << ">(" << aggExpr << "));\n";
                         break;
                     case AggregateOp::FMAX:
                     case AggregateOp::UMAX:
                     case AggregateOp::MAX:
-                        out << "res0 = std::max(res0,ramBitCast<" << type << ">(";
-                        dispatch(aggregate.getExpression(), out);
-                        out << "));\n";
+                        out << "res0 = std::max(res0,ramBitCast<" << type << ">(" << aggExpr << "));\n";
                         break;
                     case AggregateOp::COUNT: out << "++res0\n;"; break;
                     case AggregateOp::FSUM:
                     case AggregateOp::USUM:
                     case AggregateOp::SUM:
                         out << "res0 += "
-                            << "ramBitCast<" << type << ">(";
-                        dispatch(aggregate.getExpression(), out);
-                        out << ");\n";
+                            << "ramBitCast<" << type << ">(" << aggExpr << ");\n";
                         break;
 
                     case AggregateOp::MEAN:
                         out << "res0 += "
-                            << "ramBitCast<RamFloat>(";
-                        dispatch(aggregate.getExpression(), out);
-                        out << ");\n";
+                            << "ramBitCast<RamFloat>(" << aggExpr << ");\n";
                         out << "++res1;\n";
                         break;
 
                     case AggregateOp::CONCAT:
                     case AggregateOp::STRICTCONCAT:
-                        throw "Not implemented";
+                        if (aggregate.getSecondaryExpression() != nullptr) {
+                            out << "if (separator_needed) {\n";
+                            out << "concatenation << separator;\n";
+                            out << "}\n";
+                            out << "separator_needed = true;\n";
+                        }
+                        out << "const RamDomain sym = " << aggExpr << ";\n";
+                        out << "concatenation << symTable.decode(sym);\n";
                         break;
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
@@ -1192,9 +1191,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 if (uda->isStateful()) {
                     out << "&symTable, &recordTable, ";
                 }
-                out << "res0, ";
-                dispatch(aggregate.getExpression(), out);
-                out << ");\n";
+                out << "res0, " << aggExpr << ");\n";
             }
         }
 
@@ -1279,16 +1276,13 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_BEGIN_COMMENT(out);
             // get some properties
             const auto* rel = synthesiser.lookup(aggregate.getRelation());
-            auto arity = rel->getArity();
-            auto relName = synthesiser.getRelationName(rel);
-            auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
-            auto identifier = aggregate.getTupleId();
+            const std::size_t arity = rel->getArity();
+            const auto relName = synthesiser.getRelationName(rel);
+            const auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
+            const auto identifier = aggregate.getTupleId();
+            const bool hasOrderBy = false;
 
-            // aggregate tuple storing the result of aggregate
-            std::string tuple_type = "Tuple<RamDomain," + toString(arity) + ">";
-
-            // declare environment variable
-            out << "Tuple<RamDomain,1> env" << identifier << ";\n";
+            out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
 
             // get range to aggregate
             auto keys = isa->getSearchSignature(&aggregate);
@@ -1389,7 +1383,13 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "shouldRunNested = true;\n";
 
             // pick function
-            updateRes(out, aggregate);
+            std::ostringstream aggExpr;
+            if (hasOrderBy) {
+                aggExpr << "env" << identifier << "[0]";
+            } else if (!isUndefValue(&aggregate.getExpression())) {
+                dispatch(aggregate.getExpression(), aggExpr);
+            }
+            updateRes(out, aggregate, aggExpr.str());
 
             // end if statement
             out << "}\n";
@@ -1439,21 +1439,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_BEGIN_COMMENT(out);
             // get some properties
             const auto* rel = synthesiser.lookup(aggregate.getRelation());
-            auto arity = rel->getArity();
-            auto relName = synthesiser.getRelationName(rel);
-            auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
-            auto identifier = aggregate.getTupleId();
-
-            // aggregate tuple storing the result of aggregate
-            std::string tuple_type = "Tuple<RamDomain," + toString(arity) + ">";
+            const auto arity = rel->getArity();
+            const auto relName = synthesiser.getRelationName(rel);
+            const auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
+            const auto identifier = aggregate.getTupleId();
+            const ram::Aggregator& aggregator = aggregate.getAggregator();
+            // get range to aggregate
+            const auto keys = isa->getSearchSignature(&aggregate);
 
             // declare environment variable
-            out << "Tuple<RamDomain,1> env" << identifier << ";\n";
-
-            // get range to aggregate
-            auto keys = isa->getSearchSignature(&aggregate);
-
-            const ram::Aggregator& aggregator = aggregate.getAggregator();
+            out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
 
             bool isCount = false;
             ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
@@ -1468,20 +1463,10 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 return;
             }
 
-            // init result
-            std::string init = initValue(aggregator);
-            out << "bool shouldRunNested = " << (shouldRunNested(aggregator) ? "true" : "false") << ";\n";
-
-            std::string type = getType(aggregator);
-
-            out << type << " res0 = " << init << ";\n";
-
-            ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() { out << "RamUnsigned res1 = 0;\n"; });
-
             // check whether there is an index to use
+            std::string iterRange;
             if (keys.empty()) {
-                out << "for(const auto& env" << identifier << " : "
-                    << "*" << relName << ") {\n";
+                iterRange = "*" + relName;
             } else {
                 const auto& rangePatternLower = aggregate.getRangePattern().first;
                 const auto& rangePatternUpper = aggregate.getRangePattern().second;
@@ -1492,21 +1477,63 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     << "lowerUpperRange_" << keys << "(" << rangeBounds.first.str() << ","
                     << rangeBounds.second.str() << "," << ctxName << ");\n";
 
-                // aggregate result
-                out << "for(const auto& env" << identifier << " : range) {\n";
+                iterRange = "range";
             }
 
-            // produce condition inside the loop
-            out << "if( ";
-            dispatch(aggregate.getCondition(), out);
-            out << ") {\n";
+            const bool hasOrderBy = !aggregate.getOrderByExpressions().empty();
+
+            if (hasOrderBy) {
+                iterRange = orderByAggregate(aggregate, identifier, iterRange, out);
+            }
+
+            bool isConcat = false;
+            ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { isConcat = true; });
+            ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { isConcat = true; });
+
+            if (isConcat) {
+                out << "std::ostringstream concatenation;\n";
+                if (aggregate.getSecondaryExpression() != nullptr) {
+                    out << "bool separator_needed = false;\n";
+                    out << "const RamDomain sep = ";
+                    dispatch(*aggregate.getSecondaryExpression(), out);
+                    out << ";\n";
+                    out << "const std::string& separator = symTable.decode(sep);\n";
+                }
+            }
+
+            // init result
+            std::string init = initValue(aggregator);
+            out << "bool shouldRunNested = " << (shouldRunNested(aggregator) ? "true" : "false") << ";\n";
+
+            std::string type = getType(aggregator);
+            out << type << " res0 = " << init << ";\n";
+
+            ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() { out << "RamUnsigned res1 = 0;\n"; });
+
+            out << "for(const auto& env" << identifier << " : " << iterRange << ") {\n";
+
+            if (!hasOrderBy) {
+                // produce condition inside the loop
+                out << "if( ";
+                dispatch(aggregate.getCondition(), out);
+                out << ") {\n";
+            }
 
             out << "shouldRunNested = true;\n";
 
             // pick function
-            updateRes(out, aggregate);
+            std::ostringstream aggExpr;
+            if (hasOrderBy) {
+                aggExpr << "env" << identifier << "[0]";
+            } else if (!isUndefValue(&aggregate.getExpression())) {
+                dispatch(aggregate.getExpression(), aggExpr);
+            }
+            updateRes(out, aggregate, aggExpr.str());
+
+            // When evaluating a MIN, exit loop early if first element is
+            // guaranteed to be the minimum.
             auto printBreak = [&]() {
-                if (isGuaranteedToBeMinimum(aggregate)) {
+                if (hasOrderBy || isGuaranteedToBeMinimum(aggregate)) {
                     out << "break;\n";
                 }
             };
@@ -1525,6 +1552,10 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 out << "}\n";
             });
 
+            if (isConcat) {
+                out << "res0 = symTable.encode(concatenation.str());\n";
+            }
+
             // write result into environment tuple
             out << "env" << identifier << "[0] = ramBitCast(res0);\n";
 
@@ -1541,16 +1572,18 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_BEGIN_COMMENT(out);
             // get some properties
             const auto* rel = synthesiser.lookup(aggregate.getRelation());
-            auto relName = synthesiser.getRelationName(rel);
-            auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
-            auto identifier = aggregate.getTupleId();
+            const auto arity = rel->getArity();
+            const auto relName = synthesiser.getRelationName(rel);
+            const auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
+            const auto identifier = aggregate.getTupleId();
+            const bool hasOrderBy = false;
 
             assert(aggregate.getTupleId() == 0 && "not outer-most loop");
             assert(!preambleIssued && "only first loop can be made parallel");
             preambleIssued = true;
 
             // declare environment variable
-            out << "Tuple<RamDomain,1> env" << identifier << ";\n";
+            out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
 
             const ram::Aggregator& aggregator = aggregate.getAggregator();
 
@@ -1585,7 +1618,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             std::string sharedVariable = "res0";
             ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() {
-                out << "RamUnsigned res1 = " << init << ";\n";
+                out << "RamUnsigned res1 = 0;\n";
                 sharedVariable += ", res1";
             });
 
@@ -1627,9 +1660,17 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             out << "shouldRunNested = true;\n";
             // pick function
-            updateRes(out, aggregate);
+            std::ostringstream aggExpr;
+            if (hasOrderBy) {
+                aggExpr << "env" << identifier << "[0]";
+            } else if (!isUndefValue(&aggregate.getExpression())) {
+                dispatch(aggregate.getExpression(), aggExpr);
+            }
+            updateRes(out, aggregate, aggExpr.str());
 
-            out << "}\n";
+            if (!hasOrderBy) {
+                out << "}\n";
+            }
 
             // end aggregator loop
             out << "}\n";
@@ -1655,25 +1696,83 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "}\n";  // to close off pragma omp single section
             PRINT_END_COMMENT(out);
         }
+
+        std::string orderByAggregate(const AbstractAggregate& aggregate, std::size_t identifier,
+                std::string iterRange, std::ostream& out) {
+            synthesiser.currentClass->addInclude("<sstream>", true);
+            synthesiser.currentClass->addInclude("<vector>", true);
+            PRINT_BEGIN_COMMENT(out);
+
+            // get some properties
+            const std::size_t arity = aggregate.getOrderByExpressions().size() + 1;
+
+            out << "std::vector<Tuple<RamDomain, " << std::to_string(arity) << ">> orderedBy"
+                << identifier << ";\n";
+
+            out << "{ // ORDER BY\n";
+
+            out << "for (const auto& env" << identifier << " : " << iterRange << ") {\n";
+
+            // produce condition inside the loop
+            out << "if( ";
+            dispatch(aggregate.getCondition(), out);
+            out << ") {\n";
+
+            out << "std::array<RamDomain, " << std::to_string(arity) << "> tup;\n";
+
+            // evaluate the main expression
+            out << "const RamDomain value = ";
+            dispatch(aggregate.getExpression(), out);
+            out << ";\n";
+            out << "tup[0] = value;\n";
+
+            // evaluate order-by expression(s)
+            std::size_t idx = 0;
+            for (const auto& orderByExpr : aggregate.getOrderByExpressions()) {
+                ++idx;
+                out << "const RamDomain key" << idx << " = ";
+                dispatch(*orderByExpr, out);
+                out << ";\n";
+                out << "tup[" << std::to_string(idx) << "] = key" << idx << ";\n";
+            }
+
+            out << "orderedBy"<< identifier << ".emplace_back(std::move(tup));\n";
+
+            out << "} // if condition\n";
+            out << "} // for loop\n";
+
+            out << "std::sort(std::begin(orderedBy"<< identifier << "), std::end(orderedBy" << identifier << "),";
+            out << " [&](std::array<RamDomain," << std::to_string(arity) << ">& left,";
+            out << " std::array<RamDomain," << std::to_string(arity) << ">& right) -> bool {\n";
+            out <<"  return std::lexicographical_compare(left.begin()+1, left.end(), right.begin()+1, right.end());\n";
+            out << "});\n";
+
+            out << "} // ORDER BY\n";
+            PRINT_END_COMMENT(out);
+            return ("orderedBy" + toString(identifier));
+        }
+
         void visit_(type_identity<Aggregate>, const Aggregate& aggregate, std::ostream& out) override {
             PRINT_BEGIN_COMMENT(out);
             // get some properties
-            const auto* rel = synthesiser.lookup(aggregate.getRelation());
-            auto relName = synthesiser.getRelationName(rel);
-            auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
-            auto identifier = aggregate.getTupleId();
+            const auto* const rel = synthesiser.lookup(aggregate.getRelation());
+            const auto arity = rel->getArity();
+            const auto ctxName = "READ_OP_CONTEXT(" + synthesiser.getOpContextName(*rel) + ")";
+            const auto relName = synthesiser.getRelationName(rel);
+            const auto identifier = aggregate.getTupleId();
+            const ram::Aggregator& aggregator = aggregate.getAggregator();
+            const bool hasOrderBy = !aggregate.getOrderByExpressions().empty();
+
+            std::string iterRange = "*" + relName;
+            if (hasOrderBy) {
+                iterRange = orderByAggregate(aggregate, identifier, iterRange, out);
+            }
 
             // declare environment variable
-            out << "Tuple<RamDomain,1> env" << identifier << ";\n";
-
-            const ram::Aggregator& aggregator = aggregate.getAggregator();
+            out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
 
             bool isCount = false;
             ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
-
-            ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { throw "Not implemented"; });
-            ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { throw "Not implemented"; });
-
             // special case: counting number elements over an unrestricted predicate
             if (isCount && isTrue(&aggregate.getCondition())) {
                 // shortcut: use relation size
@@ -1684,35 +1783,66 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 return;
             }
 
+            bool isConcat = false;
+            ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { isConcat = true; });
+            ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { isConcat = true; });
+
+            if (isConcat) {
+                out << "std::ostringstream concatenation;\n";
+                if (aggregate.getSecondaryExpression() != nullptr) {
+                    out << "bool separator_needed = false;\n";
+                    out << "const RamDomain sep = ";
+                    dispatch(*aggregate.getSecondaryExpression(), out);
+                    out << ";\n";
+                    out << "const std::string& separator = symTable.decode(sep);\n";
+                }
+            }
+
             // init result
             std::string init = initValue(aggregator);
             out << "bool shouldRunNested = " << (shouldRunNested(aggregator) ? "true" : "false") << ";\n";
 
             std::string type = getType(aggregator);
-
             out << type << " res0 = " << init << ";\n";
 
             ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() { out << "RamUnsigned res1 = 0;\n"; });
 
-            // check whether there is an index to use
-            out << "for(const auto& env" << identifier << " : "
-                << "*" << relName << ") {\n";
+            out << "for(const auto& env" << identifier << " : " << iterRange << ") {\n";
 
-            // produce condition inside the loop
-            out << "if( ";
-            dispatch(aggregate.getCondition(), out);
-            out << ") {\n";
+            if (!hasOrderBy) {
+                // produce condition inside the loop
+                out << "if( ";
+                dispatch(aggregate.getCondition(), out);
+                out << ") {\n";
+            }
 
             out << "shouldRunNested = true;\n";
-            // pick function
-            updateRes(out, aggregate);
 
-            out << "}\n";
+            // pick function
+            std::ostringstream aggExpr;
+            if (hasOrderBy) {
+                aggExpr << "env" << identifier << "[0]";
+            } else if (!isUndefValue(&aggregate.getExpression())) {
+                dispatch(aggregate.getExpression(), aggExpr);
+            }
+            updateRes(out, aggregate, aggExpr.str());
+
+            if (!hasOrderBy) {
+                out << "}\n";
+            }
 
             // end aggregator loop
             out << "}\n";
 
-            ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() { out << "res0 = res0 / res1;\n"; });
+            ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() {
+                out << "if (res1 != 0) {\n";
+                out << "res0 = res0 / res1;\n";
+                out << "}\n";
+            });
+
+            if (isConcat) {
+                out << "res0 = symTable.encode(concatenation.str());\n";
+            }
 
             // write result into environment tuple
             out << "env" << identifier << "[0] = ramBitCast(res0);\n";
@@ -2385,7 +2515,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 case NestedIntrinsicOp::FRANGE: return emitRange("RamFloat");
             }
 
-            UNREACHABLE_BAD_CASE_ANALYSIS
+            UNREACHABLE_BAD_CASE_ANALYSIS();
         }
 
         void visit_(type_identity<UserDefinedOperator>, const UserDefinedOperator& op,
@@ -2620,7 +2750,7 @@ void Synthesiser::generateCode(GenDb& db, const std::string& id, bool& withShare
                 case TypeAttribute::Record: fatal("records cannot be used by user-defined functors");
             }
 
-            UNREACHABLE_BAD_CASE_ANALYSIS
+            UNREACHABLE_BAD_CASE_ANALYSIS();
         };
 
         std::vector<std::string> argsTy;
