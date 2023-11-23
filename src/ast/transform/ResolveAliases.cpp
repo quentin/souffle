@@ -437,6 +437,17 @@ Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& claus
     auto newBody = transform::removeTrivialEquality(clause.getBodyLiterals());
     res->setBodyLiterals(std::move(newBody));
 
+    return newBody;
+}
+}  // namespace
+
+Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& clause) {
+    auto res = Own<Clause>(clause.cloneHead());
+
+
+    auto newBody = transform::removeTrivialEquality(clause.getBodyLiterals());
+    res->setBodyLiterals(std::move(newBody));
+
     // done
     return res;
 }

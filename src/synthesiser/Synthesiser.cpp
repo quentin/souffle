@@ -1771,11 +1771,15 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             // declare environment variable
             out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
 
+            std::string iterRange = "*" + relName;
+            if (hasOrderBy) {
+                iterRange = orderByAggregate(aggregate, identifier, iterRange, out);
+            }
+
+            // declare environment variable
+            out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
             bool isCount = false;
             ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
-
-            ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { throw "Not implemented"; });
-            ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { throw "Not implemented"; });
             // special case: counting number elements over an unrestricted predicate
             if (isCount && isTrue(&aggregate.getCondition())) {
                 // shortcut: use relation size
