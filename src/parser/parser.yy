@@ -297,7 +297,7 @@
 %type <std::vector<ast::QualifiedName>>   union_type_list
 %type <VecOwn<ast::BranchType>>    adt_branch_list
 %type <Own<ast::BranchType>>       adt_branch
-%type <Mov<VecOwn<ast::Argument>>>      opt_orderby
+%type <VecOwn<ast::Argument>>      opt_orderby
 %type <Own<ast::Lattice>>                 lattice_decl
 %type <std::pair<ast::LatticeOperator, Own<ast::Argument>>>                 lattice_operator
 %type <std::map<ast::LatticeOperator, Own<ast::Argument>>>      lattice_operator_list
@@ -465,6 +465,7 @@ type_decl
       if (utl.size() > 1) {
         $$ = mk<ast::UnionType>(driver.mkQN(id), utl, @$);
       } else {
+        assert(utl.size() == 1 && "qualified name missing for alias type");
         $$ = mk<ast::AliasType>(driver.mkQN(id), utl[0], @$);
       }
     }
@@ -1242,15 +1243,11 @@ arg
       if (bodies.size() != 1) {
         driver.error("ERROR: disjunctions in aggregation clauses are currently not supported");
       }
-      if ($exprs.size() > 1) {
-        driver.error("ERROR: incorrect expression arity for user-defined aggregate");
-      }
-      auto expr = $exprs.empty() ? nullptr : std::move($exprs[0]);
-      auto second = $exprs.size() > 1 ? std::move($exprs[1]) : nullptr;
+      auto rest = $rest;
+      auto expr = rest.empty() ? nullptr : std::move(rest[0]);
       auto body = (bodies.size() == 1) ? clone(bodies[0]->getBodyLiterals()) : VecOwn<ast::Literal> {};
       VecOwn<ast::Argument> orderBy /*TODO*/;
-      $$ = mk<ast::UserDefinedAggregator>($IDENT, std::move($first), std::move(expr),
-              std::move(body), std::move(orderBy), @$);
+      $$ = mk<ast::UserDefinedAggregator>($IDENT, std::move($first), std::move(expr), std::move(body), std::move(orderBy), @$);
     }
     /* -- aggregators -- */
   | aggregate_func arg_list[exprs] COLON aggregate_body opt_orderby
