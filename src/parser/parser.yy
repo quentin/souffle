@@ -1246,35 +1246,35 @@ arg
       if (bodies.size() != 1) {
         driver.error("ERROR: disjunctions in aggregation clauses are currently not supported");
       }
-      auto exprs = $exprs;
-      if (exprs.size() > 1) {
+      auto rest = $exprs;
+      if (rest.size() > 1) {
         driver.error("ERROR: incorrect expression arity for user-defined aggregate");
       }
-      auto expr = exprs.empty() ? nullptr : std::move(exprs[0]);
-      auto second = exprs.size() > 1 ? std::move(exprs[1]) : nullptr;
+      auto expr = rest.empty() ? nullptr : std::move(rest[0]);
+      auto second = rest.size() > 1 ? std::move(rest[1]) : nullptr;
       auto body = (bodies.size() == 1) ? clone(bodies[0]->getBodyLiterals()) : VecOwn<ast::Literal> {};
       VecOwn<ast::OrderByElement> orderBy /* no orderby on user-defined aggregates */;
       $$ = mk<ast::UserDefinedAggregator>($IDENT, $first, std::move(expr),
               std::move(body), std::move(orderBy), @$);
     }
     /* -- aggregators -- */
-  | aggregate_func arg_list[exprs] COLON aggregate_body opt_orderby
+  | aggregate_func arg_list COLON aggregate_body opt_orderby
     {
       auto aggregate_func = $aggregate_func;
-      auto exprs = $exprs;
+      auto arg_list = $arg_list;
       auto bodies = $aggregate_body.toClauseBodies();
       auto opt_orderby =$opt_orderby;
       if (bodies.size() != 1) {
         driver.error("ERROR: disjunctions in aggregation clauses are currently not supported");
       }
       // TODO: move this to a semantic check when aggs are extended to multiple exprs
-      auto given    = exprs.size();
+      auto given    = arg_list.size();
       auto required = aggregateArity(aggregate_func);
       if (given < required.first || required.second < given) {
         driver.error("ERROR: incorrect expression arity for given aggregate mode");
       }
-      auto expr = exprs.empty() ? nullptr : std::move(exprs[0]);
-      auto second = exprs.size() > 1 ? std::move(exprs[1]) : nullptr;
+      auto expr = arg_list.empty() ? nullptr : std::move(arg_list[0]);
+      auto second = arg_list.size() > 1 ? std::move(arg_list[1]) : nullptr;
       auto body = (bodies.size() == 1) ? clone(bodies[0]->getBodyLiterals()) : VecOwn<ast::Literal> {};
       $$ = mk<ast::IntrinsicAggregator>(aggregate_func, std::move(expr), std::move(second), std::move(body), std::move(opt_orderby), @$);
     }
