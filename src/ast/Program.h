@@ -243,8 +243,6 @@ protected:
     friend class souffle::ParserDriver;
 
 private:
-    bool equal(const Node&) const override;
-
     Program* cloning() const override;
 
 private:
