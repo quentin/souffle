@@ -42,8 +42,7 @@ namespace souffle::ast {
  */
 class Aggregator : public Argument {
 public:
-
-    Aggregator(NodeKind kind, Own<Argument> expr = {}, Own<Argument> second = {}, VecOwn<Literal> body = {},
+    Aggregator(NodeKind Kind, Own<Argument> expr = {}, Own<Argument> second = {}, VecOwn<Literal> body = {},
             VecOwn<OrderByElement> orderby = {}, SrcLocation loc = {});
 
     /** Return target expression */
@@ -71,6 +70,8 @@ public:
     static bool classof(const Node*);
 
     const VecOwn<OrderByElement>& getOrderByElements() const;
+
+    static bool classof(const Node*);
 
 protected:
     NodeVec getChildren() const override;

@@ -83,7 +83,7 @@ protected:
     Aggregate(NodeKind kind, Own<Operation> nested, Own<Aggregator> fun, std::string rel,
             Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
             : RelationOperation(kind, rel, ident, std::move(nested)),
-              AbstractAggregate(std::move(fun), std::move(expression), std::move(condition), std::move(condition), std::move(orderBy)) {
+              AbstractAggregate(std::move(fun), std::move(expression), std::move(second), std::move(condition), std::move(orderBy)) {
         assert(kind >= NK_Aggregate && kind < NK_LastAggregate);
     }
 

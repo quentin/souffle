@@ -60,6 +60,7 @@ public:
         }
         return new IndexAggregate(NK_IndexAggregate, clone(getOperation()), clone(function), relation,
                 clone(expression), clone(second), clone(condition), clone(orderBy), std::move(pattern), getTupleId());
+                getTupleId());
     }
 
     void apply(const NodeMapper& map) override {
