@@ -48,7 +48,7 @@ namespace souffle::ram {
 class ParallelIndexAggregate : public IndexAggregate, public AbstractParallel {
 public:
     ParallelIndexAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy,
+            Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<OrderByElement> orderBy,
             RamPattern queryPattern, std::size_t ident)
             : IndexAggregate(NK_ParallelIndexAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
                       std::move(second), std::move(condition), std::move(orderBy), std::move(queryPattern), ident) {}

@@ -48,8 +48,9 @@ namespace souffle::ram {
  */
 class Aggregate : public RelationOperation, public AbstractAggregate {
 public:
+
     Aggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
+            Own<Expression> second, Own<Condition> condition, VecOwn<OrderByElement> orderBy, std::size_t ident)
             : Aggregate(NK_Aggregate, std::move(nested), std::move(fun), rel, std::move(second), std::move(expression),
                       std::move(condition), std::move(orderBy), ident) {}
 
@@ -68,7 +69,9 @@ public:
         if (second) {
           second = map(std::move(second));
         }
-        mapAll(orderBy, map);
+        for (auto &elem : orderBy) {
+            elem->expr = map(std::move(elem->expr));
+        }
     }
 
     static bool classof(const Node* n) {

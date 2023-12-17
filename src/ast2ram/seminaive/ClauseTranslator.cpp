@@ -404,10 +404,23 @@ Own<ram::Operation> ClauseTranslator::instantiateAggregator(Own<ram::Operation> 
     }();
 
     // translate order by variables
-    VecOwn<ram::Expression> orderBy;
-    for (const auto& by : agg->getOrderByExpressions()) {
-        Own<ram::Expression> expr = context.translateValue(*valueIndex, by.get());
-        orderBy.emplace_back(expr.release());
+    VecOwn<ram::AbstractAggregate::OrderByElement> orderBy;
+    for (const auto& elem : agg->getOrderByElements()) {
+        auto ts = context.getArgumentTypeAttributes(elem->getArgument());
+        if (ts.size() != 1) {
+            fatal("No valid type information for order-by expression");
+        }
+        auto tyattr = *ts.cbegin();
+        Own<ram::Expression> expr = context.translateValue(*valueIndex, elem->getArgument());
+        ram::AbstractAggregate::OrderByElement::Direction direction;
+        if (elem->getSortDirection().value_or("ASC") == "ASC") {
+            direction = ram::AbstractAggregate::OrderByElement::Asc;
+        } else {
+            direction = ram::AbstractAggregate::OrderByElement::Desc;
+        }
+        std::optional<std::string> collate_locale = elem->getCollateLocale();
+        orderBy.emplace_back(new ram::AbstractAggregate::OrderByElement{
+                std::move(expr), tyattr, direction, collate_locale});
     }
 
     // add Ram-Aggregation layer

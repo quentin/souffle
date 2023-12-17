@@ -39,8 +39,25 @@ namespace souffle::ram {
  */
 class AbstractAggregate {
 public:
+    struct OrderByElement {
+        enum Direction { Asc, Desc };
+        Own<Expression> expr;
+        TypeAttribute type;
+        Direction direction;
+        std::optional<std::string> collateLocale;
+
+        bool operator==(const OrderByElement& other) const {
+            return direction == other.direction && type == other.type &&
+                   collateLocale == other.collateLocale && *expr == *other.expr;
+        }
+
+        OrderByElement* cloneImpl() const {
+            return new OrderByElement{clone(expr), type, direction, collateLocale};
+        }
+    };
+
     AbstractAggregate(Own<Aggregator> op, Own<Expression> expr, Own<Expression> second, Own<Condition> cond,
-            VecOwn<Expression> orderBy)
+            VecOwn<OrderByElement> orderBy)
             : function(std::move(op)), expression(std::move(expr)), second(std::move(second)),
               condition(std::move(cond)), orderBy(std::move(orderBy)) {
         assert(condition != nullptr && "Condition is a null-pointer");
@@ -70,7 +87,7 @@ public:
         return second.get();
     }
 
-    const VecOwn<Expression>& getOrderByExpressions() const {
+    const VecOwn<OrderByElement>& getOrderByElements() const {
         return orderBy;
     }
 
@@ -97,7 +114,11 @@ protected:
                 if (i > 0) {
                     os << ", ";
                 }
-                os << *orderBy.at(i);
+                os << *(orderBy.at(i)->expr);
+                if (orderBy.at(i)->collateLocale) {
+                    os << " COLLATE \"" << *orderBy.at(i)->collateLocale << "\"";
+                }
+                os << " " << (orderBy.at(i)->direction == OrderByElement::Asc ? "ASC" : "DESC");
             }
             os << ")";
         }
@@ -114,10 +135,12 @@ protected:
         std::vector<const Node*> res = function->getChildren();
         res.push_back(expression.get());
         if (second) {
-          res.push_back(second.get());
+            res.push_back(second.get());
         }
         res.push_back(condition.get());
-        append(res, makePtrRange(orderBy));
+        for (const auto& elem : orderBy) {
+            res.push_back(elem->expr.get());
+        }
         return res;
     }
 
@@ -133,7 +156,7 @@ protected:
     Own<Condition> condition;
 
     /** Order by tuple elements*/
-    VecOwn<Expression> orderBy;
+    VecOwn<OrderByElement> orderBy;
 };
 
 }  // namespace souffle::ram

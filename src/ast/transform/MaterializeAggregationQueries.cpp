@@ -355,8 +355,9 @@ bool MaterializeAggregationQueriesTransformer::materializeAggregationQueries(
                 const auto* targetExpressionVariable = as<Variable>(agg.getTargetExpression());
                 localVariables.erase(targetExpressionVariable->getName());
             }
-            for (const auto& arg : agg.getOrderByExpressions()) {
-                if (const auto* var = as<ast::Variable>(arg.get())) {
+            for (const auto& elem : agg.getOrderByElements()) {
+                const Argument* arg = elem->getArgument();
+                if (const auto* var = as<ast::Variable>(arg)) {
                     localVariables.erase(var->getName());
                 } else {
                     throw "TODO: generate the argument in the aggregate clause";
@@ -448,8 +449,9 @@ bool MaterializeAggregationQueriesTransformer::needsMaterializedRelation(const A
     }
 
     // If a variable appears in the orderby term and is not in the atom => materialize
-    for (const auto& lit : agg.getOrderByExpressions()) {
-        if (const auto* var = as<Variable>(lit.get())) {
+    for (const auto& elem : agg.getOrderByElements()) {
+        const Argument* arg = elem->getArgument();
+        if (const auto* var = as<Variable>(arg)) {
             if (vars.count(var->getName()) == 0) {
                 return true;
             }

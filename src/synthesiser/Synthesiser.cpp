@@ -1480,7 +1480,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                 iterRange = "range";
             }
 
-            const bool hasOrderBy = !aggregate.getOrderByExpressions().empty();
+            const bool hasOrderBy = !aggregate.getOrderByElements().empty();
 
             if (hasOrderBy) {
                 iterRange = orderByAggregate(aggregate, identifier, iterRange, out);
@@ -1704,7 +1704,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             PRINT_BEGIN_COMMENT(out);
 
             // get some properties
-            const std::size_t arity = aggregate.getOrderByExpressions().size() + 1;
+            const std::size_t arity = aggregate.getOrderByElements().size() + 1;
 
             out << "std::vector<Tuple<RamDomain, " << std::to_string(arity) << ">> orderedBy"
                 << identifier << ";\n";
@@ -1728,10 +1728,10 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
 
             // evaluate order-by expression(s)
             std::size_t idx = 0;
-            for (const auto& orderByExpr : aggregate.getOrderByExpressions()) {
+            for (const auto& orderByElemPtr : aggregate.getOrderByElements()) {
                 ++idx;
                 out << "const RamDomain key" << idx << " = ";
-                dispatch(*orderByExpr, out);
+                dispatch(*orderByElemPtr->expr, out);
                 out << ";\n";
                 out << "tup[" << std::to_string(idx) << "] = key" << idx << ";\n";
             }
@@ -1744,6 +1744,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "std::sort(std::begin(orderedBy"<< identifier << "), std::end(orderedBy" << identifier << "),";
             out << " [&](std::array<RamDomain," << std::to_string(arity) << ">& left,";
             out << " std::array<RamDomain," << std::to_string(arity) << ">& right) -> bool {\n";
+            // TODO
             out <<"  return std::lexicographical_compare(left.begin()+1, left.end(), right.begin()+1, right.end());\n";
             out << "});\n";
 
@@ -1761,7 +1762,7 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             const auto relName = synthesiser.getRelationName(rel);
             const auto identifier = aggregate.getTupleId();
             const ram::Aggregator& aggregator = aggregate.getAggregator();
-            const bool hasOrderBy = !aggregate.getOrderByExpressions().empty();
+            const bool hasOrderBy = !aggregate.getOrderByElements().empty();
 
             std::string iterRange = "*" + relName;
             if (hasOrderBy) {

@@ -45,6 +45,7 @@
 #include "ast/NilConstant.h"
 #include "ast/Node.h"
 #include "ast/NumericConstant.h"
+#include "ast/OrderByElement.h"
 #include "ast/Pragma.h"
 #include "ast/Program.h"
 #include "ast/RecordInit.h"
@@ -122,6 +123,7 @@ struct Visitor : souffle::detail::VisitorBase<R, NodeType, Params...> {
         SOUFFLE_VISITOR_FORWARD(Program);
         SOUFFLE_VISITOR_FORWARD(Pragma);
         SOUFFLE_VISITOR_FORWARD(FunctorDeclaration);
+        SOUFFLE_VISITOR_FORWARD(OrderByElement);
 
         // did not work ...
         fatal("unsupported type: %s", typeid(node).name());
@@ -187,6 +189,7 @@ struct Visitor : souffle::detail::VisitorBase<R, NodeType, Params...> {
     SOUFFLE_VISITOR_LINK(Pragma, Node);
     SOUFFLE_VISITOR_LINK(FunctorDeclaration, Node);
     SOUFFLE_VISITOR_LINK(ast::Lattice, Node);
+    SOUFFLE_VISITOR_LINK(OrderByElement, Node);
 };
 }  // namespace souffle::ast
 

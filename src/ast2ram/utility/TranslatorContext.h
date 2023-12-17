@@ -151,6 +151,8 @@ public:
         return sipsMetric.get();
     }
 
+    std::set<TypeAttribute> getArgumentTypeAttributes(const ast::Argument* arg) const;
+
     /** Translation strategy */
     Own<ram::Statement> translateNonRecursiveClause(
             const ast::Clause& clause, TranslationMode mode = DEFAULT) const;

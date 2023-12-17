@@ -344,4 +344,8 @@ Own<ram::Condition> TranslatorContext::translateConstraint(
     return constraintTranslator->translateConstraint(lit);
 }
 
+std::set<TypeAttribute> TranslatorContext::getArgumentTypeAttributes(const ast::Argument* arg) const {
+    return typeAnalysis->getTypeAttributes(arg);
+}
+
 }  // namespace souffle::ast2ram

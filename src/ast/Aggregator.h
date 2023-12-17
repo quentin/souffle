@@ -19,9 +19,13 @@
 #include "AggregateOp.h"
 #include "ast/Argument.h"
 #include "ast/Literal.h"
+#include "ast/OrderByElement.h"
 #include "parser/SrcLocation.h"
 #include "souffle/utility/Types.h"
+
 #include <iosfwd>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace souffle::ast {
@@ -38,8 +42,9 @@ namespace souffle::ast {
  */
 class Aggregator : public Argument {
 public:
+
     Aggregator(NodeKind kind, Own<Argument> expr = {}, Own<Argument> second = {}, VecOwn<Literal> body = {},
-            VecOwn<Argument> orderby = {}, SrcLocation loc = {});
+            VecOwn<OrderByElement> orderby = {}, SrcLocation loc = {});
 
     /** Return target expression */
     const Argument* getTargetExpression() const;
@@ -65,7 +70,7 @@ public:
 
     static bool classof(const Node*);
 
-    const VecOwn<Argument>& getOrderByExpressions() const;
+    const VecOwn<OrderByElement>& getOrderByElements() const;
 
 protected:
     NodeVec getChildren() const override;
@@ -79,8 +84,8 @@ protected:
     /** Body literal of sub-query */
     VecOwn<Literal> body;
 
-    /** Order-by expressions */
-    VecOwn<Argument> orderBy;
+    /** Order-by elements */
+    VecOwn<OrderByElement> orderBy;
 };
 
 }  // namespace souffle::ast

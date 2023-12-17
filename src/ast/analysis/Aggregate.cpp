@@ -360,8 +360,9 @@ std::set<std::string> getInjectedVariables(
 std::set<std::string> getOrderByVariables(
         const TranslationUnit&, const Clause&, const Aggregator& aggregate) {
   std::set<std::string> vars;
-  for (const auto& arg : aggregate.getOrderByExpressions()) {
-        visit(*arg, [&](const Variable& v) { vars.emplace(v.getName()); });
+  for (const auto& elem: aggregate.getOrderByElements()) {
+      const auto* arg = elem->getArgument();
+      visit(*arg, [&](const Variable& v) { vars.emplace(v.getName()); });
   }
   return vars;
 }

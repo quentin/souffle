@@ -350,6 +350,9 @@ private:
     NodePtr mkInit(const ram::AbstractAggregate& aggregate);
     void* resolveFunctionPointers(const ram::AbstractAggregate& aggregate);
 
+    Own<Aggregate> mkAggregate(const std::string& base_node_type, const ram::AbstractAggregate& aggregate,
+            const ram::RelationOperation& relation_operation);
+
     /** Environment encoding, store a mapping from ram::Node to its operation index id. */
     std::unordered_map<const ram::Node*, std::size_t> indexTable;
     /** Points to the current viewContext during the generation.

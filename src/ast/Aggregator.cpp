@@ -17,7 +17,7 @@
 
 namespace souffle::ast {
 Aggregator::Aggregator(NodeKind kind, Own<Argument> expr, Own<Argument> second, VecOwn<Literal> body,
-        VecOwn<Argument> orderby, SrcLocation loc)
+        VecOwn<OrderByElement> orderby, SrcLocation loc)
         : Argument(kind, std::move(loc)), targetExpression(std::move(expr)), second(std::move(second)),
           body(std::move(body)), orderBy(std::move(orderby)) {
     // NOTE: targetExpression can be nullptr - it's used e.g. when aggregator
@@ -57,7 +57,7 @@ VecOwn<Literal> Aggregator::setBodyLiterals(VecOwn<Literal> bodyLiterals) {
     return oldBody;
 }
 
-const VecOwn<Argument>& Aggregator::getOrderByExpressions() const {
+const VecOwn<OrderByElement>& Aggregator::getOrderByElements() const {
     return orderBy;
 }
 

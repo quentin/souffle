@@ -36,6 +36,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <locale>
 #include <memory>
 #include <regex>
 #include <string>
@@ -142,7 +143,7 @@ enum NodeType {
  *
  * Add reflective from string to NodeType.
  */
-inline NodeType constructNodeType(Global&, std::string tokBase, const ram::Relation& rel) {
+inline NodeType constructNodeType(Global&, const std::string& tokBase, const ram::Relation& rel) {
 
     static const std::unordered_map<std::string, NodeType> map = {
             FOR_EACH_INTERPRETER_TOKEN(SINGLE_TOKEN_ENTRY, EXPAND_TOKEN_ENTRY)
@@ -417,7 +418,7 @@ public:
         return (*relHandle).get();
     }
 
-private:
+protected:
     RelationHandle* const relHandle;
 };
 
@@ -760,19 +761,28 @@ class Aggregate : public Node,
                   public RelationalOperation,
                   public FunctorNode {
 public:
-
-    struct OrderByElement {
-        Own<Node> expr;
-        char order; // i,u,f,s,I,U,F,S
-    };
-
     Aggregate(enum NodeType ty, const ram::Node* sdw, RelationHandle* relHandle, Own<Node> expr,
-            Own<Node> second, Own<Node> filter, Own<Node> nested, Own<Node> init,
-            std::vector<OrderByElement> orderByElements, void*& functorPtr)
+            Own<Node> second, Own<Node> filter, Own<Node> nested, Own<Node> init, VecOwn<Node> orderby_nodes,
+            std::string orderby_operations, std::vector<std::locale> orderby_collate_locales,
+            void* functorPtr)
             : Node(ty, sdw), ConditionalOperation(std::move(filter)), NestedOperation(std::move(nested)),
               RelationalOperation(relHandle), FunctorNode(functorPtr), expr(std::move(expr)),
-              second(std::move(second)), init(std::move(init)), orderByElements(std::move(orderByElements)) {
+              second(std::move(second)), init(std::move(init)), orderByNodes(std::move(orderby_nodes)),
+              orderByOperations(orderby_operations),
+              orderByCollateLocales(std::move(orderby_collate_locales)) {
+        assert(orderByNodes.size() == orderByOperations.size());
+
+        orderByNodesPtr.reserve(orderByNodes.size());
+        for (auto &n : orderByNodes) {
+            orderByNodesPtr.emplace_back(n.get());
+        }
     }
+
+    Aggregate(Own<Aggregate> agg)
+            : Aggregate(agg->type, agg->shadow, agg->relHandle, std::move(agg->expr), std::move(agg->second),
+                      std::move(agg->cond), std::move(agg->nested), std::move(agg->init),
+                      std::move(agg->orderByNodes), std::move(agg->orderByOperations),
+                      std::move(agg->orderByCollateLocales), agg->getFunctionPointer()) {}
 
     inline const Node* getExpr() const {
         return expr.get();
@@ -786,15 +796,30 @@ public:
         return init.get();
     }
 
-    const std::vector<OrderByElement>& getOrderByElements() const {
-        return orderByElements;
+    std::size_t getOrderByArity() const {
+        return orderByNodes.size();
+    }
+
+    const std::vector<Node*>& getOrderByNodes() const {
+        return orderByNodesPtr;
+    }
+
+    const char* getOrderByOperations() const {
+        return orderByOperations.data();
+    }
+
+    const std::vector<std::locale>& getOrderByCollateLocales() const {
+        return orderByCollateLocales;
     }
 
 protected:
     Own<Node> expr;
     Own<Node> second;
     Own<Node> init;
-    std::vector<OrderByElement> orderByElements;
+    VecOwn<Node> orderByNodes;
+    std::vector<Node*> orderByNodesPtr;
+    std::string orderByOperations;
+    std::vector<std::locale> orderByCollateLocales;
 };
 
 /**
@@ -809,13 +834,8 @@ class ParallelAggregate : public Aggregate, public AbstractParallel {
  */
 class IndexAggregate : public Aggregate, public SuperOperation, public ViewOperation {
 public:
-    IndexAggregate(enum NodeType ty, const ram::Node* sdw, RelationHandle* relHandle, Own<Node> expr,
-            Own<Node> second, Own<Node> filter, Own<Node> nested, Own<Node> init,
-            std::vector<OrderByElement> orderByTupleElements, void*& functorPtr, std::size_t viewId,
-            SuperInstruction superInst)
-            : Aggregate(ty, sdw, relHandle, std::move(expr), std::move(second), std::move(filter),
-                      std::move(nested), std::move(init), std::move(orderByTupleElements), functorPtr),
-              SuperOperation(std::move(superInst)), ViewOperation(viewId) {}
+    IndexAggregate(Own<Aggregate> agg, std::size_t viewId, SuperInstruction superInst)
+            : Aggregate(std::move(agg)), SuperOperation(std::move(superInst)), ViewOperation(viewId) {}
 };
 
 /**

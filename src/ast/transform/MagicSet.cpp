@@ -544,7 +544,7 @@ bool NormaliseDatabaseTransformer::normaliseArguments(TranslationUnit& translati
                                 (aggr->getSecondaryExpression() != nullptr
                                                 ? clone(aggr->getSecondaryExpression())
                                                 : nullptr),
-                                std::move(newBodyLiterals), clone(aggr->getOrderByExpressions()));
+                                std::move(newBodyLiterals), clone(aggr->getOrderByElements()));
                     } else {
                         auto* uda = as<UserDefinedAggregator>(aggr);
                         return mk<UserDefinedAggregator>(uda->getBaseOperatorName(), clone(uda->getInit()),

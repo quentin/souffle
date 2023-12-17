@@ -295,9 +295,11 @@
 %type <std::vector<ast::QualifiedName>>   component_type_params
 %type <std::vector<ast::QualifiedName>>   component_param_list
 %type <std::vector<ast::QualifiedName>>   union_type_list
-%type <VecOwn<ast::BranchType>>    adt_branch_list
-%type <Own<ast::BranchType>>       adt_branch
-%type <VecOwn<ast::Argument>>      opt_orderby
+%type <VecOwn<ast::BranchType>>           adt_branch_list
+%type <Own<ast::BranchType>>              adt_branch
+%type <VecOwn<ast::OrderByElement>>       opt_orderby
+%type <VecOwn<ast::OrderByElement>>       non_empty_orderby_list
+%type <Own<ast::OrderByElement>>          orderby_element
 %type <Own<ast::Lattice>>                 lattice_decl
 %type <std::pair<ast::LatticeOperator, Own<ast::Argument>>>                 lattice_operator
 %type <std::map<ast::LatticeOperator, Own<ast::Argument>>>      lattice_operator_list
@@ -1088,10 +1090,6 @@ arg
     {
       $$ = mk<ast::UnnamedVariable>(@$);
     }
-  | DOLLAR
-    {
-      $$ = driver.addDeprecatedCounter(@$);
-    }
   | AUTOINC LPAREN RPAREN
     {
       $$ = mk<ast::Counter>(@$);
@@ -1250,7 +1248,7 @@ arg
       auto expr = exprs.empty() ? nullptr : std::move(exprs[0]);
       auto second = exprs.size() > 1 ? std::move(exprs[1]) : nullptr;
       auto body = (bodies.size() == 1) ? clone(bodies[0]->getBodyLiterals()) : VecOwn<ast::Literal> {};
-      VecOwn<ast::Argument> orderBy /*TODO*/;
+      VecOwn<ast::OrderByElement> orderBy /* no orderby on user-defined aggregates */;
       $$ = mk<ast::UserDefinedAggregator>($IDENT, $first, std::move(expr),
               std::move(body), std::move(orderBy), @$);
     }
@@ -1362,10 +1360,57 @@ opt_orderby
   : %empty
     {
     }
-  | ORDERBY LPAREN non_empty_arg_list RPAREN
+  | ORDERBY LPAREN non_empty_orderby_list RPAREN
     {
       $$ = $3;
     }
+
+non_empty_orderby_list
+  : orderby_element
+    {
+      $$.push_back($orderby_element);
+    }
+  | non_empty_orderby_list COMMA orderby_element
+    {
+      $$ = $1;
+      $$.push_back($orderby_element);
+    }
+  ;
+
+orderby_element
+  : arg
+    {
+      $$ = mk<ast::OrderByElement>($arg, std::nullopt, std::nullopt, @$);
+    }
+  | arg IDENT[direction]
+    {
+      auto direction = $direction;
+      if (direction != "ASC" && direction != "DESC") {
+        driver.error(@2, "Expected ASC or DESC keyword");
+      }
+      $$ = mk<ast::OrderByElement>($arg, std::nullopt, direction, @$);
+    }
+  | arg IDENT[collate] STRING[locale]
+    {
+      auto collate_kw = $collate;
+      if (collate_kw != "COLLATE") {
+        driver.error(@2, "Expected COLLATE keyword");
+      }
+      $$ = mk<ast::OrderByElement>($arg, $locale, std::nullopt, @$);
+    }
+  | arg IDENT[collate] STRING[locale] IDENT[direction]
+    {
+      auto collate_kw = $collate;
+      if (collate_kw != "COLLATE") {
+        driver.error(@2, "Expected COLLATE keyword");
+      }
+      auto direction = $direction;
+      if (direction != "ASC" && direction != "DESC") {
+        driver.error(@4, "Expected ASC or DESC keyword");
+      }
+      $$ = mk<ast::OrderByElement>($arg, $locale, direction, @$);
+    }
+  ;
 
 /**
  * Query Plan

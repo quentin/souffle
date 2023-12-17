@@ -112,6 +112,7 @@
 #include <functional>
 #include <iostream>
 #include <iterator>
+#include <locale>
 #include <map>
 #include <memory>
 #include <numeric>
@@ -1999,7 +2000,13 @@ RamDomain Engine::evalAggregate(
             separator = execute(secondary, ctxt);
         }
 
-        const auto& orderByElements = shadow.getOrderByElements();
+        const auto& orderByNodes = shadow.getOrderByNodes();
+        const char* orderByOperations = shadow.getOrderByOperations();
+        const std::size_t orderByArity = shadow.getOrderByArity();
+
+        // data contains sequences of:
+        // - the aggregate expression value
+        // - the order by expression values
         std::vector<RamDomain> data;
         size_t count = 0;
         for (const auto& tuple : ranges) {
@@ -2011,23 +2018,95 @@ RamDomain Engine::evalAggregate(
 
             shouldRunNested = true;
 
-            for (const auto& obe : orderByElements) {
-                data.push_back(execute(obe.expr.get(), ctxt));
-            }
-
             const RamDomain val = execute(expression, ctxt);
             data.push_back(val);
 
+            for (std::size_t i = 0; i < orderByArity; ++i) {
+                data.push_back(execute(orderByNodes[i], ctxt));
+            }
+
             ++count;
         }
+
+        const std::vector<std::locale>& locales = shadow.getOrderByCollateLocales();
         const RamDomain* datap = data.data();
-        const size_t arity = orderByElements.size() + 1;
         std::vector<size_t> sorted(count);
         std::iota(std::begin(sorted), std::end(sorted), 0);
         std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
-            const RamDomain* lp = datap + left * arity;
-            const RamDomain* rp = datap + right * arity;
-            return std::lexicographical_compare(lp, lp + arity, rp, rp + arity);
+            const RamDomain* lp = datap + left * (orderByArity+1) + 1;
+            const RamDomain* rp = datap + right * (orderByArity+1) + 1;
+            for (std::size_t i = 0; i < orderByArity; ++i) {
+                switch (orderByOperations[i]) {
+                    // ASCENDING
+                    case 'a': [[fallthrough]];
+                    case 'r': [[fallthrough]];
+                    case 'i':
+                        if (ramBitCast<RamSigned>(lp[i]) < ramBitCast<RamSigned>(rp[i])) {
+                            return true;
+                        } else if (ramBitCast<RamSigned>(lp[i]) > ramBitCast<RamSigned>(rp[i])) {
+                            return false;
+                        };
+                        break;
+                    case 'u':
+                        if (ramBitCast<RamUnsigned>(lp[i]) < ramBitCast<RamUnsigned>(rp[i])) {
+                            return true;
+                        } else if (ramBitCast<RamUnsigned>(lp[i]) > ramBitCast<RamUnsigned>(rp[i])) {
+                            return false;
+                        };
+                        break;
+                    case 'f':
+                        if (ramBitCast<RamFloat>(lp[i]) < ramBitCast<RamFloat>(rp[i])) {
+                            return true;
+                        } else if (ramBitCast<RamFloat>(lp[i]) > ramBitCast<RamFloat>(rp[i])) {
+                            return false;
+                        };
+                        break;
+                    case 's': {
+                        const std::string& lsym = symbolTable.decode(lp[i]);
+                        const std::string& rsym = symbolTable.decode(rp[i]);
+                        if (locales[i](lsym, rsym)) {
+                            return true;
+                        } else if (locales[i](rsym, lsym)) {
+                            return false;
+                        }
+                    } break;
+
+                    // DESCENDING
+                    case 'A': [[fallthrough]];
+                    case 'R': [[fallthrough]];
+                    case 'I':
+                        if (ramBitCast<RamSigned>(lp[i]) < ramBitCast<RamSigned>(rp[i])) {
+                            return false;
+                        } else if (ramBitCast<RamSigned>(lp[i]) > ramBitCast<RamSigned>(rp[i])) {
+                            return true;
+                        };
+                        break;
+                    case 'U':
+                        if (ramBitCast<RamUnsigned>(lp[i]) < ramBitCast<RamUnsigned>(rp[i])) {
+                            return false;
+                        } else if (ramBitCast<RamUnsigned>(lp[i]) > ramBitCast<RamUnsigned>(rp[i])) {
+                            return true;
+                        };
+                        break;
+                    case 'F':
+                        if (ramBitCast<RamFloat>(lp[i]) < ramBitCast<RamFloat>(rp[i])) {
+                            return false;
+                        } else if (ramBitCast<RamFloat>(lp[i]) > ramBitCast<RamFloat>(rp[i])) {
+                            return true;
+                        };
+                        break;
+                    case 'S': {
+                        const std::string& lsym = symbolTable.decode(lp[i]);
+                        const std::string& rsym = symbolTable.decode(rp[i]);
+                        if (locales[i](lsym, rsym)) {
+                            return false;
+                        } else if (locales[i](rsym, lsym)) {
+                            return true;
+                        }
+                    } break;
+                }
+            }
+            return false;
         });
 
         bool first = true;
@@ -2039,7 +2118,7 @@ RamDomain Engine::evalAggregate(
             if (separator && !first) {
                 accumulateSymbol << sep;
             }
-            accumulateSymbol << symbolTable.decode(data.at(index * arity + (arity - 1)));
+            accumulateSymbol << symbolTable.decode(data.at(index * (orderByArity + 1)));
             first = false;
         }
         res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));

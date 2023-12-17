@@ -1,0 +1,19 @@
+
+.decl dict(word:symbol)
+dict("ängel").
+dict("ar").
+dict("år").
+dict("förnamn").
+dict("ögrupp").
+dict("zebra").
+dict("Zebra").
+
+.decl dict_index(word:symbol, locale:symbol)
+.output dict_index()
+dict_index(val, "en_US.UTF-8") :-
+  val = concat word, ", " : dict(word) orderby (word COLLATE "en_US.UTF-8" ASC).
+// sv_SE gives an interesting ordering, but not present on all machines so the test may fail.
+// dict_index(val, "sv_SE.UTF-8") :-
+//   val = concat word, ", " : dict(word) orderby (word COLLATE "sv_SE.UTF-8" ASC).
+dict_index(val, "C") :-
+  val = concat word, ", " : dict(word) orderby (word COLLATE "C" ASC).

@@ -12,18 +12,15 @@ set(SOUFFLE_SOURCES
     MainDriver.cpp
     ast/Annotation.cpp
     ast/Aggregator.cpp
-    ast/IntrinsicAggregator.cpp
-    ast/UserDefinedAggregator.cpp
     ast/AlgebraicDataType.cpp
     ast/AliasType.cpp
     ast/Atom.cpp
     ast/Attribute.cpp
     ast/BinaryConstraint.cpp
     ast/BooleanConstraint.cpp
-    ast/BranchType.cpp
     ast/BranchInit.cpp
+    ast/BranchType.cpp
     ast/Clause.cpp
-    ast/SubsumptiveClause.cpp
     ast/Component.cpp
     ast/ComponentInit.cpp
     ast/ComponentType.cpp
@@ -32,8 +29,9 @@ set(SOUFFLE_SOURCES
     ast/Directive.cpp
     ast/ExecutionOrder.cpp
     ast/ExecutionPlan.cpp
-    ast/FunctorDeclaration.cpp
     ast/FunctionalConstraint.cpp
+    ast/FunctorDeclaration.cpp
+    ast/IntrinsicAggregator.cpp
     ast/IntrinsicFunctor.cpp
     ast/IterationCounter.cpp
     ast/Lattice.cpp
@@ -41,6 +39,7 @@ set(SOUFFLE_SOURCES
     ast/NilConstant.cpp
     ast/Node.cpp
     ast/NumericConstant.cpp
+    ast/OrderByElement.cpp
     ast/Pragma.cpp
     ast/Program.cpp
     ast/QualifiedName.cpp
@@ -49,6 +48,7 @@ set(SOUFFLE_SOURCES
     ast/Relation.cpp
     ast/StringConstant.cpp
     ast/SubsetType.cpp
+    ast/SubsumptiveClause.cpp
     ast/Term.cpp
     ast/TokenTree.cpp
     ast/TranslationUnit.cpp
@@ -56,6 +56,7 @@ set(SOUFFLE_SOURCES
     ast/TypeCast.cpp
     ast/UnionType.cpp
     ast/UnnamedVariable.cpp
+    ast/UserDefinedAggregator.cpp
     ast/UserDefinedFunctor.cpp
     ast/Variable.cpp
     ast/analysis/Aggregate.cpp
@@ -64,32 +65,32 @@ set(SOUFFLE_SOURCES
     ast/analysis/Functor.cpp
     ast/analysis/Ground.cpp
     ast/analysis/IOType.cpp
+    ast/analysis/JoinSize.cpp
     ast/analysis/PrecedenceGraph.cpp
     ast/analysis/ProfileUse.cpp
     ast/analysis/RecursiveClauses.cpp
     ast/analysis/RedundantRelations.cpp
     ast/analysis/RelationSchedule.cpp
-    ast/analysis/JoinSize.cpp
     ast/analysis/SCCGraph.cpp
     ast/analysis/TopologicallySortedSCCGraph.cpp
     ast/analysis/typesystem/PolymorphicObjects.cpp
     ast/analysis/typesystem/SumTypeBranches.cpp
     ast/analysis/typesystem/Type.cpp
-    ast/analysis/typesystem/TypeConstraints.cpp
     ast/analysis/typesystem/TypeConstrainsAnalysis.cpp
     ast/analysis/typesystem/TypeConstrainsAnalysis.h
-    ast/analysis/typesystem/TypeSystem.cpp
+    ast/analysis/typesystem/TypeConstraints.cpp
     ast/analysis/typesystem/TypeEnvironment.cpp
+    ast/analysis/typesystem/TypeSystem.cpp
     ast/transform/AddNullariesToAtomlessAggregates.cpp
     ast/transform/ComponentChecker.cpp
     ast/transform/ComponentInstantiation.cpp
-    ast/transform/DebugReporter.cpp
     ast/transform/DebugDeltaRelation.cpp
+    ast/transform/DebugReporter.cpp
     ast/transform/ExecutionPlanChecker.cpp
     ast/transform/ExpandEqrels.cpp
     ast/transform/FoldAnonymousRecords.cpp
-    ast/transform/GroundedTermsChecker.cpp
     ast/transform/GroundWitnesses.cpp
+    ast/transform/GroundedTermsChecker.cpp
     ast/transform/InlineRelations.cpp
     ast/transform/InsertLatticeOperations.cpp
     ast/transform/MagicSet.cpp
@@ -111,15 +112,13 @@ set(SOUFFLE_SOURCES
     ast/transform/ResolveAliases.cpp
     ast/transform/ResolveAnonymousRecordAliases.cpp
     ast/transform/SemanticChecker.cpp
+    ast/transform/SimplifyAggregateTargetExpression.cpp
     ast/transform/SimplifyConstantBinaryConstraints.cpp
     ast/transform/SubsumptionQualifier.cpp
-    ast/transform/SimplifyAggregateTargetExpression.cpp
     ast/transform/Transformer.cpp
     ast/transform/TypeChecker.cpp
     ast/transform/UniqueAggregationVariables.cpp
     ast/utility/BindingStore.cpp
-    ast2ram/utility/SipsMetric.cpp
-    ast2ram/utility/SipGraph.cpp
     ast/utility/Utils.cpp
     ast2ram/provenance/ClauseTranslator.cpp
     ast2ram/provenance/ConstraintTranslator.cpp
@@ -131,15 +130,17 @@ set(SOUFFLE_SOURCES
     ast2ram/seminaive/TranslationStrategy.cpp
     ast2ram/seminaive/UnitTranslator.cpp
     ast2ram/seminaive/ValueTranslator.cpp
-    ast2ram/utility/Utils.cpp
+    ast2ram/utility/SipGraph.cpp
+    ast2ram/utility/SipsMetric.cpp
     ast2ram/utility/TranslatorContext.cpp
+    ast2ram/utility/Utils.cpp
     ast2ram/utility/ValueIndex.cpp
-    interpreter/Engine.cpp
-    interpreter/Generator.cpp
-    interpreter/BrieIndex.cpp
-    interpreter/BTreeIndex.cpp
     interpreter/BTreeDeleteIndex.cpp
+    interpreter/BTreeIndex.cpp
+    interpreter/BrieIndex.cpp
+    interpreter/Engine.cpp
     interpreter/EqrelIndex.cpp
+    interpreter/Generator.cpp
     interpreter/ProvenanceIndex.cpp
     parser/ParserDriver.cpp
     parser/ParserUtils.cpp
@@ -151,13 +152,13 @@ set(SOUFFLE_SOURCES
     ram/analysis/Index.cpp
     ram/analysis/Level.cpp
     ram/analysis/Relation.cpp
-    ram/transform/IfExistsConversion.cpp
     ram/transform/CollapseFilters.cpp
     ram/transform/EliminateDuplicates.cpp
     ram/transform/ExpandFilter.cpp
     ram/transform/HoistAggregate.cpp
     ram/transform/HoistConditions.cpp
     ram/transform/IfConversion.cpp
+    ram/transform/IfExistsConversion.cpp
     ram/transform/MakeIndex.cpp
     ram/transform/Parallel.cpp
     ram/transform/ReorderConditions.cpp
@@ -165,12 +166,12 @@ set(SOUFFLE_SOURCES
     ram/transform/Transformer.cpp
     ram/transform/TupleId.cpp
     ram/utility/NodeMapper.cpp
-    reports/ErrorReport.cpp
     reports/DebugReport.cpp
-    synthesiser/Synthesiser.cpp
-    synthesiser/Relation.cpp
-    synthesiser/Utils.cpp
+    reports/ErrorReport.cpp
     synthesiser/GenDb.cpp
+    synthesiser/Relation.cpp
+    synthesiser/Synthesiser.cpp
+    synthesiser/Utils.cpp
 )
 
 # --------------------------------------------------

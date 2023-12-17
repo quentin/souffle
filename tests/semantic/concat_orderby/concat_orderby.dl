@@ -1,0 +1,45 @@
+
+.decl elem(name:symbol, value:number)
+elem("c", 1).
+elem("c", 7).
+elem("d", 2).
+elem("A", 5).
+elem("B", 4).
+elem("1", 5).
+elem("+", 6).
+elem("0", 7).
+
+.decl elems_by_name(val:symbol)
+.output elems_by_name()
+elems_by_name(val) :-
+  val = concat name, " " : elem(name, _) orderby (name).
+
+.decl elems_by_value(val:symbol)
+.output elems_by_value()
+elems_by_value(val) :-
+  val = concat to_string(value), " " : elem(_, value) orderby (value).
+
+.decl elems_by_value_and_name(val:symbol)
+.output elems_by_value_and_name()
+elems_by_value_and_name(val) :-
+  val = concat (name+":"+to_string(value)), " " : elem(name, value) orderby (value, name).
+
+.decl elems_by_value_asc(val:symbol)
+.output elems_by_value_asc()
+elems_by_value_asc(val) :-
+  val = concat to_string(value), " <= " : elem(_, value) orderby (value ASC).
+
+.decl elems_by_value_desc(val:symbol)
+.output elems_by_value_desc()
+elems_by_value_desc(val) :-
+  val = concat to_string(value), " >= " : elem(_, value) orderby (value DESC).
+
+.decl elems_by_value_desc_and_name_desc(val:symbol)
+.output elems_by_value_desc_and_name_desc()
+elems_by_value_desc_and_name_desc(val) :-
+  val = concat (name+":"+to_string(value)), " >>= " : elem(name, value) orderby (value DESC, name DESC).
+
+.decl elems_by_value_desc_and_name_asc(val:symbol)
+.output elems_by_value_desc_and_name_asc()
+elems_by_value_desc_and_name_asc(val) :-
+  val = concat (name+":"+to_string(value)), " ><= " : elem(name, value) orderby (value DESC, name ASC).

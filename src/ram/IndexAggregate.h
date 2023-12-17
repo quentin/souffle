@@ -46,7 +46,7 @@ namespace souffle::ram {
 class IndexAggregate : public IndexOperation, public AbstractAggregate {
 public:
     IndexAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Expression>(second), Own<Condition> condition, VecOwn<Expression> orderBy, RamPattern queryPattern, std::size_t ident)
+            Own<Expression>(second), Own<Condition> condition, VecOwn<OrderByElement> orderBy, RamPattern queryPattern, std::size_t ident)
             : IndexAggregate(NK_IndexAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
                       std::move(second), std::move(condition), std::move(orderBy), std::move(queryPattern), ident) {}
 
@@ -70,7 +70,9 @@ public:
         if (second) {
           second = map(std::move(second));
         }
-        mapAll(orderBy, map);
+        for (auto &elem : orderBy) {
+            elem->expr = map(std::move(elem->expr));
+        }
     }
 
     static bool classof(const Node* n) {
@@ -80,7 +82,7 @@ public:
 
 protected:
     IndexAggregate(NodeKind kind, Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Expression>(second), Own<Condition> condition, VecOwn<Expression> orderBy, RamPattern queryPattern, std::size_t ident)
+            Own<Expression> expression, Own<Expression>(second), Own<Condition> condition, VecOwn<OrderByElement> orderBy, RamPattern queryPattern, std::size_t ident)
             : IndexOperation(kind, rel, ident, std::move(queryPattern), std::move(nested)),
               AbstractAggregate(std::move(fun), std::move(expression), std::move(second), std::move(condition), std::move(orderBy)) {
         assert(kind >= NK_IndexAggregate && kind < NK_LastIndexAggregate);

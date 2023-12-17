@@ -91,7 +91,7 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                         return mk<ParallelAggregate>(clone(aggregate->getOperation()),
                                 clone(aggregate->getAggregator()), aggregate->getRelation(),
                                 clone(aggregate->getExpression()), clone(aggregate->getSecondaryExpression()),
-                                clone(aggregate->getCondition()), clone(aggregate->getOrderByExpressions()),
+                                clone(aggregate->getCondition()), clone(aggregate->getOrderByElements()),
                                 aggregate->getTupleId());
                     }
                 }
@@ -111,7 +111,7 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                                 clone(indexAggregate->getExpression()),
                                 clone(indexAggregate->getSecondaryExpression()),
                                 clone(indexAggregate->getCondition()),
-                                clone(indexAggregate->getOrderByExpressions()), std::move(queryPattern),
+                                clone(indexAggregate->getOrderByElements()), std::move(queryPattern),
                                 indexAggregate->getTupleId());
                     }
                 }

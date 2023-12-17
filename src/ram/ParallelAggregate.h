@@ -49,7 +49,7 @@ namespace souffle::ram {
 class ParallelAggregate : public Aggregate, public AbstractParallel {
 public:
     ParallelAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
+            Own<Expression> second, Own<Condition> condition, VecOwn<OrderByElement> orderBy, std::size_t ident)
             : Aggregate(NK_ParallelAggregate, std::move(nested), std::move(fun), rel, std::move(expression), std::move(second), std::move(condition),
                       std::move(orderBy), ident) {}
 
