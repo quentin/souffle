@@ -74,6 +74,7 @@ public:
         for (auto &elem : orderBy) {
             elem->expr = map(std::move(elem->expr));
         }
+        function->apply(map);
     }
 
     static bool classof(const Node* n) {
