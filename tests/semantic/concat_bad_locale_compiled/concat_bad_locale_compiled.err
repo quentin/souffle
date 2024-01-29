@@ -1,0 +1,4 @@
+Error: Unknown locale 'bad-locale' in rule:
+joined(@generator_0) :-
+   @generator_0 = concat word, " " : { dict(word) } orderby (word COLLATE "bad-locale").
+in file concat_bad_locale_compiled.dl [8:1-9:73]

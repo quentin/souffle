@@ -409,7 +409,7 @@ Own<Aggregate> NodeGenerator::mkAggregate(const std::string& base_node_type,
     for (const auto& e : aggregate.getOrderByElements()) {
         NodePtr obexpr = dispatch(*e->expr);
         orderByNodes.emplace_back(std::move(obexpr));
-        char tychar;
+        char tychar = ' ';
         switch(e->type) {
           case TypeAttribute::Symbol:
             tychar = 's';
@@ -438,8 +438,7 @@ Own<Aggregate> NodeGenerator::mkAggregate(const std::string& base_node_type,
         try {
             orderByCollateLocales.emplace_back(e->collateLocale.value_or(""));
         } catch (std::runtime_error& err) {
-            std::cerr << "Error: Unknown locale '" << e->collateLocale.value_or("") << "'.\n";
-            orderByCollateLocales.emplace_back("C");
+            throw std::runtime_error("Error: Unknown locale '" + e->collateLocale.value_or("") + "'.");
         }
     }
 

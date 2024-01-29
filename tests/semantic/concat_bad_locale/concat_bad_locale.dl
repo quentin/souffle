@@ -1,0 +1,10 @@
+
+.decl dict(word:symbol)
+dict("souffle").
+dict("datalog").
+
+.decl joined(word:symbol)
+.output joined()
+joined(s) :-
+  s = concat word, " " : dict(word) orderby (word COLLATE "bad-locale").
+

@@ -394,21 +394,21 @@ Own<Clause> ResolveAliasesTransformer::resolveAliases(const Clause& clause) {
 
 namespace {
 void removeTrivialEquality(VecOwn<Literal>& body) {
-  auto it = body.begin();
-  while (it != body.end()) {
-      Literal* literal = it->get();
-      if (auto* constraint = as<BinaryConstraint>(literal)) {
-          // TODO: don't filter out `FEQ` constraints, since `x = x` can fail when `x` is a NaN
-          if (isEqConstraint(constraint->getBaseOperator())) {
-              if (*constraint->getLHS() == *constraint->getRHS()) {
-                  it = body.erase(it);  // skip this one
-                  continue;
-              }
-          }
-      }
-      visit(literal, [&](Aggregator& agg) { removeTrivialEquality(agg.bodyLiterals()); });
-      ++it;
-  }
+    auto it = body.begin();
+    while (it != body.end()) {
+        Literal* literal = it->get();
+        if (auto* constraint = as<BinaryConstraint>(literal)) {
+            // TODO: don't filter out `FEQ` constraints, since `x = x` can fail when `x` is a NaN
+            if (isEqConstraint(constraint->getBaseOperator())) {
+                if (*constraint->getLHS() == *constraint->getRHS()) {
+                    it = body.erase(it);  // skip this one
+                    continue;
+                }
+            }
+        }
+        visit(literal, [&](Aggregator& agg) { removeTrivialEquality(agg.bodyLiterals()); });
+        ++it;
+    }
 }
 VecOwn<Literal> removeTrivialEquality(const std::vector<Literal*> body) {
     VecOwn<Literal> newBody;
@@ -433,22 +433,9 @@ VecOwn<Literal> removeTrivialEquality(const std::vector<Literal*> body) {
 Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& clause) {
     auto res = Own<Clause>(clause.cloneHead());
 
-
     auto newBody = transform::removeTrivialEquality(clause.getBodyLiterals());
     res->setBodyLiterals(std::move(newBody));
 
-    return newBody;
-}
-}  // namespace
-
-Own<Clause> ResolveAliasesTransformer::removeTrivialEquality(const Clause& clause) {
-    auto res = Own<Clause>(clause.cloneHead());
-
-
-    auto newBody = transform::removeTrivialEquality(clause.getBodyLiterals());
-    res->setBodyLiterals(std::move(newBody));
-
-    // done
     return res;
 }
 

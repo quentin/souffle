@@ -1726,14 +1726,16 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << ";\n";
             out << "tup[0] = value;\n";
 
-            // evaluate order-by expression(s)
-            std::size_t idx = 0;
-            for (const auto& orderByElemPtr : aggregate.getOrderByElements()) {
-                ++idx;
-                out << "const RamDomain key" << idx << " = ";
-                dispatch(*orderByElemPtr->expr, out);
-                out << ";\n";
-                out << "tup[" << std::to_string(idx) << "] = key" << idx << ";\n";
+            {
+                // evaluate order-by expression(s)
+                std::size_t idx = 0;
+                for (const auto& orderByElemPtr : aggregate.getOrderByElements()) {
+                    ++idx;
+                    out << "const RamDomain key" << idx << " = ";
+                    dispatch(*orderByElemPtr->expr, out);
+                    out << ";\n";
+                    out << "tup[" << std::to_string(idx) << "] = key" << idx << ";\n";
+                }
             }
 
             out << "orderedBy"<< identifier << ".emplace_back(std::move(tup));\n";
@@ -1741,12 +1743,73 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             out << "} // if condition\n";
             out << "} // for loop\n";
 
-            out << "std::sort(std::begin(orderedBy"<< identifier << "), std::end(orderedBy" << identifier << "),";
-            out << " [&](std::array<RamDomain," << std::to_string(arity) << ">& left,";
-            out << " std::array<RamDomain," << std::to_string(arity) << ">& right) -> bool {\n";
-            // TODO
-            out <<"  return std::lexicographical_compare(left.begin()+1, left.end(), right.begin()+1, right.end());\n";
-            out << "});\n";
+            {
+                std::size_t idx = 0;
+                // sort locales for symbol comparison
+                for (const auto& orderByElemPtr : aggregate.getOrderByElements()) {
+                    ++idx;
+                    if (orderByElemPtr->type == TypeAttribute::Symbol) {
+                        synthesiser.currentClass->addInclude("<locale>", true);
+                        out << "std::locale locale" << idx << ";\n";
+                        out << "try {\n";
+                        out << "locale" << idx << " = std::locale(\""
+                            << escape(orderByElemPtr->collateLocale.value_or("")) << "\");\n";
+                        out << "} catch(std::runtime_error &) { ";
+                        out << R"(throw std::runtime_error("Error: Unknown locale ')"
+                            << escape(orderByElemPtr->collateLocale.value_or("")) << R"('");)";
+                        out << "}\n";
+                    }
+                }
+
+                // sort lambda
+                out << "std::sort(std::begin(orderedBy" << identifier << "), std::end(orderedBy" << identifier
+                    << "),";
+                out << " [&](std::array<RamDomain," << std::to_string(arity) << ">& left,";
+                out << " std::array<RamDomain," << std::to_string(arity) << ">& right) -> bool {\n";
+
+                idx = 0;
+                for (const auto& orderByElemPtr : aggregate.getOrderByElements()) {
+                    ++idx;
+                    const bool Descending =
+                            (orderByElemPtr->direction == ram::AbstractAggregate::OrderByElement::Desc);
+                    const char* returnLess = (Descending ? "false" : "true");
+                    const char* returnGreater = (Descending ? "true" : "false");
+
+                    if (orderByElemPtr->type == TypeAttribute::Symbol) {
+                        // special comparison for symbols using locale collation
+                        out << "const std::string& lsym = symTable.decode(left[" << idx << "]);\n";
+                        out << "const std::string& rsym = symTable.decode(right[" << idx << "]);\n";
+                        out << "if (locale" << idx << "(lsym, rsym)) { return " << returnLess << "; }\n";
+                        out << "else if (locale" << idx << "(rsym, lsym)) { return " << returnGreater
+                            << ";}\n";
+                    } else {
+                        // comparison for other types
+                        const char* ramType = [&]() {
+                            switch (orderByElemPtr->type) {
+                                case TypeAttribute::Signed: return "RamSigned";
+                                case TypeAttribute::Unsigned: return "RamUnsigned";
+                                case TypeAttribute::Float: return "RamFloat";
+                                case TypeAttribute::Record: /* TODO order-by semantics for records ? */
+                                    return "RamSigned";
+                                case TypeAttribute::ADT: /* TODO order-by semantics for ADTs ? */
+                                    return "RamSigned";
+                                case TypeAttribute::Symbol: [[fallthrough]];
+                                default: throw "Unexpected type";
+                            }
+                        }();
+
+                        out << "if (ramBitCast<" << ramType << ">(left[" << idx << "]) < ramBitCast<"
+                            << ramType << ">(right[" << idx << "])) {\n"
+                            << "return " << returnLess << ";\n"
+                            << "} else if (ramBitCast<" << ramType << ">(left[" << idx << "]) > ramBitCast<"
+                            << ramType << ">(right[" << idx << "])) {\n"
+                            << "return " << returnGreater << ";\n}";
+                    }
+                }
+
+                out << "return false;";
+                out << "});\n";
+            }
 
             out << "} // ORDER BY\n";
             PRINT_END_COMMENT(out);
@@ -1763,14 +1826,6 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
             const auto identifier = aggregate.getTupleId();
             const ram::Aggregator& aggregator = aggregate.getAggregator();
             const bool hasOrderBy = !aggregate.getOrderByElements().empty();
-
-            std::string iterRange = "*" + relName;
-            if (hasOrderBy) {
-                iterRange = orderByAggregate(aggregate, identifier, iterRange, out);
-            }
-
-            // declare environment variable
-            out << "Tuple<RamDomain," << toString(std::max((std::size_t)1,arity)) << "> env" << identifier << ";\n";
 
             std::string iterRange = "*" + relName;
             if (hasOrderBy) {

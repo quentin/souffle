@@ -278,3 +278,14 @@ positive_test(issue2482)
 positive_test(concat_aggregate)
 positive_test(concat_orderby)
 positive_test(concat_collate)
+souffle_run_test_helper(
+  TEST_NAME concat_bad_locale
+  CATEGORY semantic
+  NEGATIVE
+)
+souffle_run_test_helper(
+  TEST_NAME concat_bad_locale_compiled
+  CATEGORY semantic
+  NEGATIVE
+  COMPILED
+)
