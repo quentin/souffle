@@ -1932,6 +1932,12 @@ RamDomain Engine::initValue(const ram::Aggregator& aggregator, const Shadow& sha
             case AggregateOp::CONCAT: return 0;
             case AggregateOp::COUNT: return 0;
             case AggregateOp::STRICTCONCAT: return 0;
+            case AggregateOp::RANK: return 0;
+            case AggregateOp::ARANK: return 0;
+            case AggregateOp::FRANK: return 0;
+            case AggregateOp::RRANK: return 0;
+            case AggregateOp::SRANK: return 0;
+            case AggregateOp::URANK: return 0;
         }
     } else if (isA<ram::UserDefinedAggregator>(aggregator)) {
         return execute(shadow.getInit(), ctxt);
@@ -1988,10 +1994,17 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
     const std::size_t tupleId = aggregate.getTupleId();
 
     bool isConcat = false;
-    ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { isConcat = true; });
-    ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { isConcat = true; });
-    const bool needsOrderBy = isConcat;
-    if(needsOrderBy) {
+    bool isRank = false;
+    if (const auto* ia = as<ram::IntrinsicAggregator>(aggregator)) {
+        const auto op = ia->getFunction();
+        if (isAnyConcatAggregator(op)) {
+            isConcat = true;
+        } else if (isAnyRankAggregator(op)) {
+            isRank = true;
+        }
+    };
+    const bool needsOrdering = isConcat || isRank;
+    if(needsOrdering) {
 
         const auto& orderByNodes = shadow.getOrderByNodes();
         const char* orderByOperations = shadow.getOrderByOperations();
@@ -2002,6 +2015,11 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
             if (secondary) {
                 separator = execute(secondary, ctxt);
             }
+        }
+
+        RamDomain targetRank = 0;
+        if (isRank) {
+            targetRank = execute(secondary, ctxt);
         }
 
         // data contains sequences of:
@@ -2133,6 +2151,14 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
                 first = false;
             }
             res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));
+        } else if (isRank) {
+            if (targetRank < 1 || static_cast<size_t>(targetRank) > data.size()) {
+                shouldRunNested = false;
+            } else {
+                // TODO when multiple elements have same rank according to order-by
+                const size_t index = sorted.at(targetRank-1);
+                res = data.at(index * (orderByArity + 1));
+            }
         }
 
     } else {
@@ -2193,7 +2219,14 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
 
                     case AggregateOp::STRICTCONCAT:
                     case AggregateOp::CONCAT:
-                    case AggregateOp::COUNT: fatal("This should never be executed");
+                    case AggregateOp::COUNT:
+                    case AggregateOp::RANK:
+                    case AggregateOp::ARANK:
+                    case AggregateOp::FRANK:
+                    case AggregateOp::RRANK:
+                    case AggregateOp::SRANK:
+                    case AggregateOp::URANK:
+                        fatal("This should never be executed");
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
                 auto userFunctorPtr = reinterpret_cast<void (*)()>(shadow.getFunctionPointer());

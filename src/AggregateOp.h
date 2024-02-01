@@ -42,6 +42,13 @@ enum class AggregateOp {
     CONCAT,
     COUNT,
     STRICTCONCAT,
+
+    RANK,
+    ARANK,
+    FRANK,
+    RRANK,
+    SRANK,
+    URANK,
 };
 
 inline std::ostream& operator<<(std::ostream& os, AggregateOp op) {
@@ -64,6 +71,14 @@ inline std::ostream& operator<<(std::ostream& os, AggregateOp op) {
         case AggregateOp::SUM:
         case AggregateOp::USUM:
         case AggregateOp::FSUM: return os << "sum";
+
+        case AggregateOp::RANK:
+        case AggregateOp::ARANK:
+        case AggregateOp::FRANK:
+        case AggregateOp::RRANK:
+        case AggregateOp::SRANK:
+        case AggregateOp::URANK:
+                                return os << "rank";
     }
 
     UNREACHABLE_BAD_CASE_ANALYSIS();
@@ -87,6 +102,13 @@ inline std::pair<uint8_t, uint8_t> aggregateArity(AggregateOp op) {
         case AggregateOp::UMAX:
         case AggregateOp::UMIN:
         case AggregateOp::USUM: return {1, 1};
+
+        case AggregateOp::RANK:
+        case AggregateOp::ARANK:
+        case AggregateOp::FRANK:
+        case AggregateOp::RRANK:
+        case AggregateOp::SRANK:
+        case AggregateOp::URANK: return {2, 2};
     }
 
     UNREACHABLE_BAD_CASE_ANALYSIS();
@@ -113,6 +135,13 @@ inline TypeAttribute getTypeAttributeAggregate(const AggregateOp op) {
 
         case AggregateOp::CONCAT:
         case AggregateOp::STRICTCONCAT: return TypeAttribute::Symbol;
+
+        case AggregateOp::RANK: return TypeAttribute::Signed;
+        case AggregateOp::ARANK: return TypeAttribute::ADT;
+        case AggregateOp::FRANK: return TypeAttribute::Float;
+        case AggregateOp::RRANK: return TypeAttribute::Record;
+        case AggregateOp::SRANK: return TypeAttribute::Symbol;
+        case AggregateOp::URANK: return TypeAttribute::Unsigned;
     }
 
     UNREACHABLE_BAD_CASE_ANALYSIS();
@@ -122,12 +151,18 @@ inline bool isOverloadedAggregator(const AggregateOp op) {
     switch (op) {
         case AggregateOp::MAX:
         case AggregateOp::MIN:
+        case AggregateOp::RANK:
         case AggregateOp::SUM: return true;
 
+        case AggregateOp::COUNT:
         case AggregateOp::MEAN:
         case AggregateOp::CONCAT:
         case AggregateOp::STRICTCONCAT:
-        case AggregateOp::COUNT: return false;
+        case AggregateOp::ARANK:
+        case AggregateOp::FRANK:
+        case AggregateOp::RRANK:
+        case AggregateOp::SRANK:
+        case AggregateOp::URANK: return false;
 
         default: return false;
     }
@@ -154,9 +189,27 @@ inline AggregateOp convertOverloadedAggregator(const AggregateOp op, const TypeA
         CASE_NUMERIC(MIN)
         CASE_NUMERIC(SUM)
             // clang-format on
+        case AggregateOp::RANK:
+          if (type == TypeAttribute::Signed) return AggregateOp::RANK;
+          if (type == TypeAttribute::ADT) return AggregateOp::ARANK;
+          if (type == TypeAttribute::Float) return AggregateOp::FRANK;
+          if (type == TypeAttribute::Record) return AggregateOp::RRANK;
+          if (type == TypeAttribute::Symbol) return AggregateOp::SRANK;
+          if (type == TypeAttribute::Unsigned) return AggregateOp::URANK;
+          fatal("invalid overload");
     }
 
 #undef CASE_NUMERIC
+}
+
+inline bool isAnyConcatAggregator(const AggregateOp op) {
+    return (op == AggregateOp::CONCAT 
+            || op == AggregateOp::STRICTCONCAT);
+}
+
+inline bool isAnyRankAggregator(const AggregateOp op) {
+    return (op == AggregateOp::RANK || op == AggregateOp::ARANK || op == AggregateOp::FRANK ||
+            op == AggregateOp::RRANK || op == AggregateOp::SRANK || op == AggregateOp::URANK);
 }
 
 }  // namespace souffle

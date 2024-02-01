@@ -165,6 +165,7 @@
 %token STRICTCONCAT              "strictconcat aggregator"
 %token SUM                       "sum aggregator"
 %token ORDERBY                   "orderby"
+%token RANK                      "rank aggregator"
 %token TRUELIT                   "true literal constraint"
 %token FALSELIT                  "false literal constraint"
 %token PLAN                      "plan keyword"
@@ -1338,6 +1339,10 @@ aggregate_func
   | MIN
     {
       $$ = AggregateOp::MIN;
+    }
+  | RANK
+    {
+      $$ = AggregateOp::RANK;
     }
   | STRICTCONCAT
     {

@@ -93,6 +93,7 @@ protected:
     void indexMultiResultFunctors(const ast::Clause& clause);
     void indexNodeArguments(std::size_t nodeLevel, const std::vector<ast::Argument*>& nodeArgs);
     void indexAggregatorBody(const ast::Aggregator& agg);
+    void indexAggregatorExpressions(const ast::Aggregator& agg);
     void indexGenerator(const ast::Argument& arg);
 
     /** Core clause translation stages */

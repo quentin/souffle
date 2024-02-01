@@ -85,8 +85,8 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                         // We can only parallelize intrinsic aggregators for
                         && isA<ram::IntrinsicAggregator>(aggregate->getAggregator())) {
                     const auto op = as<ram::IntrinsicAggregator>(aggregate->getAggregator())->getFunction();
-                    // TODO support parallel CONCAT/STRICTCONCAT
-                    if (op != AggregateOp::CONCAT && op != AggregateOp::STRICTCONCAT) {
+                    // TODO support parallel CONCAT/STRICTCONCAT/RANK
+                    if (op != AggregateOp::CONCAT && op != AggregateOp::STRICTCONCAT && !isAnyRankAggregator(op)) {
                         changed = true;
                         return mk<ParallelAggregate>(clone(aggregate->getOperation()),
                                 clone(aggregate->getAggregator()), aggregate->getRelation(),
@@ -102,8 +102,8 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                         // We can only parallelize intrinsic aggregators
                         && isA<ram::IntrinsicAggregator>(indexAggregate->getAggregator())) {
                     const auto op = as<ram::IntrinsicAggregator>(indexAggregate->getAggregator())->getFunction();
-                    // TODO support parallel CONCAT/STRICTCONCAT
-                    if (op != AggregateOp::CONCAT && op != AggregateOp::STRICTCONCAT) {
+                    // TODO support parallel CONCAT/STRICTCONCAT/RANK
+                    if (op != AggregateOp::CONCAT && op != AggregateOp::STRICTCONCAT && !isAnyRankAggregator(op)) {
                         changed = true;
                         RamPattern queryPattern = clone(indexAggregate->getRangePattern());
                         return mk<ParallelIndexAggregate>(clone(indexAggregate->getOperation()),

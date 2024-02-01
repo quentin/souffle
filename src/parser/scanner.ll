@@ -210,6 +210,7 @@ WS [ \t\r\v\f]
 "concat"                              { return yy::parser::make_CONCAT(yylloc); }
 "strictconcat"                        { return yy::parser::make_STRICTCONCAT(yylloc); }
 "orderby"                             { return yy::parser::make_ORDERBY(yylloc); }
+"rank"                                { return yy::parser::make_RANK(yylloc); }
 "sum"                                 { return yy::parser::make_SUM(yylloc); }
 "true"                                { return yy::parser::make_TRUELIT(yylloc); }
 "false"                               { return yy::parser::make_FALSELIT(yylloc); }

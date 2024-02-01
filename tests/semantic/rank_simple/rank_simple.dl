@@ -1,0 +1,28 @@
+
+.decl chapter(nth:number, title:symbol, pages:number)
+chapter(1, "monday", 10).
+chapter(2, "tuesday", 15).
+chapter(3, "wednesday", 6).
+chapter(4, "thursday", 15).
+chapter(5, "friday", 30).
+chapter(6, "saturday", 12).
+chapter(7, "sunday", 20).
+
+.decl first_by_title(title:symbol)
+.output first_by_title()
+first_by_title(title) :-
+  nth = rank n, 1 : chapter(n,t,_) orderby (t),
+  chapter(nth, title, _).
+
+.decl fourth_by_title(title:symbol)
+.output fourth_by_title()
+fourth_by_title(title) :-
+  title = rank t, 4 : chapter(_,t,_) orderby (t).
+
+.decl rank_by_pages(rk:number, title:symbol, pages:number)
+.output rank_by_pages()
+rank_by_pages(rk, title, pages) :-
+  rk = range(-10,10),
+  id = rank i, rk : chapter(i,_,p) orderby (p DESC),
+  chapter(id, title, pages).
+

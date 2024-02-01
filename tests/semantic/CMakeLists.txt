@@ -289,3 +289,4 @@ souffle_run_test_helper(
   NEGATIVE
   COMPILED
 )
+positive_test(rank_simple)

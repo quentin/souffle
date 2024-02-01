@@ -436,6 +436,12 @@ bool TypeAnalysis::analyseAggregators(const TranslationUnit& translationUnit) {
                 setAggregatorType(agg, TypeAttribute::Float);
             } else if (isUnsigned(targetExpression)) {
                 setAggregatorType(agg, TypeAttribute::Unsigned);
+            } else if (isRecord(targetExpression)) {
+                setAggregatorType(agg, TypeAttribute::Record);
+            } else if (isSymbol(targetExpression)) {
+                setAggregatorType(agg, TypeAttribute::Symbol);
+            } else if (isADT(targetExpression)) {
+                setAggregatorType(agg, TypeAttribute::ADT);
             } else {
                 setAggregatorType(agg, TypeAttribute::Signed);
             }
@@ -506,6 +512,14 @@ bool TypeAnalysis::isUnsigned(const Argument* argument) const {
 
 bool TypeAnalysis::isSymbol(const Argument* argument) const {
     return isOfKind(getTypes(argument), TypeAttribute::Symbol);
+}
+
+bool TypeAnalysis::isRecord(const Argument* argument) const {
+    return isOfKind(getTypes(argument), TypeAttribute::Record);
+}
+
+bool TypeAnalysis::isADT(const Argument* argument) const {
+    return isOfKind(getTypes(argument), TypeAttribute::ADT);
 }
 
 void TypeAnalysis::run(const TranslationUnit& translationUnit) {
