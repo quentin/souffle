@@ -1965,9 +1965,10 @@ void ifIntrinsic(const ram::Aggregator& aggregator, AggregateOp op, std::functio
     }
 }
 
-template <typename Aggregate, typename Shadow, typename Iter>
-RamDomain Engine::evalAggregate(
-        const Aggregate& aggregate, const Shadow& shadow, const Iter& ranges, Context& ctxt) {
+template <typename Aggregate, typename Shadow>
+RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow,
+        const std::function<void(const std::function<bool(const RamDomain*)>&)>& for_each_in_ranges,
+        Context& ctxt) {
     bool shouldRunNested = false;
 
     const Node& filter = *shadow.getCondition();
@@ -1989,31 +1990,30 @@ RamDomain Engine::evalAggregate(
     bool isConcat = false;
     ifIntrinsic(aggregator, AggregateOp::CONCAT, [&]() { isConcat = true; });
     ifIntrinsic(aggregator, AggregateOp::STRICTCONCAT, [&]() { isConcat = true; });
-    if(isConcat) {
-        // concatenation with optional order by
-
-        // Use for string concatenation.
-        std::stringstream accumulateSymbol;
-
-        std::optional<RamDomain> separator = std::nullopt;
-        if (secondary) {
-            separator = execute(secondary, ctxt);
-        }
+    const bool needsOrderBy = isConcat;
+    if(needsOrderBy) {
 
         const auto& orderByNodes = shadow.getOrderByNodes();
         const char* orderByOperations = shadow.getOrderByOperations();
         const std::size_t orderByArity = shadow.getOrderByArity();
+
+        std::optional<RamDomain> separator = std::nullopt;
+        if (isConcat) {
+            if (secondary) {
+                separator = execute(secondary, ctxt);
+            }
+        }
 
         // data contains sequences of:
         // - the aggregate expression value
         // - the order by expression values
         std::vector<RamDomain> data;
         size_t count = 0;
-        for (const auto& tuple : ranges) {
-            ctxt[tupleId] = tuple.data();
+        for_each_in_ranges([&](const RamDomain* tuple_data) -> bool {
+            ctxt[tupleId] = tuple_data;
 
             if (!execute(&filter, ctxt)) {
-                continue;
+                return true; // continue
             }
 
             shouldRunNested = true;
@@ -2026,15 +2026,13 @@ RamDomain Engine::evalAggregate(
             }
 
             ++count;
-        }
+            return true;
+        });
 
         const std::vector<std::locale>& locales = shadow.getOrderByCollateLocales();
-        const RamDomain* datap = data.data();
-        std::vector<size_t> sorted(count);
-        std::iota(std::begin(sorted), std::end(sorted), 0);
-        std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
-            const RamDomain* lp = datap + left * (orderByArity+1) + 1;
-            const RamDomain* rp = datap + right * (orderByArity+1) + 1;
+
+        // compute less operator for order-by
+        const auto less_operator = [&](const RamDomain* lp, const RamDomain* rp) -> bool {
             for (std::size_t i = 0; i < orderByArity; ++i) {
                 switch (orderByOperations[i]) {
                     // ASCENDING
@@ -2107,39 +2105,53 @@ RamDomain Engine::evalAggregate(
                 }
             }
             return false;
+        };
+
+        const RamDomain* datap = data.data();
+        std::vector<size_t> sorted(count);
+        std::iota(std::begin(sorted), std::end(sorted), 0);
+        std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
+            const RamDomain* lp = datap + left * (orderByArity+1) + 1;
+            const RamDomain* rp = datap + right * (orderByArity+1) + 1;
+            return less_operator(lp, rp);
         });
 
-        bool first = true;
-        std::string sep;
-        if (separator) {
-            sep = symbolTable.decode(*separator);
-        }
-        for (size_t index : sorted) {
-            if (separator && !first) {
-                accumulateSymbol << sep;
+        if (isConcat) {
+
+            // Use for string concatenation.
+            std::stringstream accumulateSymbol;
+            bool first = true;
+            std::string sep;
+            if (separator) {
+                sep = symbolTable.decode(*separator);
             }
-            accumulateSymbol << symbolTable.decode(data.at(index * (orderByArity + 1)));
-            first = false;
+            for (size_t index : sorted) {
+                if (separator && !first) {
+                    accumulateSymbol << sep;
+                }
+                accumulateSymbol << symbolTable.decode(data.at(index * (orderByArity + 1)));
+                first = false;
+            }
+            res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));
         }
-        res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));
 
     } else {
-        for (const auto& tuple : ranges) {
-            ctxt[tupleId] = tuple.data();
+        bool isCount = false;
+        ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
+
+        for_each_in_ranges([&](const RamDomain* tuple_data) -> bool {
+            ctxt[tupleId] = tuple_data;
 
             if (!execute(&filter, ctxt)) {
-                continue;
+                return true;
             }
 
             shouldRunNested = true;
 
-            bool isCount = false;
-            ifIntrinsic(aggregator, AggregateOp::COUNT, [&]() { isCount = true; });
-
             // count is a special case.
             if (isCount) {
                 ++res;
-                continue;
+                return true;
             }
 
             // eval target expression
@@ -2194,7 +2206,8 @@ RamDomain Engine::evalAggregate(
             } else {
                 fatal("Unhandled aggregator");
             }
-        }
+            return true;
+        });
 
         ifIntrinsic(aggregator, AggregateOp::MEAN, [&]() {
             if (accumulateMean.second != 0) {
@@ -2218,7 +2231,16 @@ RamDomain Engine::evalAggregate(
 template <typename Rel>
 RamDomain Engine::evalSimpleAggregate(
         const Rel& rel, const ram::Aggregate& cur, const Aggregate& shadow, Context& ctxt) {
-    return evalAggregate(cur, shadow, rel.scan(), ctxt);
+
+    const auto for_each_in_ranges = [&](const std::function<bool(const RamDomain*)>& yield) {
+        for (const auto& tuple : rel.scan()) {
+            if (!yield(tuple.data())) {
+                return;
+            }
+        }
+    };
+
+    return evalAggregate(cur, shadow, for_each_in_ranges, ctxt);
 }
 
 template <typename Rel>
@@ -2232,7 +2254,16 @@ RamDomain Engine::evalParallelAggregate(
     for (const auto& info : viewInfo) {
         newCtxt.createView(*getRelationHandle(info[0]), info[1], info[2]);
     }
-    return evalAggregate(cur, shadow, rel.scan(), newCtxt);
+
+    const auto for_each_in_ranges = [&](const std::function<bool(const RamDomain*)>& yield) {
+        for (const auto& tuple : rel.scan()) {
+            if (!yield(tuple.data())) {
+                return;
+            }
+        }
+    };
+
+    return evalAggregate(cur, shadow, for_each_in_ranges, newCtxt);
 }
 
 template <typename Rel>
@@ -2257,7 +2288,15 @@ RamDomain Engine::evalParallelIndexAggregate(
     std::size_t viewId = shadow.getViewId();
     auto view = Rel::castView(newCtxt.getView(viewId));
 
-    return evalAggregate(cur, shadow, view->range(low, high), newCtxt);
+    const auto for_each_in_ranges = [&](const std::function<bool(const RamDomain*)>& yield) {
+        for (const auto& tuple : view->range(low, high)) {
+            if (!yield(tuple.data())) {
+                return;
+            }
+        }
+    };
+
+    return evalAggregate(cur, shadow, for_each_in_ranges, newCtxt);
 }
 
 template <typename Rel>
@@ -2273,7 +2312,15 @@ RamDomain Engine::evalIndexAggregate(
     std::size_t viewId = shadow.getViewId();
     auto view = Rel::castView(ctxt.getView(viewId));
 
-    return evalAggregate(cur, shadow, view->range(low, high), ctxt);
+    const auto for_each_in_ranges = [&](const std::function<bool(const RamDomain*)>& yield) {
+        for (const auto& tuple : view->range(low, high)) {
+            if (!yield(tuple.data())) {
+                return;
+            }
+        }
+    };
+
+    return evalAggregate(cur, shadow, for_each_in_ranges, ctxt);
 }
 
 template <typename Rel>

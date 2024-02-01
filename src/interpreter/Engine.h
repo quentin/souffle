@@ -147,9 +147,11 @@ private:
     template <typename Shadow>
     RamDomain initValue(const ram::Aggregator& aggregator, const Shadow& shadow, Context& ctxt);
 
-    template <typename Aggregate, typename Shadow, typename Iter>
-    RamDomain evalAggregate(
-            const Aggregate& aggregate, const Shadow& shadow, const Iter& ranges, Context& ctxt);
+    template <typename Aggregate, typename Shadow>
+    RamDomain evalAggregate(const Aggregate& aggregate, const Shadow& shadow,
+            /* yield a RamDomain tuple for each element in ranges */
+            const std::function<void(const std::function<bool(const RamDomain*)>&)>& for_each_in_ranges,
+            Context& ctxt);
 
     template <typename Rel>
     RamDomain evalSimpleAggregate(const Rel& rel, const ram::Aggregate& cur,
