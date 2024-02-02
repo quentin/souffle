@@ -2017,16 +2017,20 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
             }
         }
 
-        RamDomain targetRank = 0;
+        std::size_t targetRank = 0;
         if (isRank) {
-            targetRank = execute(secondary, ctxt);
+            const RamDomain desiredRank = execute(secondary, ctxt);
+            if (desiredRank <= 0) {
+                return true;
+            }
+            targetRank = static_cast<std::size_t>(desiredRank);
         }
 
         // data contains sequences of:
-        // - the aggregate expression value
         // - the order by expression values
+        // - the aggregate expression value
         std::vector<RamDomain> data;
-        size_t count = 0;
+        std::size_t count = 0;
         for_each_in_ranges([&](const RamDomain* tuple_data) -> bool {
             ctxt[tupleId] = tuple_data;
 
@@ -2037,11 +2041,12 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
             shouldRunNested = true;
 
             const RamDomain val = execute(expression, ctxt);
-            data.push_back(val);
 
             for (std::size_t i = 0; i < orderByArity; ++i) {
                 data.push_back(execute(orderByNodes[i], ctxt));
             }
+
+            data.push_back(val);
 
             ++count;
             return true;
@@ -2049,9 +2054,10 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
 
         const std::vector<std::locale>& locales = shadow.getOrderByCollateLocales();
 
-        // compute less operator for order-by
-        const auto less_operator = [&](const RamDomain* lp, const RamDomain* rp) -> bool {
-            for (std::size_t i = 0; i < orderByArity; ++i) {
+        // compute less operator with using the first `orderByOperationCount` orderby operations.
+        const auto less_operator = [&](const std::size_t orderByOperationCount, const RamDomain* lp,
+                                           const RamDomain* rp) -> bool {
+            for (std::size_t i = 0; i < orderByOperationCount; ++i) {
                 switch (orderByOperations[i]) {
                     // ASCENDING
                     case 'a': [[fallthrough]];
@@ -2122,16 +2128,18 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
                     } break;
                 }
             }
+            // sort by expression value
+
             return false;
         };
 
         const RamDomain* datap = data.data();
-        std::vector<size_t> sorted(count);
+        std::vector<std::size_t> sorted(count);
         std::iota(std::begin(sorted), std::end(sorted), 0);
-        std::sort(std::begin(sorted), std::end(sorted), [&](size_t left, size_t right) -> bool {
-            const RamDomain* lp = datap + left * (orderByArity+1) + 1;
-            const RamDomain* rp = datap + right * (orderByArity+1) + 1;
-            return less_operator(lp, rp);
+        std::sort(std::begin(sorted), std::end(sorted), [&](std::size_t left, std::size_t right) -> bool {
+            const RamDomain* lp = datap + left * (orderByArity + 1);
+            const RamDomain* rp = datap + right * (orderByArity + 1);
+            return less_operator(orderByArity + 1, lp, rp);
         });
 
         if (isConcat) {
@@ -2143,22 +2151,49 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
             if (separator) {
                 sep = symbolTable.decode(*separator);
             }
-            for (size_t index : sorted) {
+            for (std::size_t index : sorted) {
                 if (separator && !first) {
                     accumulateSymbol << sep;
                 }
-                accumulateSymbol << symbolTable.decode(data.at(index * (orderByArity + 1)));
+                accumulateSymbol << symbolTable.decode(data.at(index * (orderByArity + 1) + orderByArity));
                 first = false;
             }
             res = ramBitCast(symbolTable.encode(accumulateSymbol.str()));
         } else if (isRank) {
-            if (targetRank < 1 || static_cast<size_t>(targetRank) > data.size()) {
-                shouldRunNested = false;
-            } else {
-                // TODO when multiple elements have same rank according to order-by
-                const size_t index = sorted.at(targetRank-1);
-                res = data.at(index * (orderByArity + 1));
+            shouldRunNested = false;
+            if (static_cast<std::size_t>(targetRank) <= sorted.size()) {
+                // result environment
+                souffle::Tuple<RamDomain, 1> tuple;
+                ctxt[tupleId] = tuple.data();
+
+                // Find the range of elements with target rank.
+                // Two consecutive elements A,B have the same rank unless then compare A<B.
+                // Therefore the `rank` aggregate may generate more than one value.
+                //
+                // if there is no `orderby`, use the expression value.
+                const std::size_t orderByOperationCount = (orderByArity == 0 ? 1 : orderByArity);
+                std::size_t rank = 1;
+                for (std::size_t elem = 0; elem < sorted.size(); ++elem) {
+                    if (elem > 0) {
+                        const RamDomain* lp = datap + sorted.at(elem - 1) * (orderByArity + 1);
+                        const RamDomain* rp = datap + sorted.at(elem) * (orderByArity + 1);
+                        if (less_operator(orderByOperationCount, lp, rp)) {
+                            ++rank;
+                        }
+                    }
+                    if (rank > targetRank) {
+                        break;
+                    }
+                    if (rank == targetRank) {
+                        const std::size_t index = sorted.at(elem);
+                        tuple[0] = data.at(index * (orderByArity + 1) + orderByArity);
+                        if (!execute(&nestedOperation, ctxt)) {
+                            return false;
+                        }
+                    }
+                }
             }
+            return true;
         }
 
     } else {
@@ -2249,14 +2284,13 @@ RamDomain Engine::evalAggregate(const Aggregate& aggregate, const Shadow& shadow
         });
     }
 
-    // write result to environment
-    souffle::Tuple<RamDomain, 1> tuple;
-    tuple[0] = res;
-    ctxt[tupleId] = tuple.data();
-
     if (!shouldRunNested) {
         return true;
     } else {
+        // write result to environment
+        souffle::Tuple<RamDomain, 1> tuple;
+        tuple[0] = res;
+        ctxt[tupleId] = tuple.data();
         return execute(&nestedOperation, ctxt);
     }
 }

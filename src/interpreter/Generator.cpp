@@ -406,30 +406,28 @@ Own<Aggregate> NodeGenerator::mkAggregate(const std::string& base_node_type,
     std::string orderByOperations;
     std::vector<std::locale> orderByCollateLocales;
 
+    const auto charFromTypeAttribute = [](TypeAttribute a) -> char {
+        switch(a) {
+          case TypeAttribute::Symbol:
+            return 's';
+          case TypeAttribute::Signed:
+            return 'i';
+          case TypeAttribute::Float:
+            return 'f';
+          case TypeAttribute::Unsigned:
+            return 'u';
+          case TypeAttribute::Record:
+            return 'r';
+          case TypeAttribute::ADT:
+            return 'a';
+        }
+        return ' ';
+    };
+
     for (const auto& e : aggregate.getOrderByElements()) {
         NodePtr obexpr = dispatch(*e->expr);
         orderByNodes.emplace_back(std::move(obexpr));
-        char tychar = ' ';
-        switch(e->type) {
-          case TypeAttribute::Symbol:
-            tychar = 's';
-            break;
-          case TypeAttribute::Signed:
-            tychar = 'i';
-            break;
-          case TypeAttribute::Float:
-            tychar = 'f';
-            break;
-          case TypeAttribute::Unsigned:
-            tychar = 'u';
-            break;
-          case TypeAttribute::Record:
-            tychar = 'r';
-            break;
-          case TypeAttribute::ADT:
-            tychar = 'a';
-            break;
-        }
+        char tychar = charFromTypeAttribute(e->type);
         if (e->direction == ram::AbstractAggregate::OrderByElement::Desc) {
             tychar = std::toupper(tychar);
         }
@@ -441,6 +439,9 @@ Own<Aggregate> NodeGenerator::mkAggregate(const std::string& base_node_type,
             throw std::runtime_error("Error: Unknown locale '" + e->collateLocale.value_or("") + "'.");
         }
     }
+
+    orderByOperations.push_back(charFromTypeAttribute(*aggregate.getExpressionType()));
+    orderByCollateLocales.emplace_back("");
 
     orderingContext.addNewTuple(relation_operation.getTupleId(), 1);
     NodePtr nested = visit_(type_identity<ram::TupleOperation>(), relation_operation);

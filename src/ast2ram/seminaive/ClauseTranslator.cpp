@@ -423,10 +423,15 @@ Own<ram::Operation> ClauseTranslator::instantiateAggregator(Own<ram::Operation> 
                 std::move(expr), tyattr, direction, collate_locale});
     }
 
+    std::optional<TypeAttribute> exprType = std::nullopt;
+    if (aggExpr != nullptr) {
+        exprType = *context.getArgumentTypeAttributes(aggExpr).cbegin();
+    }
+
     // add Ram-Aggregation layer
     return mk<ram::Aggregate>(std::move(op), std::move(aggregator), getClauseAtomName(clause, aggAtom),
             expr ? std::move(expr) : mk<ram::UndefValue>(), std::move(second),
-            aggCond ? std::move(aggCond) : mk<ram::True>(), std::move(orderBy), curLevel);
+            aggCond ? std::move(aggCond) : mk<ram::True>(), std::move(orderBy), exprType, curLevel);
 }
 
 Own<ram::Operation> ClauseTranslator::instantiateMultiResultFunctor(

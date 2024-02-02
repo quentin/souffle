@@ -629,7 +629,7 @@ Own<ram::Statement> UnitTranslator::generateStratumLubSequence(
         }
         op = mk<ram::Aggregate>(std::move(op), std::move(aggregator), newName,
                 mk<ram::TupleElement>(level, i - 1), nullptr, std::move(condition),
-                VecOwn<ram::AbstractAggregate::OrderByElement>{}, level);
+                VecOwn<ram::AbstractAggregate::OrderByElement>{}, std::nullopt, level);
     }
 
     op = mk<ram::Scan>(newName, 0, std::move(op));

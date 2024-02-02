@@ -419,8 +419,8 @@ Own<Operation> MakeIndexTransformer::rewriteAggregate(const Aggregate* agg) {
         if (indexable) {
             return mk<IndexAggregate>(clone(agg->getOperation()), clone(agg->getAggregator()),
                     agg->getRelation(), clone(agg->getExpression()), clone(agg->getSecondaryExpression()),
-                    std::move(condition), clone(agg->getOrderByElements()), std::move(queryPattern),
-                    agg->getTupleId());
+                    std::move(condition), clone(agg->getOrderByElements()), agg->getExpressionType(),
+                    std::move(queryPattern), agg->getTupleId());
         }
     }
 

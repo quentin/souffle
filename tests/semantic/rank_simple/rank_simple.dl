@@ -1,23 +1,17 @@
 
 .decl chapter(nth:number, title:symbol, pages:number)
-chapter(1, "monday", 10).
-chapter(2, "tuesday", 15).
-chapter(3, "wednesday", 6).
-chapter(4, "thursday", 15).
-chapter(5, "friday", 30).
-chapter(6, "saturday", 12).
-chapter(7, "sunday", 20).
+.input chapter(delimiter=",")
 
-.decl first_by_title(title:symbol)
-.output first_by_title()
-first_by_title(title) :-
-  nth = rank n, 1 : chapter(n,t,_) orderby (t),
-  chapter(nth, title, _).
+ .decl first_by_title(title:symbol)
+ .output first_by_title()
+ first_by_title(title) :-
+   nth = rank n, 1 : chapter(n,t,_) orderby (t),
+   chapter(nth, title, _).
 
 .decl fourth_by_title(title:symbol)
 .output fourth_by_title()
 fourth_by_title(title) :-
-  title = rank t, 4 : chapter(_,t,_) orderby (t).
+  title = rank t, 4 : chapter(_,t,_). // implicit order-by t
 
 .decl rank_by_pages(rk:number, title:symbol, pages:number)
 .output rank_by_pages()
@@ -26,3 +20,16 @@ rank_by_pages(rk, title, pages) :-
   id = rank i, rk : chapter(i,_,p) orderby (p DESC),
   chapter(id, title, pages).
 
+.decl third_by_pages_desc(title:symbol, pages:number)
+.output third_by_pages_desc()
+third_by_pages_desc(title, pages) :-
+  id = rank i, 3 : chapter(i,_,p) orderby (p DESC),
+  chapter(id, title, pages).
+
+.decl third_by_pages_asc(title:symbol, pages:number)
+.output third_by_pages_asc()
+// same as third_by_pages_desc but ASC orderby, ClauseNormalisation must be
+// different and MinimiseProgramTransformer must not eliminate this clause
+third_by_pages_asc(title, pages) :-
+  id = rank i, 3 : chapter(i,_,p) orderby (p ASC),
+  chapter(id, title, pages).

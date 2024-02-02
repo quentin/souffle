@@ -770,7 +770,6 @@ public:
               second(std::move(second)), init(std::move(init)), orderByNodes(std::move(orderby_nodes)),
               orderByOperations(orderby_operations),
               orderByCollateLocales(std::move(orderby_collate_locales)) {
-        assert(orderByNodes.size() == orderByOperations.size());
 
         orderByNodesPtr.reserve(orderByNodes.size());
         for (auto &n : orderByNodes) {

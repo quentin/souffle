@@ -92,7 +92,7 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                                 clone(aggregate->getAggregator()), aggregate->getRelation(),
                                 clone(aggregate->getExpression()), clone(aggregate->getSecondaryExpression()),
                                 clone(aggregate->getCondition()), clone(aggregate->getOrderByElements()),
-                                aggregate->getTupleId());
+                                aggregate->getExpressionType(), aggregate->getTupleId());
                     }
                 }
             } else if (const IndexAggregate* indexAggregate = as<IndexAggregate>(node)) {
@@ -111,7 +111,8 @@ bool ParallelTransformer::parallelizeOperations(Program& program) {
                                 clone(indexAggregate->getExpression()),
                                 clone(indexAggregate->getSecondaryExpression()),
                                 clone(indexAggregate->getCondition()),
-                                clone(indexAggregate->getOrderByElements()), std::move(queryPattern),
+                                clone(indexAggregate->getOrderByElements()),
+                                indexAggregate->getExpressionType(), std::move(queryPattern),
                                 indexAggregate->getTupleId());
                     }
                 }

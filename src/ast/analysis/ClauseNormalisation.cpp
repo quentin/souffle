@@ -141,6 +141,16 @@ std::string NormalisedClause::normaliseArgument(const Argument* arg) {
             aggrTypeSignatureComponents.push_back(normalisedExpr);
         }
 
+        if (aggr->getSecondaryExpression() != nullptr) {
+            std::string normalisedExpr = normaliseArgument(aggr->getSecondaryExpression());
+            aggrTypeSignatureComponents.push_back(normalisedExpr);
+        }
+
+        // TODO not sure how ClauseNormalisation works, so just ignore when we have order-by
+        if (!aggr->getOrderByElements().empty()) {
+            fullyNormalised = false;
+        }
+
         // Type signature is its own special atom
         clauseElements.push_back(
                 {QualifiedName::fromString(aggrTypeSignature.str()), aggrTypeSignatureComponents});

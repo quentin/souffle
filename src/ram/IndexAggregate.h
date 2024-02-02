@@ -46,9 +46,9 @@ namespace souffle::ram {
 class IndexAggregate : public IndexOperation, public AbstractAggregate {
 public:
     IndexAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Expression>(second), Own<Condition> condition, VecOwn<OrderByElement> orderBy, RamPattern queryPattern, std::size_t ident)
+            Own<Expression>(second), Own<Condition> condition, VecOwn<OrderByElement> orderBy, std::optional<TypeAttribute> exprType, RamPattern queryPattern, std::size_t ident)
             : IndexAggregate(NK_IndexAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
-                      std::move(second), std::move(condition), std::move(orderBy), std::move(queryPattern), ident) {}
+                      std::move(second), std::move(condition), std::move(orderBy), std::move(exprType), std::move(queryPattern), ident) {}
 
     IndexAggregate* cloning() const override {
         RamPattern pattern;
@@ -58,16 +58,16 @@ public:
         for (const auto& i : queryPattern.second) {
             pattern.second.emplace_back(i->cloning());
         }
-        return new IndexAggregate(NK_IndexAggregate, clone(getOperation()), clone(function), relation,
-                clone(expression), clone(second), clone(condition), clone(orderBy), std::move(pattern), getTupleId());
-                getTupleId());
+
+        return new IndexAggregate(getKind(), clone(getOperation()), clone(function), relation,
+                clone(expression), clone(second), clone(condition), clone(orderBy), getExpressionType(),
+                std::move(pattern), getTupleId());
     }
 
     void apply(const NodeMapper& map) override {
         IndexOperation::apply(map);
         condition = map(std::move(condition));
         expression = map(std::move(expression));
-        function->apply(map);
         if (second) {
           second = map(std::move(second));
         }
@@ -84,9 +84,9 @@ public:
 
 protected:
     IndexAggregate(NodeKind kind, Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Expression>(second), Own<Condition> condition, VecOwn<OrderByElement> orderBy, RamPattern queryPattern, std::size_t ident)
+            Own<Expression> expression, Own<Expression>(second), Own<Condition> condition, VecOwn<OrderByElement> orderBy, std::optional<TypeAttribute> exprType, RamPattern queryPattern, std::size_t ident)
             : IndexOperation(kind, rel, ident, std::move(queryPattern), std::move(nested)),
-              AbstractAggregate(std::move(fun), std::move(expression), std::move(second), std::move(condition), std::move(orderBy)) {
+              AbstractAggregate(std::move(fun), std::move(expression), std::move(second), std::move(condition), std::move(orderBy), exprType) {
         assert(kind >= NK_IndexAggregate && kind < NK_LastIndexAggregate);
     }
 

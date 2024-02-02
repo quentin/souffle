@@ -50,9 +50,9 @@ class Aggregate : public RelationOperation, public AbstractAggregate {
 public:
 
     Aggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel, Own<Expression> expression,
-            Own<Expression> second, Own<Condition> condition, VecOwn<OrderByElement> orderBy, std::size_t ident)
+            Own<Expression> second, Own<Condition> condition, VecOwn<OrderByElement> orderBy, std::optional<TypeAttribute> exprType, std::size_t, ident)
             : Aggregate(NK_Aggregate, std::move(nested), std::move(fun), rel, std::move(second), std::move(expression),
-                      std::move(condition), std::move(orderBy), ident) {}
+                      std::move(condition), std::move(orderBy), std::move(exprType), ident) {}
 
     ~Aggregate() override = default;
 
@@ -82,9 +82,11 @@ public:
 
 protected:
     Aggregate(NodeKind kind, Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<Expression> orderBy, std::size_t ident)
+            Own<Expression> expression, Own<Expression> second, Own<Condition> condition,
+            VecOwn<OrderByElement> orderBy, std::optional<TypeAttribute> exprType, std::size_t ident)
             : RelationOperation(kind, rel, ident, std::move(nested)),
-              AbstractAggregate(std::move(fun), std::move(expression), std::move(second), std::move(condition), std::move(orderBy)) {
+              AbstractAggregate(std::move(fun), std::move(expression), std::move(second),
+                      std::move(condition), std::move(orderBy), exprType) {
         assert(kind >= NK_Aggregate && kind < NK_LastAggregate);
     }
 

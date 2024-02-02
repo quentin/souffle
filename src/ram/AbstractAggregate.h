@@ -57,9 +57,9 @@ public:
     };
 
     AbstractAggregate(Own<Aggregator> op, Own<Expression> expr, Own<Expression> second, Own<Condition> cond,
-            VecOwn<OrderByElement> orderBy)
+            VecOwn<OrderByElement> orderBy, std::optional<TypeAttribute> exprType)
             : function(std::move(op)), expression(std::move(expr)), second(std::move(second)),
-              condition(std::move(cond)), orderBy(std::move(orderBy)) {
+              condition(std::move(cond)), orderBy(std::move(orderBy)), exprType(exprType) {
         assert(condition != nullptr && "Condition is a null-pointer");
         assert(expression != nullptr && "Expression is a null-pointer");
     }
@@ -99,6 +99,10 @@ public:
         return Node::ChildNodes(getChildren(), detail::ConstCaster());
     }
 
+    std::optional<TypeAttribute> getExpressionType() const {
+        return exprType;
+    }
+
 protected:
     void print(std::ostream& os, int tabpos) const {
         function->print(os, tabpos);
@@ -128,7 +132,7 @@ protected:
         const auto& other = asAssert<AbstractAggregate, AllowCrossCast>(node);
         return equal_ptr(function, other.function) && equal_ptr(expression, other.expression) &&
                equal_ptr(second, other.second) && equal_ptr(condition, other.condition) &&
-               equal_targets(orderBy, other.orderBy);
+               equal_targets(orderBy, other.orderBy) && (exprType == other.exprType);
     }
 
     std::vector<const Node*> getChildren() const {
@@ -157,6 +161,9 @@ protected:
 
     /** Order by tuple elements*/
     VecOwn<OrderByElement> orderBy;
+
+    /// type attribute of the expression if expression is not nullptr
+    std::optional<TypeAttribute> exprType;
 };
 
 }  // namespace souffle::ram
