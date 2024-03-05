@@ -8,6 +8,14 @@ on:
     branches:
       - 'master'
 
+concurrency:
+  # Use github.run_id on master branch, so concurrent pushes can happen on master
+  # Use github.event.pull_request.number on pull requests, so it's unique per pull request
+  # Use github.ref on other branches, so it's unique per branch
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/master' && github.run_id || github.event.pull_request.number || github.ref }}
+  # cancel workflow job when a new one arrives
+  cancel-in-progress: true
+
 env:
   CHOCO_CACHE_DIR: "${{ github.workspace }}/choco-cache"
 
