@@ -251,7 +251,7 @@ function(SOUFFLE_RUN_TEST_HELPER)
     list(PREPEND SOUFFLE_PARAMS ${EXTRA_FLAGS})
 
     if (OPENMP_FOUND)
-      list(APPEND SOUFFLE_PARAMS "-j8")
+      list(APPEND SOUFFLE_PARAMS "-j${SOUFFLE_TEST_THREADS}")
     endif()
 
     souffle_run_integration_test(TEST_NAME ${PARAM_TEST_NAME}

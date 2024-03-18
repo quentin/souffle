@@ -24,7 +24,7 @@ runs:
       shell: bash
 
     - name: setup-domain
-      run: cmake -S . -B build ${{ inputs.cmake-flags }}
+      run: cmake -S . -B build ${{ inputs.cmake-flags }} -DSOUFFLE_TEST_THREADS=${JOBS}
       shell: bash
 
     - name: make
@@ -38,5 +38,5 @@ runs:
         sh/chunkify.py
         )
         echo "[Debug] Running tests in range ${TESTS_TO_RUN}."
-        ctest --test-dir build -I "${TESTS_TO_RUN}" --output-on-failure --progress -j${JOBS}
+        ctest --test-dir build -I "${TESTS_TO_RUN}" --output-on-failure --progress
       shell: bash
