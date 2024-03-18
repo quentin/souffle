@@ -24,7 +24,7 @@ runs:
       shell: bash
 
     - name: setup-domain
-      run: cmake -S . -B build ${{ inputs.cmake-flags }} -DSOUFFLE_TEST_THREADS=${JOBS}
+      run: cmake -S . -B build ${{ inputs.cmake-flags }} -DSOUFFLE_TEST_THREADS=8
       shell: bash
 
     - name: make
