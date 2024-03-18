@@ -105,6 +105,7 @@ option(SOUFFLE_BASH_COMPLETION "Enable/Disable bash completion" OFF)
 option(SOUFFLE_USE_LIBFFI "Enable/Disable use of libffi" ON)
 option(SOUFFLE_CUSTOM_GETOPTLONG "Enable/Disable custom getopt_long implementation" OFF)
 option(SOUFFLE_TEST_THREADS "Number of souffle threads in tests" "auto")
+message("Running tests with ${SOUFFLE_TEST_THREADS} threads")
 
 cmake_dependent_option(SOUFFLE_USE_LIBCPP "Link to libc++ instead of libstdc++" ON
     "CMAKE_CXX_COMPILER_ID STREQUAL Clang" OFF)

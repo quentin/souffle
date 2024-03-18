@@ -54,7 +54,7 @@ jobs:
     - name: cmake-test-64bit
       uses: ./.github/actions/cmake-test
       with:
-        cmake-flags: -DSOUFFLE_DOMAIN_64BIT=ON
+        cmake-flags: -DSOUFFLE_DOMAIN_64BIT=ON -DSOUFFLE_TEST_EXAMPLES=ON -DSOUFFLE_TEST_THREADS=8
         n-chunks: ${{ needs.Test-Setup.outputs.n-chunks }}
         chunk: ${{ matrix.chunk }}
 
