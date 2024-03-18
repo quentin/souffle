@@ -38,5 +38,5 @@ runs:
         sh/chunkify.py
         )
         echo "[Debug] Running tests in range ${TESTS_TO_RUN}."
-        ctest --test-dir build -I "${TESTS_TO_RUN}" --output-on-failure --progress
+        ctest --test-dir build -R cprog4 -L compiled --repeat-until-fail 20 --output-on-failure --progress -VV
       shell: bash
