@@ -140,7 +140,7 @@ static souffle::PiggyList<parent_t> randomize_disjoint_set(
         nodes.append(DisjointSet::b2p(ds.makeNode()));
     }
     check(ds, nodes);
-    return nodes;
+    return souffle::PiggyList<parent_t>{nodes};
 }
 
 // When creating a maximally-disjoint set, each node has rank 0.
