@@ -9,6 +9,7 @@ set(SOUFFLE_SOURCES
     FunctorOps.cpp
     Global.cpp
     MainDriver.cpp
+    Session.cpp
     ast/Annotation.cpp
     ast/Aggregator.cpp
     ast/IntrinsicAggregator.cpp

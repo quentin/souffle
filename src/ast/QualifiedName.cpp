@@ -7,6 +7,7 @@
  */
 
 #include "ast/QualifiedName.h"
+#include "Session.h"
 #include "souffle/utility/StreamUtil.h"
 #include "souffle/utility/StringUtil.h"
 
@@ -23,9 +24,9 @@ namespace souffle::ast {
 
 /// Container of qualified names, provides interning by associating a unique
 /// numerical index to each qualified name.
-struct QNInterner {
+class QNInternerImpl : public QNInterner {
 public:
-    explicit QNInterner() {
+    explicit QNInternerImpl() {
         qualifiedNames.emplace_back(QualifiedNameData{{}, ""});
         qualifiedNameToIndex.emplace("", 0);
     }
@@ -33,7 +34,7 @@ public:
     /// Return the qualified name object for the given string.
     ///
     /// Each `.` character is treated as a separator.
-    QualifiedName intern(std::string_view qn) {
+    QualifiedName intern(std::string_view qn) override {
         const auto It = qualifiedNameToIndex.find(qn);
         if (It != qualifiedNameToIndex.end()) {
             return QualifiedName{It->second};
@@ -49,7 +50,7 @@ public:
     }
 
     /// Return the qualified name data object from the given index.
-    const QualifiedNameData& at(uint32_t index) {
+    const QualifiedNameData& at(uint32_t index) override {
         return qualifiedNames.at(index);
     }
 
@@ -62,16 +63,12 @@ private:
     std::unordered_map<std::string_view, uint32_t> qualifiedNameToIndex;
 };
 
-namespace {
-/// The default qualified name interner instance.
-QNInterner Interner;
-}  // namespace
-
 QualifiedName::QualifiedName() : index(0) {}
 QualifiedName::QualifiedName(uint32_t idx) : index(idx) {}
 
 const QualifiedNameData& QualifiedName::data() const {
-    return Interner.at(index);
+    return SessionGlobals::with(
+            [&](SessionGlobals& sess) -> const QualifiedNameData& { return sess.interner->at(index); });
 }
 
 bool QualifiedName::operator==(const QualifiedName& other) const {
@@ -84,12 +81,14 @@ bool QualifiedName::operator!=(const QualifiedName& other) const {
 
 void QualifiedName::append(const std::string& segment) {
     assert(segment.find('.') == std::string::npos);
-    *this = Interner.intern(data().qualified + "." + segment);
+    SessionGlobals::with(
+            [&](SessionGlobals& sess) { *this = sess.interner->intern(data().qualified + "." + segment); });
 }
 
 void QualifiedName::prepend(const std::string& segment) {
     assert(segment.find('.') == std::string::npos);
-    *this = Interner.intern(segment + "." + data().qualified);
+    SessionGlobals::with(
+            [&](SessionGlobals& sess) { *this = sess.interner->intern(segment + "." + data().qualified); });
 }
 
 void QualifiedName::append(const QualifiedName& rhs) {
@@ -100,7 +99,8 @@ void QualifiedName::append(const QualifiedName& rhs) {
         index = rhs.index;
         return;
     }
-    *this = Interner.intern(toString() + "." + rhs.toString());
+    SessionGlobals::with(
+            [&](SessionGlobals& sess) { *this = sess.interner->intern(toString() + "." + rhs.toString()); });
 }
 
 /** convert to a string separated by fullstop */
@@ -109,7 +109,7 @@ const std::string& QualifiedName::toString() const {
 }
 
 QualifiedName QualifiedName::fromString(std::string_view qname) {
-    return Interner.intern(qname);
+    return SessionGlobals::with([&](SessionGlobals& sess) { return sess.interner->intern(qname); });
 }
 
 bool QualifiedName::lexicalLess(const QualifiedName& other) const {
@@ -167,6 +167,10 @@ QualifiedName operator+(const std::string& head, const QualifiedName& tail) {
     QualifiedName res = tail;
     res.prepend(head);
     return res;
+}
+
+std::unique_ptr<QNInterner> QNInterner::make() {
+    return std::make_unique<QNInternerImpl>();
 }
 
 }  // namespace souffle::ast

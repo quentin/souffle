@@ -10,14 +10,17 @@
  * @file The souffle executable
  */
 
+#include "Session.h"
 #include "MainDriver.h"
 
 #include <sstream>
 #include <vector>
 
+using namespace souffle;
+
 namespace {
 
-bool processArgs(souffle::Global& glb, int argc, char** argv) {
+bool processArgs(Global& glb, int argc, char** argv) {
     /* have all to do with command line arguments in its own scope, as these are accessible through the global
      * configuration only */
     std::stringstream header;
@@ -31,8 +34,8 @@ bool processArgs(souffle::Global& glb, int argc, char** argv) {
     // command line options, the environment will be filled with the arguments passed to them, or
     // the empty string if they take none
     // main option, the datalog program itself, has an empty key
-    const std::vector<souffle::MainOption> options = souffle::getMainOptions();
-    glb.config().processArgs(argc, argv, header.str(), souffle::versionFooter(), options);
+    const std::vector<MainOption> options = getMainOptions();
+    glb.config().processArgs(argc, argv, header.str(), versionFooter(), options);
 
     return true;
 }
@@ -40,9 +43,10 @@ bool processArgs(souffle::Global& glb, int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    souffle::Global glb;
-
-    processArgs(glb, argc, argv);
-
-    return souffle::main(glb, argv[0]);
+    return SessionGlobals::createDefaultThen([&]() {
+        return SessionGlobals::with([&](SessionGlobals &sess) {
+            processArgs(sess.glb, argc, argv);
+            return souffle::main(sess, argv[0]);
+        });
+    });
 }

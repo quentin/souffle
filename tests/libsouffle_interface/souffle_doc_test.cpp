@@ -147,64 +147,71 @@ private:
     const std::string FileContent;
 };
 
+int test_main() {
+    return SessionGlobals::with([](SessionGlobals& sess) {
+        auto InputDl = std::make_shared<SingleFileFS>("input.dl", Input);
+
+        Global &glb = sess.glb;
+        glb.config().set("", "input.dl");
+
+        ErrorReport errReport;
+        DebugReport dbgReport(glb);
+        auto VFS = std::make_shared<OverlayFileSystem>(InputDl);
+        ParserDriver driver{glb, VFS};
+
+        auto tu = driver.parseFromFS(std::filesystem::path{"input.dl"}, errReport, dbgReport);
+
+        if (errReport.getNumErrors() > 0) {
+            errReport.print(std::cerr);
+            return static_cast<int>(errReport.getNumErrors());
+        }
+
+        std::set<std::tuple<CommentKind, std::string>> actual;
+        for (const ParserDriver::ScannedComment& comment : driver.ScannedComments) {
+            actual.emplace(std::get<1>(comment), std::get<2>(comment));
+        }
+
+        bool ok = true;
+
+        if (ExpectedComments != actual) {
+            ok = false;
+
+            for (const auto& missing : (ExpectedComments - actual)) {
+                std::cerr << "Missing expected comment or with wrong kind: " << std::get<1>(missing) << "\n";
+            }
+
+            for (const auto& unexpected : (actual - ExpectedComments)) {
+                std::cerr << "Unexpected comment or with wrong kind: " << std::get<1>(unexpected) << "\n";
+            }
+        }
+
+        auto& prg = tu->getProgram();
+        AnnotationCollector collector;
+        visit(prg, collector);
+
+        if (ExpectedAnnotations != collector.collected) {
+            ok = false;
+
+            for (const auto& missing : (ExpectedAnnotations - collector.collected)) {
+                std::cerr << "Missing expected annotation: '" << std::get<4>(missing) << "' on "
+                          << annotationTargetString(std::get<0>(missing)) << " '" << std::get<1>(missing)
+                          << "'\n";
+            }
+
+            for (const auto& unexpected : (collector.collected - ExpectedAnnotations)) {
+                std::cerr << "Unexpected annotation: '" << std::get<4>(unexpected) << "' on "
+                          << annotationTargetString(std::get<0>(unexpected)) << " '"
+                          << std::get<1>(unexpected) << "'\n";
+            }
+        }
+
+        return (ok ? 0 : 1);
+    });
+}
+
 }  // namespace
 
 int main(int, char**) {
-    auto InputDl = std::make_shared<SingleFileFS>("input.dl", Input);
-
-    Global glb;
-    glb.config().set("", "input.dl");
-
-    ErrorReport errReport;
-    DebugReport dbgReport(glb);
-    auto VFS = std::make_shared<OverlayFileSystem>(InputDl);
-    ParserDriver driver{glb, VFS};
-
-    auto tu = driver.parseFromFS(std::filesystem::path{"input.dl"}, errReport, dbgReport);
-
-    if (errReport.getNumErrors() > 0) {
-        errReport.print(std::cerr);
-        return static_cast<int>(errReport.getNumErrors());
-    }
-
-    std::set<std::tuple<CommentKind, std::string>> actual;
-    for (const ParserDriver::ScannedComment& comment : driver.ScannedComments) {
-        actual.emplace(std::get<1>(comment), std::get<2>(comment));
-    }
-
-    bool ok = true;
-
-    if (ExpectedComments != actual) {
-        ok = false;
-
-        for (const auto& missing : (ExpectedComments - actual)) {
-            std::cerr << "Missing expected comment or with wrong kind: " << std::get<1>(missing) << "\n";
-        }
-
-        for (const auto& unexpected : (actual - ExpectedComments)) {
-            std::cerr << "Unexpected comment or with wrong kind: " << std::get<1>(unexpected) << "\n";
-        }
-    }
-
-    auto& prg = tu->getProgram();
-    AnnotationCollector collector;
-    visit(prg, collector);
-
-    if (ExpectedAnnotations != collector.collected) {
-        ok = false;
-
-        for (const auto& missing : (ExpectedAnnotations - collector.collected)) {
-            std::cerr << "Missing expected annotation: '" << std::get<4>(missing) << "' on "
-                      << annotationTargetString(std::get<0>(missing)) << " '" << std::get<1>(missing)
-                      << "'\n";
-        }
-
-        for (const auto& unexpected : (collector.collected - ExpectedAnnotations)) {
-            std::cerr << "Unexpected annotation: '" << std::get<4>(unexpected) << "' on "
-                      << annotationTargetString(std::get<0>(unexpected)) << " '" << std::get<1>(unexpected)
-                      << "'\n";
-        }
-    }
-
-    return (ok ? 0 : 1);
+    return SessionGlobals::createDefaultThen([&]() { return test_main(); });
 }
+

@@ -16,6 +16,7 @@
 
 #include "MainDriver.h"
 #include "Global.h"
+#include "Session.h"
 #include "ast/Clause.h"
 #include "ast/Node.h"
 #include "ast/Program.h"
@@ -742,7 +743,9 @@ std::vector<MainOption> getMainOptions() {
   return options;
 }
 
-int main(Global& glb, const char* souffle_executable) {
+int main(SessionGlobals& sess, const char* souffle_executable) {
+    Global& glb = sess.glb;
+
     /* Time taking for overall runtime */
     auto souffle_start = std::chrono::high_resolution_clock::now();
 

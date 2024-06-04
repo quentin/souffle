@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -37,7 +38,7 @@ struct QualifiedNameData {
     bool lexicalLess(const QualifiedNameData& other) const;
 };
 
-struct QNInterner;
+class QNInternerImpl;
 
 /**
  * @brief Qualified Name class defines fully/partially qualified names
@@ -45,7 +46,7 @@ struct QNInterner;
  */
 class QualifiedName {
 private:
-    friend struct QNInterner;
+    friend struct QNInternerImpl;
     explicit QualifiedName(uint32_t);
 
 public:
@@ -108,6 +109,16 @@ private:
     /// index of this qualified name in the qualified-name interner
     uint32_t index;
 };
+
+class QNInterner {
+public:
+  virtual QualifiedName intern(std::string_view qn) = 0;
+  virtual const QualifiedNameData& at(uint32_t index) = 0;
+
+  static std::unique_ptr<QNInterner> make();
+};
+
+
 
 /// Return the qualified name by the adding prefix segment in head of the qualified name.
 QualifiedName operator+(const std::string& head, const QualifiedName& tail);

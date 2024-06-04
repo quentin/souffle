@@ -14,6 +14,7 @@
 #pragma once
 
 #include "Global.h"
+#include "Session.h"
 #include "ast/transform/Pipeline.h"
 #include "ast2ram/UnitTranslator.h"
 #include "ast2ram/utility/TranslatorContext.h"
@@ -39,7 +40,7 @@ std::string versionFooter();
 std::vector<MainOption> getMainOptions();
 
 /** Execute entire Souffle driver. */
-int main(Global& glb, const char* souffle_executable);
+int main(SessionGlobals& sess, const char* souffle_executable);
 
 /** Construct and return an AST transformer pipeline. */
 Own<ast::transform::PipelineTransformer> astTransformationPipeline(Global& glb);
