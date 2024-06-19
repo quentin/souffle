@@ -802,22 +802,10 @@ void ClauseTranslator::indexAggregatorBody(const ast::Aggregator& agg) {
     }
 }
 
-void ClauseTranslator::indexAggregatorExpressions(const ast::Aggregator& agg) {
-    auto aggLoc = valueIndex->getGeneratorLoc(agg);
-    if (const auto* var = as<ast::Variable>(agg.getTargetExpression())) {
-        valueIndex->addVarReference(var->getName(), aggLoc.identifier, 1);
-    }
-    if (const auto* var = as<ast::Variable>(agg.getSecondaryExpression())) {
-        valueIndex->addVarReference(var->getName(), aggLoc.identifier, 1);
-    }
-    // TODO getOrderByElements ?
-}
-
 void ClauseTranslator::indexAggregators(const ast::Clause& clause) {
     // Index aggregator bodies
     visit(clause, [&](const ast::Aggregator& agg) {
         indexAggregatorBody(agg);
-        indexAggregatorExpressions(agg);
     });
 
     // Add aggregator value introductions

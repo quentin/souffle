@@ -67,8 +67,6 @@ public:
 
     virtual std::string getBaseOperatorName() const = 0;
 
-    static bool classof(const Node*);
-
     const VecOwn<OrderByElement>& getOrderByElements() const;
 
     static bool classof(const Node*);

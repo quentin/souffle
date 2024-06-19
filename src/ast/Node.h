@@ -81,6 +81,11 @@ public:
     enum NodeKind {
         NK_NONE,
         NK_Argument,
+            NK_Aggregator,
+                NK_IntrinsicAggregator,
+                NK_UserDefinedAggregator,
+            NK_LastAggregator,
+
             NK_Constant,
                 NK_NilConstant,
                 NK_NumericConstant,
@@ -91,11 +96,6 @@ public:
             NK_ExecutionOrder,
             NK_ExecutionPlan,
             NK_IterationCounter,
-
-            NK_Aggregator,
-                NK_IntrinsicAggregator,
-                NK_UserDefinedAggregator,
-            NK_LastAggregator,
 
             NK_Term,
                 NK_BranchInit,
@@ -135,6 +135,7 @@ public:
             NK_Negation,
         NK_LastLiteral,
 
+        NK_OrderByElement,
         NK_Pragma,
         NK_Program,
         NK_Relation,

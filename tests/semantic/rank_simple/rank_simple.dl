@@ -2,27 +2,46 @@
 .decl chapter(nth:number, title:symbol, pages:number)
 .input chapter(delimiter=",")
 
- .decl first_by_title(title:symbol)
- .output first_by_title()
- first_by_title(title) :-
-   nth = rank n, 1 : chapter(n,t,_) orderby (t),
-   chapter(nth, title, _).
+.decl rank_by_title_asc(rk:number, title:symbol)
+.output rank_by_title_asc()
+rank_by_title_asc(rk, title) :-
+  n = count : chapter(_,_,_),
+  rk = range(1,n),
+  // order chapter by title t, select element at rank rk, return its title t
+  title = rank t, rk : chapter(_,t,_) orderby (t ASC).
+
+.decl first_by_title(title:symbol)
+.output first_by_title()
+first_by_title(title) :-
+  // order chapter by title, select element at rank 1, return its
+  // chapter-number `n` in `nth`
+  nth = rank n, 1 : chapter(n,t,_) orderby (t), // implicit ASC
+  // select chapter `nth`
+  chapter(nth, title, _).
 
 .decl fourth_by_title(title:symbol)
 .output fourth_by_title()
 fourth_by_title(title) :-
-  title = rank t, 4 : chapter(_,t,_). // implicit order-by t
+  // order chapter by title `t` (since it has no order-by), select element at
+  // rank 4, return title `t`
+  title = rank t, 4 : chapter(_,t,_). // implicit order-by t ASC
 
-.decl rank_by_pages(rk:number, title:symbol, pages:number)
-.output rank_by_pages()
-rank_by_pages(rk, title, pages) :-
+.decl rank_by_pages_desc(rk:number, title:symbol, pages:number)
+.output rank_by_pages_desc()
+rank_by_pages_desc(rk, title, pages) :-
   rk = range(-10,10),
+  // order chapter by pages in descending order (explicit orderby),
+  // select element at rank `rk`, return its chapter-number `i` into
+  // `id`.
   id = rank i, rk : chapter(i,_,p) orderby (p DESC),
   chapter(id, title, pages).
 
 .decl third_by_pages_desc(title:symbol, pages:number)
 .output third_by_pages_desc()
 third_by_pages_desc(title, pages) :-
+  // order chapter by pages in descending order (explicit orderby),
+  // select element at rank 3, return its chapter-number `i` into
+  // `id`.
   id = rank i, 3 : chapter(i,_,p) orderby (p DESC),
   chapter(id, title, pages).
 
@@ -31,5 +50,8 @@ third_by_pages_desc(title, pages) :-
 // same as third_by_pages_desc but ASC orderby, ClauseNormalisation must be
 // different and MinimiseProgramTransformer must not eliminate this clause
 third_by_pages_asc(title, pages) :-
+  // order chapter by pages in ascending order (explicit orderby),
+  // select element at rank 3, return its chapter-number `i` into
+  // `id`.
   id = rank i, 3 : chapter(i,_,p) orderby (p ASC),
   chapter(id, title, pages).

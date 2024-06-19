@@ -233,6 +233,8 @@ public:
 
     void apply(const NodeMapper& map) override;
 
+    bool equal(const Node& node) const override;
+
     static bool classof(const Node*);
 
 protected:

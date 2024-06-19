@@ -48,10 +48,12 @@ namespace souffle::ram {
 class ParallelIndexAggregate : public IndexAggregate, public AbstractParallel {
 public:
     ParallelIndexAggregate(Own<Operation> nested, Own<Aggregator> fun, std::string rel,
-            Own<Expression> expression, Own<Expression> second, Own<Condition> condition, VecOwn<OrderByElement> orderBy,
-            , std::optional<TypeAttribute> exprTypeRamPattern queryPattern, std::size_t ident)
-            : IndexAggregate(NK_ParallelIndexAggregate, std::move(nested), std::move(fun), rel, std::move(expression),
-                      std::move(second), std::move(condition), std::move(orderBy), exprType, std::move(queryPattern), ident) {}
+            Own<Expression> expression, Own<Expression> second, Own<Condition> condition,
+            VecOwn<OrderByElement> orderBy, std::optional<TypeAttribute> exprType, RamPattern queryPattern,
+            std::size_t ident)
+            : IndexAggregate(NK_ParallelIndexAggregate, std::move(nested), std::move(fun), rel,
+                      std::move(expression), std::move(second), std::move(condition), std::move(orderBy),
+                      exprType, std::move(queryPattern), ident) {}
 
     ParallelIndexAggregate* cloning() const override {
         RamPattern pattern;

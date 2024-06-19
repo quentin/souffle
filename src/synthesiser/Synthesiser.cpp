@@ -1133,6 +1133,12 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                     case AggregateOp::FSUM:
                     case AggregateOp::USUM:
                     case AggregateOp::STRICTCONCAT:
+                    case AggregateOp::RANK:
+                    case AggregateOp::ARANK:
+                    case AggregateOp::FRANK:
+                    case AggregateOp::RRANK:
+                    case AggregateOp::SRANK:
+                    case AggregateOp::URANK:
                     case AggregateOp::SUM: return "0";
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {
@@ -1184,6 +1190,15 @@ void Synthesiser::emitCode(std::ostream& out, const Statement& stmt) {
                         }
                         out << "const RamDomain sym = " << aggExpr << ";\n";
                         out << "concatenation << symTable.decode(sym);\n";
+                        break;
+
+                    case AggregateOp::RANK:
+                    case AggregateOp::ARANK:
+                    case AggregateOp::FRANK:
+                    case AggregateOp::RRANK:
+                    case AggregateOp::SRANK:
+                    case AggregateOp::URANK:
+                        throw "TODO RANK";
                         break;
                 }
             } else if (const auto* uda = as<ram::UserDefinedAggregator>(aggregator)) {

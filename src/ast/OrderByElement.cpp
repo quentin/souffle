@@ -9,7 +9,8 @@ namespace souffle::ast {
 
 OrderByElement::OrderByElement(Own<Argument> arg, std::optional<std::string> collate_locale,
         std::optional<std::string> direction, SrcLocation loc)
-        : Node(loc), argument(std::move(arg)), collateLocale(collate_locale), sortDirection(direction) {}
+        : Node(NK_OrderByElement, loc), argument(std::move(arg)), collateLocale(collate_locale),
+          sortDirection(direction) {}
 
 void OrderByElement::apply(const NodeMapper& map) {
     argument = map(std::move(argument));

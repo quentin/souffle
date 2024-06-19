@@ -1091,10 +1091,6 @@ arg
     {
       $$ = mk<ast::UnnamedVariable>(@$);
     }
-  | DOLLAR
-    {
-      $$ = driver.addDeprecatedCounter(@$);
-    }
   | AUTOINC LPAREN RPAREN
     {
       $$ = mk<ast::Counter>(@$);
