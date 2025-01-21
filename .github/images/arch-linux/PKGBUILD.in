@@ -29,7 +29,6 @@ build() {
 	cmake -S . -B ./build \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DSOUFFLE_GIT=OFF \
-        -DSOUFFLE_VERSION=${pkgver} \
         -DPACKAGE_VERSION=${pkgver} \
 
     cmake --build ./build --parallel "$(nproc)"

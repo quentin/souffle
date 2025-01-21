@@ -1,4 +1,5 @@
 #!/bin/sh
+set -euxo
 
 # Run the build command
 case "$DOMAIN_SIZE" in
@@ -11,6 +12,8 @@ case "$DOMAIN_SIZE" in
     ;;
 esac
 
-
 # Create the package
 cmake --build ./build --parallel "$(nproc)" --target package
+
+# Run a few tests for consistency
+cmake --build ./build --target test -- ARGS="-R access1"
