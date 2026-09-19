@@ -10,6 +10,16 @@ souffle_add_binary_test(binary_relation_test src SOUFFLE_HEADERS_ONLY)
 souffle_add_binary_test(brie_test src SOUFFLE_HEADERS_ONLY)
 souffle_add_binary_test(btree_multiset_test src SOUFFLE_HEADERS_ONLY)
 souffle_add_binary_test(btree_set_test src SOUFFLE_HEADERS_ONLY)
+souffle_add_binary_test(dynamic_btree_test src SOUFFLE_HEADERS_ONLY)
+
+# Build explicitly with `cmake --build <build-dir> --target dynamic_btree_benchmark`.
+add_executable(dynamic_btree_benchmark EXCLUDE_FROM_ALL dynamic_btree_benchmark.cpp)
+target_compile_features(dynamic_btree_benchmark PRIVATE cxx_std_17)
+target_include_directories(dynamic_btree_benchmark PRIVATE ${PROJECT_SOURCE_DIR}/src/include ${PROJECT_SOURCE_DIR}/src)
+if (OPENMP_FOUND)
+    target_link_libraries(dynamic_btree_benchmark PRIVATE OpenMP::OpenMP_CXX)
+endif ()
+
 souffle_add_binary_test(compiled_tuple_test src SOUFFLE_HEADERS_ONLY)
 souffle_add_binary_test(disjoint_set_property_test src SOUFFLE_HEADERS_ONLY)
 souffle_add_binary_test(eqrel_datastructure_test src SOUFFLE_HEADERS_ONLY)
