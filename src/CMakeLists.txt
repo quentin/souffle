@@ -307,6 +307,10 @@ if (SOUFFLE_USE_ZLIB)
 endif()
 
 if (SOUFFLE_USE_SQLITE)
+    if (NOT TARGET SQLite3::SQLite3) # CMake < 4.3
+      add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+    endif ()
+
     target_compile_definitions(libsouffle PUBLIC USE_SQLITE)
     target_compile_definitions(compiled PUBLIC USE_SQLITE)
     target_link_libraries(libsouffle PUBLIC SQLite3::SQLite3)
