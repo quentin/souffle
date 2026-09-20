@@ -18,15 +18,9 @@
 
 namespace souffle::interpreter {
 
-#define CREATE_PROVENANCE_REL(Structure, Arity, AuxiliaryArity, ...)                                       \
-    if (id.getArity() == Arity && id.getAuxiliaryArity() == AuxiliaryArity) {                              \
-        return mk<Relation<Arity, AuxiliaryArity, interpreter::Provenance>>(id.getName(), indexSelection); \
-    }
-
 Own<RelationWrapper> createProvenanceRelation(
         const ram::Relation& id, const ram::analysis::IndexCluster& indexSelection) {
-    FOR_EACH_PROVENANCE(CREATE_PROVENANCE_REL);
-    fatal("Requested arity not yet supported. Feel free to add it.");
+    return mk<DynamicRelation>(id, indexSelection, true);
 }
 
 }  // namespace souffle::interpreter

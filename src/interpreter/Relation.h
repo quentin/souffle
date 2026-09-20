@@ -20,13 +20,18 @@
 #include "ram/analysis/Index.h"
 #include "souffle/RamTypes.h"
 #include "souffle/SouffleInterface.h"
+#include "souffle/datastructure/DynamicBTree.h"
+#include "souffle/datastructure/EquivalenceRelation.h"
 #include "souffle/utility/MiscUtil.h"
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <deque>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -150,100 +155,170 @@ protected:
     arity_type auxiliaryArity;
 };
 
-/**
- * A relation, composed of a collection of indexes.
- */
-template <std::size_t _Arity, std::size_t _AuxiliaryArity,
-        template <std::size_t, std::size_t> typename Structure>
-class Relation : public RelationWrapper {
+/** A B-tree relation whose tuple and index arities are supplied at runtime. */
+class DynamicRelation : public RelationWrapper {
 public:
-    static constexpr std::size_t Arity = _Arity;
-    static constexpr std::size_t AuxiliaryArity = _AuxiliaryArity;
-    using Attribute = std::size_t;
-    using AttributeSet = std::set<Attribute>;
-    using Index = interpreter::Index<Arity, AuxiliaryArity, Structure>;
-    using Tuple = souffle::Tuple<RamDomain, Arity>;
-    using View = typename Index::View;
-    using iterator = typename Index::iterator;
+    using Tuple = souffle::DynamicTuple;
+    using Index = souffle::DynamicBTreeSet;
+    using iterator = Index::iterator;
+    using IndexRange = souffle::range<iterator>;
 
-    /**
-     * Construct a typed tuple from a raw data.
-     */
-    static Tuple constructTuple(const RamDomain* data) {
-        Tuple tuple{};
-        std::copy_n(data, Arity, tuple.begin());
-        return tuple;
-    }
+    class View : public ViewWrapper {
+        const Index& index;
 
-    /**
-     * Cast an abstract view into a view of Index::View type.
-     */
-    static View* castView(ViewWrapper* view) {
-        return static_cast<View*>(view);
-    }
+    public:
+        explicit View(const Index& index) : index(index) {}
 
-    /**
-     * Creates a relation, build all necessary indexes.
-     */
-    Relation(const std::string& name, const ram::analysis::IndexCluster& indexSelection)
-            : RelationWrapper(Arity, AuxiliaryArity, name) {
-        for (const auto& order : indexSelection.getAllOrders()) {
-            ram::analysis::LexOrder fullOrder = order;
-            // Expand the order to a total order
-            ram::analysis::AttributeSet set{order.begin(), order.end()};
-
-            // This operation is not performance critical.
-            // Not using constexpr Arity to avoid compiler warning. (When Arity == 0)
-            for (std::size_t i = 0; i < getArity(); ++i) {
-                if (set.find(i) == set.end()) {
-                    fullOrder.push_back(i);
-                }
-            }
-
-            indexes.push_back(mk<Index>(fullOrder));
+        bool contains(const Tuple& tuple) const {
+            return index.contains(tuple);
         }
 
-        // Use the first index as default main index
-        main = indexes[0].get();
+        bool contains(const Tuple& low, const Tuple& high) const {
+            return !index.range(low, high).empty();
+        }
+
+        IndexRange range(const Tuple& low, const Tuple& high) const {
+            return index.range(low, high);
+        }
+    };
+
+    DynamicRelation(const ram::Relation& id, const ram::analysis::IndexCluster& indexSelection,
+            bool provenance = false)
+            : DynamicRelation(id.getName(), id.getArity(), id.getAuxiliaryArity(), indexSelection,
+                      id.getRepresentation() == RelationRepresentation::EQREL, provenance) {}
+
+    DynamicRelation(const std::string& name, std::size_t arity, std::size_t auxiliaryArity,
+            const ram::analysis::IndexCluster& indexSelection, bool equivalenceRelation = false,
+            bool provenance = false)
+            : RelationWrapper(arity, auxiliaryArity, name), equivalenceRelation(equivalenceRelation),
+              provenanceRelation(provenance) {
+        if (auxiliaryArity > arity) {
+            throw std::invalid_argument("relation auxiliary arity must not exceed relation arity");
+        }
+        if (equivalenceRelation && (arity != 2 || auxiliaryArity != 0)) {
+            throw std::invalid_argument("equivalence relations must be binary and have no auxiliary attributes");
+        }
+        if (provenanceRelation && (arity < 2 || auxiliaryArity < 2)) {
+            throw std::invalid_argument("provenance relations require rule and level attributes");
+        }
+        for (const auto& selectedOrder : indexSelection.getAllOrders()) {
+            auto order = selectedOrder;
+            for (std::size_t col = 0; col < this->arity; ++col) {
+                if (std::find(order.begin(), order.end(), col) == order.end()) {
+                    order.push_back(col);
+                }
+            }
+            orders.emplace_back(std::move(order));
+            // Rows are encoded into index order before insertion. The B-tree
+            // therefore compares their stored columns in natural order.
+            indexes.emplace_back(this->arity);
+        }
+        assert(!indexes.empty());
     }
 
-    Relation(Relation& other) = delete;
-
-    // -- Implement all virtual interface from Wrapper. --
-    // -- Operations defined in this section are not performance-oriented.
-public:
-    void purge() override {
-        __purge();
+    Index& getIndex(std::size_t indexPos) {
+        return indexes.at(indexPos);
     }
 
-    void insert(const RamDomain* data) override {
-        insert(constructTuple(data));
+    const Index& getIndex(std::size_t indexPos) const {
+        return indexes.at(indexPos);
     }
 
-    bool contains(const RamDomain* data) const override {
-        return contains(constructTuple(data));
+    souffle::DynamicTuple encode(const Tuple& tuple, std::size_t indexPos) const {
+        if (tuple.size() != arity) throw std::invalid_argument("tuple arity does not match relation arity");
+        souffle::DynamicTuple encoded(arity);
+        const auto& order = orders.at(indexPos).getOrder();
+        for (std::size_t i = 0; i < arity; ++i) encoded[i] = tuple[order[i]];
+        return encoded;
     }
 
-    IndexViewPtr createView(const std::size_t& indexPos) const override {
-        return mk<View>(indexes[indexPos]->createView());
+    bool insert(const Tuple& tuple) {
+        if (tuple.size() != arity) throw std::invalid_argument("tuple arity does not match relation arity");
+        std::unique_lock<std::mutex> updateLock(mutationMutex, std::defer_lock);
+        if (equivalenceRelation || provenanceRelation || auxiliaryArity != 0) updateLock.lock();
+        if (equivalenceRelation) {
+            if (tuple.size() != 2) throw std::invalid_argument("equivalence relation must have arity 2");
+            const bool inserted = eqrel.insert(tuple);
+            rebuildIndexes();
+            return inserted;
+        }
+        if (provenanceRelation || auxiliaryArity != 0) return insertOrUpdate(tuple);
+        if (!indexes.front().insert(encode(tuple, 0))) return false;
+        for (std::size_t i = 1; i < indexes.size(); ++i) indexes[i].insert(encode(tuple, i));
+        return true;
+    }
+
+    bool erase(const Tuple& tuple) {
+        if (tuple.size() != arity) throw std::invalid_argument("tuple arity does not match relation arity");
+        std::lock_guard<std::mutex> lock(mutationMutex);
+        if (indexes.front().erase(encode(tuple, 0)) == 0) return false;
+        for (std::size_t i = 1; i < indexes.size(); ++i) indexes[i].erase(encode(tuple, i));
+        return true;
+    }
+
+    bool contains(const Tuple& tuple) const {
+        if (tuple.size() != arity) throw std::invalid_argument("tuple arity does not match relation arity");
+        if (equivalenceRelation) return eqrel.contains(tuple);
+        return indexes.front().contains(encode(tuple, 0));
+    }
+
+    void extendAndInsert(DynamicRelation& other) {
+        assert(equivalenceRelation && other.equivalenceRelation);
+        std::scoped_lock lock(mutationMutex, other.mutationMutex);
+        eqrel.extendAndInsert(other.eqrel);
+        rebuildIndexes();
+        other.rebuildIndexes();
+    }
+
+    IndexRange scan() const {
+        return {indexes.front().begin(), indexes.front().end()};
+    }
+
+    IndexRange range(std::size_t indexPos, const Tuple& low, const Tuple& high) const {
+        return indexes.at(indexPos).range(low, high);
+    }
+
+    std::vector<IndexRange> partitionScan(std::size_t partitionCount) const {
+        return indexes.front().partition(partitionCount);
+    }
+
+    std::vector<IndexRange> partitionRange(
+            std::size_t indexPos, const Tuple& low, const Tuple& high, std::size_t partitionCount) const {
+        return indexes.at(indexPos).partitionRange(low, high, partitionCount);
     }
 
     std::size_t size() const override {
-        return __size();
+        if (equivalenceRelation) return eqrel.size();
+        return indexes.front().size();
     }
 
-    Order getIndexOrder(std::size_t idx) const override {
-        return indexes[idx]->getOrder();
+    bool empty() const {
+        if (equivalenceRelation) return eqrel.empty();
+        return indexes.front().empty();
+    }
+
+    void purge() override {
+        std::lock_guard<std::mutex> lock(mutationMutex);
+        if (equivalenceRelation) eqrel.clear();
+        for (auto& index : indexes) index.clear();
+    }
+
+    void insert(const RamDomain* tuple) override {
+        insert(Tuple(tuple, tuple + arity));
+    }
+
+    bool contains(const RamDomain* tuple) const override {
+        return contains(Tuple(tuple, tuple + arity));
     }
 
     class iterator_base : public RelationWrapper::iterator_base {
         iterator iter;
-        Order order;
-        RamDomain data[Arity];
+        std::vector<std::size_t> order;
+        mutable Tuple decoded;
 
     public:
-        iterator_base(typename Index::iterator iter, Order order)
-                : iter(std::move(iter)), order(std::move(order)) {}
+        iterator_base(iterator iter, std::vector<std::size_t> order)
+                : iter(std::move(iter)), order(std::move(order)), decoded(this->order.size()) {}
 
         iterator_base& operator++() override {
             ++iter;
@@ -251,12 +326,12 @@ public:
         }
 
         const RamDomain* operator*() override {
-            const auto& tuple = *iter;
-            // Not using constexpr Arity to avoid compiler warning. (When Arity == 0)
+            const auto& row = *iter;
             for (std::size_t i = 0; i < order.size(); ++i) {
-                data[order[i]] = tuple[i];
+                assert(order[i] < decoded.size());
+                decoded[order[i]] = row[i];
             }
-            return data;
+            return decoded.data();
         }
 
         iterator_base* clone() const override {
@@ -264,186 +339,107 @@ public:
         }
 
         bool equal(const RelationWrapper::iterator_base& other) const override {
-            if (auto* o = as<iterator_base>(other)) {
-                return iter == o->iter;
-            }
+            if (auto* rhs = as<iterator_base>(other)) return iter == rhs->iter;
             return false;
         }
     };
 
     Iterator begin() const override {
-        return Iterator(new iterator_base(main->begin(), main->getOrder()));
+        return Iterator(new iterator_base(indexes.front().begin(), orders.front().getOrder()));
     }
 
     Iterator end() const override {
-        return Iterator(new iterator_base(main->end(), main->getOrder()));
+        return Iterator(new iterator_base(indexes.front().end(), orders.front().getOrder()));
     }
 
-    // -----
-    // Following section defines and implement interfaces for interpreter execution.
-    //
-    // These functions are performance efficient but requires compile time knowledge and
-    // are not expected to be used other then the interpreter generator/engine.
-    // -----
-public:
-    /**
-     * Add the given tuple to this relation.
-     */
-    bool insert(const Tuple& tuple) {
-        if (!(main->insert(tuple))) {
-            return false;
-        }
-        for (std::size_t i = 1; i < indexes.size(); ++i) {
-            indexes[i]->insert(tuple);
-        }
-        return true;
-    }
-
-    /**
-     * Add all entries of the given relation to this relation.
-     */
-    void insert(const Relation<Arity, AuxiliaryArity, Structure>& other) {
-        for (const auto& tuple : other.scan()) {
-            this->insert(tuple);
-        }
-    }
-
-    /**
-     * Tests whether this relation contains the given tuple.
-     */
-    bool contains(const Tuple& tuple) const {
-        return main->contains(tuple);
-    }
-
-    /**
-     * Tests whether this relation contains any element between the given boundaries.
-     */
-    bool contains(const std::size_t& indexPos, const Tuple& low, const Tuple& high) const {
-        return indexes[indexPos]->contains(low, high);
-    }
-
-    /**
-     * Obtains a pair of iterators to scan the entire relation.
-     *
-     * Return 'raw iterator' that returns tuples in undecoded form.
-     */
-    souffle::range<iterator> scan() const {
-        return main->scan();
-    }
-
-    /**
-     * Returns a partitioned list of iterators for parallel computation
-     */
-    std::vector<souffle::range<iterator>> partitionScan(std::size_t partitionCount) const {
-        return main->partitionScan(partitionCount);
-    }
-
-    /**
-     * Obtains a pair of iterators covering the interval between the two given entries.
-     */
-    souffle::range<iterator> range(const std::size_t& indexPos, const Tuple& low, const Tuple& high) const {
-        return indexes[indexPos]->range(low, high);
-    }
-
-    /**
-     * Returns a partitioned list of iterators coving elements in range [low, high]
-     */
-    std::vector<souffle::range<iterator>> partitionRange(const std::size_t& indexPos, const Tuple& low,
-            const Tuple& high, std::size_t partitionCount) const {
-        return indexes[indexPos]->partitionRange(low, high, partitionCount);
-    }
-
-    /**
-     * Swaps the content of this and the given relation, including the
-     * installed indexes.
-     */
-    void swap(Relation<Arity, AuxiliaryArity, Structure>& other) {
-        indexes.swap(other.indexes);
-    }
-
-    /**
-     * Return number of tuples in relation (full-order)
-     */
-    std::size_t __size() const {
-        return main->size();
-    }
-
-    /**
-     * Check if the relation is empty
-     */
-    bool empty() const {
-        return main->empty();
-    }
-
-    /**
-     * Clear all indexes
-     */
-    void __purge() {
-        for (auto& idx : indexes) {
-            idx->clear();
-        }
-    }
-
-    /**
-     * Check if a tuple exists in relation
-     */
-    bool exists(const Tuple& tuple) const {
-        return main->contains(tuple);
-    }
-
-    Index* getIndex(std::size_t idx) const {
-        return indexes.at(idx).get();
-    }
-
-    void printStats(std::ostream& o) const override {
+    void printStats(std::ostream& out) const override {
         for (std::size_t i = 0; i < indexes.size(); ++i) {
-            o << "Index " << i << ":\n";
-            indexes[i]->printStats(o);
+            out << "Index " << i << ":\n";
+            indexes[i].printStats(out);
         }
     }
 
-protected:
-    // a map of managed indexes
-    VecOwn<Index> indexes;
-
-    // a pointer to the main index within the managed index
-    Index* main;
-};
-
-template <std::size_t _Arity, std::size_t _AuxiliaryArity>
-class BtreeDeleteRelation : public Relation<_Arity, _AuxiliaryArity, BtreeDelete> {
-public:
-    using Relation<_Arity, _AuxiliaryArity, BtreeDelete>::Relation;
-    using Relation<_Arity, _AuxiliaryArity, BtreeDelete>::main;
-    using Relation<_Arity, _AuxiliaryArity, BtreeDelete>::indexes;
-    using Tuple = souffle::Tuple<RamDomain, _Arity>;
-
-    /**
-     * Erase the given tuple from this relation.
-     */
-    bool erase(const Tuple& tuple) {
-        using DeleteIndex = BtreeDeleteIndex<_Arity, _AuxiliaryArity>;
-        if (!(static_cast<DeleteIndex*>(main))->erase(tuple)) {
-            return false;
-        }
-        for (std::size_t i = 1; i < indexes.size(); ++i) {
-            static_cast<DeleteIndex*>(indexes[i].get())->erase(tuple);
-        }
-        return true;
+    Order getIndexOrder(std::size_t indexPos) const override {
+        return orders.at(indexPos);
     }
-};
 
-class EqrelRelation : public Relation<2, 0, Eqrel> {
-public:
-    using Relation<2, 0, Eqrel>::Relation;
+    IndexViewPtr createView(const std::size_t& indexPos) const override {
+        return mk<View>(indexes.at(indexPos));
+    }
 
-    void extendAndInsert(const EqrelRelation& rel) {
-        auto src = static_cast<EqrelIndex*>(this->main);
-        for (auto& trgIndex : rel.indexes) {
-            auto trg = static_cast<EqrelIndex*>(trgIndex.get());
-            src->extendAndInsert(trg);
+    static View* castView(ViewWrapper* view) {
+        return static_cast<View*>(view);
+    }
+
+private:
+    bool insertOrUpdate(const Tuple& tuple) {
+        bool changed = false;
+        const std::size_t keyArity = arity - auxiliaryArity;
+        for (std::size_t indexPos = 0; indexPos < indexes.size(); ++indexPos) {
+            auto& index = indexes[indexPos];
+            auto encoded = encode(tuple, indexPos);
+            auto found = index.end();
+            for (auto it = index.begin(); it != index.end(); ++it) {
+                if (std::equal((*it).begin(), (*it).begin() + keyArity, encoded.begin())) {
+                    found = it;
+                    break;
+                }
+            }
+            if (found == index.end()) {
+                index.insert(encoded);
+                changed = true;
+                continue;
+            }
+
+            Tuple updated = *found;
+            bool update = false;
+            if (provenanceRelation) {
+                const auto& order = orders[indexPos].getOrder();
+                const auto level = static_cast<std::size_t>(std::find(order.begin(), order.end(), arity - 1) -
+                                                            order.begin());
+                const auto rule = static_cast<std::size_t>(std::find(order.begin(), order.end(), arity - 2) -
+                                                           order.begin());
+                const auto newLevel = ramBitCast<RamSigned>(encoded[level]);
+                const auto oldLevel = ramBitCast<RamSigned>(updated[level]);
+                const auto newRule = ramBitCast<RamSigned>(encoded[rule]);
+                const auto oldRule = ramBitCast<RamSigned>(updated[rule]);
+                update = newLevel < oldLevel || (newLevel == oldLevel && newRule < oldRule);
+                if (update) {
+                    updated[rule] = encoded[rule];
+                    updated[level] = encoded[level];
+                }
+            } else {
+                const std::size_t firstAuxiliary = arity - auxiliaryArity;
+                for (std::size_t col = firstAuxiliary; col < arity; ++col) {
+                    if (updated[col] != encoded[col]) {
+                        updated[col] = encoded[col];
+                        update = true;
+                    }
+                }
+            }
+            if (update) {
+                index.erase(*found);
+                index.insert(updated);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    void rebuildIndexes() {
+        for (auto& index : indexes) index.clear();
+        if (!equivalenceRelation) return;
+        for (const auto& tuple : eqrel) {
+            for (std::size_t i = 0; i < indexes.size(); ++i) indexes[i].insert(encode(tuple, i));
         }
     }
+
+    std::vector<Index> indexes;
+    std::vector<Order> orders;
+    std::mutex mutationMutex;
+    bool equivalenceRelation;
+    bool provenanceRelation;
+    souffle::EquivalenceRelation<Tuple> eqrel;
 };
 
 // The type of relation factory functions.

@@ -23,7 +23,6 @@
 
 #pragma once
 
-#include "interpreter/Util.h"
 #include "ram/Relation.h"
 #include "souffle/RamTypes.h"
 #include "souffle/utility/ContainerUtil.h"
@@ -54,11 +53,8 @@ struct RelationWrapper;
 
 // clang-format off
 
-/* This macro defines all the interpreterNode token.
- * For common operation, pass to Forward.
- * For specialized operation, pass to FOR_EACH(Expand, tok)
- */
-#define FOR_EACH_INTERPRETER_TOKEN(Forward, Expand)\
+/* This macro defines all interpreter node tokens. */
+#define FOR_EACH_INTERPRETER_TOKEN(Forward)\
     Forward(NumericConstant)\
     Forward(Variable)\
     Forward(StringConstant)\
@@ -73,30 +69,30 @@ struct RelationWrapper;
     Forward(False)\
     Forward(Conjunction)\
     Forward(Negation)\
-    FOR_EACH(Expand, EmptinessCheck)\
-    FOR_EACH(Expand, RelationSize)\
-    FOR_EACH(Expand, ExistenceCheck)\
-    FOR_EACH_PROVENANCE(Expand, ProvenanceExistenceCheck)\
+    Forward(EmptinessCheck)\
+    Forward(RelationSize)\
+    Forward(ExistenceCheck)\
+    Forward(ProvenanceExistenceCheck)\
     Forward(Constraint)\
     Forward(TupleOperation)\
-    FOR_EACH(Expand, Scan)\
-    FOR_EACH(Expand, ParallelScan)\
-    FOR_EACH(Expand, IndexScan)\
-    FOR_EACH(Expand, ParallelIndexScan)\
-    FOR_EACH(Expand, IfExists)\
-    FOR_EACH(Expand, ParallelIfExists)\
-    FOR_EACH(Expand, IndexIfExists)\
-    FOR_EACH(Expand, ParallelIndexIfExists)\
+    Forward(Scan)\
+    Forward(ParallelScan)\
+    Forward(IndexScan)\
+    Forward(ParallelIndexScan)\
+    Forward(IfExists)\
+    Forward(ParallelIfExists)\
+    Forward(IndexIfExists)\
+    Forward(ParallelIndexIfExists)\
     Forward(UnpackRecord)\
-    FOR_EACH(Expand, Aggregate)\
-    FOR_EACH(Expand, ParallelAggregate)\
-    FOR_EACH(Expand, IndexAggregate)\
-    FOR_EACH(Expand, ParallelIndexAggregate)\
+    Forward(Aggregate)\
+    Forward(ParallelAggregate)\
+    Forward(IndexAggregate)\
+    Forward(ParallelIndexAggregate)\
     Forward(Break)\
     Forward(Filter)\
-    FOR_EACH(Expand, GuardedInsert)\
-    FOR_EACH(Expand, Insert)\
-    FOR_EACH_BTREE_DELETE(Expand, Erase)\
+    Forward(GuardedInsert)\
+    Forward(Insert)\
+    Forward(Erase)\
     Forward(SubroutineReturn)\
     Forward(Sequence)\
     Forward(Parallel)\
@@ -107,7 +103,7 @@ struct RelationWrapper;
     Forward(LogTimer)\
     Forward(DebugInfo)\
     Forward(Clear)\
-    FOR_EACH(Expand, EstimateJoinSize)\
+    Forward(EstimateJoinSize)\
     Forward(LogSize)\
     Forward(IO)\
     Forward(Query)\
@@ -117,55 +113,31 @@ struct RelationWrapper;
 
 #define SINGLE_TOKEN(tok) I_##tok,
 
-#define EXPAND_TOKEN(structure, arity, auxiliaryArity, tok)\
-    I_##tok##_##structure##_##arity##_##auxiliaryArity,
-
 /*
- * Declares all the tokens.
- * For Forward token OP, creates I_OP
- * For Extended token OP, generate I_OP_Structure_Arity for each data structure and supported arity.
+ * Declares one token for each interpreter operation.
  */
 enum NodeType {
-    FOR_EACH_INTERPRETER_TOKEN(SINGLE_TOKEN, EXPAND_TOKEN)
+    FOR_EACH_INTERPRETER_TOKEN(SINGLE_TOKEN)
 };
 
 #undef SINGLE_TOKEN
-#undef EXPAND_TOKEN
 
 #define __TO_STRING(a) #a
 #define SINGLE_TOKEN_ENTRY(tok) {__TO_STRING(I_##tok), I_##tok},
-#define EXPAND_TOKEN_ENTRY(Structure, arity, auxiliaryArity, tok) \
-    {__TO_STRING(I_##tok##_##Structure##_##arity##_##auxiliaryArity), I_##tok##_##Structure##_##arity##_##auxiliaryArity},
 
 /**
- * Construct interpreterNodeType by looking at the representation and the arity of the given rel.
- *
- * Add reflective from string to NodeType.
+ * Construct an interpreter node type by operation name; relation arity is runtime data.
  */
-inline NodeType constructNodeType(Global&, std::string tokBase, const ram::Relation& rel) {
+inline NodeType constructNodeType(Global&, std::string tokBase, const ram::Relation&) {
 
     static const std::unordered_map<std::string, NodeType> map = {
-            FOR_EACH_INTERPRETER_TOKEN(SINGLE_TOKEN_ENTRY, EXPAND_TOKEN_ENTRY)
+            FOR_EACH_INTERPRETER_TOKEN(SINGLE_TOKEN_ENTRY)
     };
 
-    std::string arity = std::to_string(rel.getArity());
-    std::string auxiliaryArity = std::to_string(rel.getAuxiliaryArity());
-    bool hasProvenance = rel.getArity() > 0 && rel.getAttributeNames().back() == "@level_number";
-    if (hasProvenance) {
-        return map.at("I_" + tokBase + "_Provenance_" + arity + "_" + auxiliaryArity);
-    } else if (rel.getRepresentation() == RelationRepresentation::EQREL) {
-        return map.at("I_" + tokBase + "_Eqrel_" + arity + "_" + auxiliaryArity);
-    } else if(rel.getRepresentation() == RelationRepresentation::BTREE_DELETE) {
-        return map.at("I_" + tokBase + "_BtreeDelete_" + arity + "_" + auxiliaryArity);
-    } else  {
-        return map.at("I_" + tokBase + "_Btree_" + arity + "_" + auxiliaryArity);
-    }
-
-    fatal("Unrecognized node type: base:%s arity:%s.", tokBase, arity);
+    return map.at("I_" + tokBase);
 }
 
 #undef __TO_STRING
-#undef EXPAND_TOKEN_ENTRY
 #undef SINGLE_TOKEN_ENTRY
 
 // clang-format on

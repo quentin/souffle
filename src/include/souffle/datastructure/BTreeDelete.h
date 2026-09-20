@@ -1637,10 +1637,21 @@ public:
         // Now on a leaf node
         assert(iter.cur->isLeaf());
 
-        // Delete the key, move other keys backwards and update size
-        iter.cur->keys[iter.pos].~Key();
-        for (size_type i = iter.pos + 1; i < iter.cur->getNumElements(); ++i) {
-            iter.cur->keys[i - 1] = iter.cur->keys[i];
+        const size_type oldSize = iter.cur->getNumElements();
+        if constexpr (std::is_trivially_destructible_v<Key>) {
+            // Preserve the existing path for compiled relations, whose fixed tuples
+            // are trivially destructible.
+            iter.cur->keys[iter.pos].~Key();
+            for (size_type i = iter.pos + 1; i < oldSize; ++i) {
+                iter.cur->keys[i - 1] = iter.cur->keys[i];
+            }
+        } else {
+            // Keep nontrivial keys alive while compacting. Explicitly destroying a
+            // slot before assigning to it leaves a dead object in the key array.
+            for (size_type i = iter.pos + 1; i < oldSize; ++i) {
+                iter.cur->keys[i - 1] = std::move(iter.cur->keys[i]);
+            }
+            iter.cur->keys[oldSize - 1] = Key{};
         }
         iter.cur->numElements--;
 

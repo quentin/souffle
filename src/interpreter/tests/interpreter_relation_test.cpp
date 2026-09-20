@@ -46,9 +46,9 @@ TEST(Relation0, Construction) {
     OrderCollection orders = {emptyOrder};
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<0, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 0, 0, indexSelection);
 
-    souffle::Tuple<RamDomain, 0> tuple;
+    souffle::DynamicTuple tuple;
     // add some values
     EXPECT_EQ(0, rel.size());
     rel.insert(tuple);
@@ -68,10 +68,10 @@ TEST(Relation0, Iteration) {
     OrderCollection orders = {emptyOrder};
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<0, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 0, 0, indexSelection);
     RelationWrapper* wrapper = &rel;
 
-    souffle::Tuple<RamDomain, 0> tuple;
+    souffle::DynamicTuple tuple;
 
     // empty relation
     EXPECT_EQ(wrapper->begin() == wrapper->end(), true);
@@ -95,7 +95,7 @@ TEST(Relation1, Construction) {
     mapping.insert({existenceCheck, fullOrder});
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<1, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 1, 0, indexSelection);
     RelInterface relInt(rel, symbolTable, "test", {"i"}, {"i"}, 0);
 
     tuple d1(&relInt, {1});
@@ -124,7 +124,7 @@ TEST(Basic, Iteration) {
     mapping.insert({existenceCheck, fullOrder});
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<1, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 1, 0, indexSelection);
     RelInterface relInt(rel, symbolTable, "test", {"i"}, {"i"}, 0);
 
     // add some values
@@ -159,7 +159,7 @@ TEST(Independence, Iteration) {
     mapping.insert({existenceCheck, fullOrder});
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<1, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 1, 0, indexSelection);
     RelInterface relInt(rel, symbolTable, "test", {"i"}, {"i"}, 0);
 
     // add a value
@@ -195,7 +195,7 @@ TEST(IndependentMoving, Iteration) {
     mapping.insert({existenceCheck, fullOrder});
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<1, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 1, 0, indexSelection);
     RelInterface relInt(rel, symbolTable, "test", {"i"}, {"i"}, 0);
 
     // add a value
@@ -226,7 +226,7 @@ TEST(IndependentCopying, Iteration) {
     mapping.insert({existenceCheck, fullOrder});
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<1, 0, interpreter::Btree> rel("test", indexSelection);
+    DynamicRelation rel("test", 1, 0, indexSelection);
     RelInterface relInt(rel, symbolTable, "test", {"i"}, {"i"}, 0);
 
     // add a value
@@ -258,14 +258,16 @@ TEST(Reordering, Iteration) {
     mapping.insert({existenceCheck, fullOrder});
     IndexCluster indexSelection(mapping, searches, orders);
 
-    Relation<3, 0, interpreter::Btree> rel("test", indexSelection);
-    souffle::Tuple<RamDomain, 3> tuple{0, 1, 2};
+    DynamicRelation rel("test", 3, 0, indexSelection);
+    souffle::DynamicTuple tuple{0, 1, 2};
     rel.insert(tuple);
+    EXPECT_TRUE(rel.contains(tuple));
+    EXPECT_FALSE(rel.contains({0, 1, 3}));
 
     // Scan should give undecoded tuple.
     {
         const auto& t = *(rel.scan().begin());
-        EXPECT_EQ((souffle::Tuple<RamDomain, 3>{0, 2, 1}), t);
+        EXPECT_EQ((souffle::DynamicTuple{0, 2, 1}), t);
     }
 
     // For-each should give decoded tuple.

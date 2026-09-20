@@ -34,6 +34,7 @@
 #include <shared_mutex>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -461,7 +462,15 @@ public:
         enum IterType { ALL, ANTERIOR, ANTPOST, WITHIN };
         IterType ityp;
 
-        TupleType cPair;
+        static TupleType makePair() {
+            if constexpr (std::is_constructible_v<TupleType, std::size_t>) {
+                return TupleType(2);
+            } else {
+                return TupleType{};
+            }
+        }
+
+        TupleType cPair = makePair();
 
         // the disjoint set that we're currently iterating through
         StatesBucket djSetList;

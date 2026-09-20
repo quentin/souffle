@@ -529,24 +529,12 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
 #define EVAL_LEFT(ty) ramBitCast<ty>(execute(shadow.getLhs(), ctxt))
 #define EVAL_RIGHT(ty) ramBitCast<ty>(execute(shadow.getRhs(), ctxt))
 
-// Overload CASE based on number of arguments.
-// CASE(Kind) -> BASE_CASE(Kind)
-// CASE(Kind, Structure, Arity, AuxiliaryArity) -> EXTEND_CASE(Kind, Structure, Arity, AuxiliaryArity)
-#define GET_MACRO(_1, _2, _3, _4, NAME, ...) NAME
-#define CASE(...) GET_MACRO(__VA_ARGS__, EXTEND_CASE, _Dummy, _Dummy2, BASE_CASE)(__VA_ARGS__)
-
-#define BASE_CASE(Kind) \
-    case (I_##Kind): {  \
+#define CASE(Kind, ...)                                                   \
+    case (I_##Kind): { \
         return [&]() -> RamDomain { \
             [[maybe_unused]] const auto& shadow = *static_cast<const interpreter::Kind*>(node); \
-            [[maybe_unused]] const auto& cur = *static_cast<const ram::Kind*>(node->getShadow());
-// EXTEND_CASE also defer the relation type
-#define EXTEND_CASE(Kind, Structure, Arity, AuxiliaryArity)       \
-    case (I_##Kind##_##Structure##_##Arity##_##AuxiliaryArity): { \
-        return [&]() -> RamDomain { \
-            [[maybe_unused]] const auto& shadow = *static_cast<const interpreter::Kind*>(node); \
-            [[maybe_unused]] const auto& cur = *static_cast<const ram::Kind*>(node->getShadow());\
-            using RelType = Relation<Arity, AuxiliaryArity, interpreter::Structure>;
+            [[maybe_unused]] const auto& cur = *static_cast<const ram::Kind*>(node->getShadow()); \
+            using RelType [[maybe_unused]] = DynamicRelation;
 #define ESAC(Kind) \
     }              \
     ();            \
@@ -994,38 +982,38 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             return !execute(shadow.getChild(), ctxt);
         ESAC(Negation)
 
-#define EMPTINESS_CHECK(Structure, Arity, AuxiliaryArity, ...)          \
-    CASE(EmptinessCheck, Structure, Arity, AuxiliaryArity)              \
+#define EMPTINESS_CHECK(...)          \
+    CASE(EmptinessCheck)              \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return rel.empty();                                             \
     ESAC(EmptinessCheck)
 
-        FOR_EACH(EMPTINESS_CHECK)
+        EMPTINESS_CHECK()
 #undef EMPTINESS_CHECK
 
-#define RELATION_SIZE(Structure, Arity, AuxiliaryArity, ...)            \
-    CASE(RelationSize, Structure, Arity, AuxiliaryArity)                \
+#define RELATION_SIZE(...)            \
+    CASE(RelationSize)                \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return rel.size();                                              \
     ESAC(RelationSize)
 
-        FOR_EACH(RELATION_SIZE)
+        RELATION_SIZE()
 #undef RELATION_SIZE
 
-#define EXISTENCE_CHECK(Structure, Arity, AuxiliaryArity, ...) \
-    CASE(ExistenceCheck, Structure, Arity, AuxiliaryArity)     \
+#define EXISTENCE_CHECK(...) \
+    CASE(ExistenceCheck)     \
         return evalExistenceCheck<RelType>(shadow, ctxt);      \
     ESAC(ExistenceCheck)
 
-        FOR_EACH(EXISTENCE_CHECK)
+        EXISTENCE_CHECK()
 #undef EXISTENCE_CHECK
 
-#define PROVENANCE_EXISTENCE_CHECK(Structure, Arity, AuxiliaryArity, ...) \
-    CASE(ProvenanceExistenceCheck, Structure, Arity, AuxiliaryArity)      \
+#define PROVENANCE_EXISTENCE_CHECK(...) \
+    CASE(ProvenanceExistenceCheck)      \
         return evalProvenanceExistenceCheck<RelType>(shadow, ctxt);       \
     ESAC(ProvenanceExistenceCheck)
 
-        FOR_EACH_PROVENANCE(PROVENANCE_EXISTENCE_CHECK)
+        PROVENANCE_EXISTENCE_CHECK()
 #undef PROVENANCE_EXISTENCE_CHECK
 
         CASE(Constraint)
@@ -1143,73 +1131,73 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             return result;
         ESAC(TupleOperation)
 
-#define SCAN(Structure, Arity, AuxiliaryArity, ...)                     \
-    CASE(Scan, Structure, Arity, AuxiliaryArity)                        \
+#define SCAN(...)                     \
+    CASE(Scan)                        \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalScan(rel, cur, shadow, ctxt);                        \
     ESAC(Scan)
 
-        FOR_EACH(SCAN)
+        SCAN()
 #undef SCAN
 
-#define PARALLEL_SCAN(Structure, Arity, AuxiliaryArity, ...)            \
-    CASE(ParallelScan, Structure, Arity, AuxiliaryArity)                \
+#define PARALLEL_SCAN(...)            \
+    CASE(ParallelScan)                \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalParallelScan(rel, cur, shadow, ctxt);                \
     ESAC(ParallelScan)
-        FOR_EACH(PARALLEL_SCAN)
+        PARALLEL_SCAN()
 #undef PARALLEL_SCAN
 
-#define INDEX_SCAN(Structure, Arity, AuxiliaryArity, ...) \
-    CASE(IndexScan, Structure, Arity, AuxiliaryArity)     \
+#define INDEX_SCAN(...) \
+    CASE(IndexScan)     \
         return evalIndexScan<RelType>(cur, shadow, ctxt); \
     ESAC(IndexScan)
 
-        FOR_EACH(INDEX_SCAN)
+        INDEX_SCAN()
 #undef INDEX_SCAN
 
-#define PARALLEL_INDEX_SCAN(Structure, Arity, AuxiliaryArity, ...)      \
-    CASE(ParallelIndexScan, Structure, Arity, AuxiliaryArity)           \
+#define PARALLEL_INDEX_SCAN(...)      \
+    CASE(ParallelIndexScan)           \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalParallelIndexScan(rel, cur, shadow, ctxt);           \
     ESAC(ParallelIndexScan)
 
-        FOR_EACH(PARALLEL_INDEX_SCAN)
+        PARALLEL_INDEX_SCAN()
 #undef PARALLEL_INDEX_SCAN
 
-#define IFEXISTS(Structure, Arity, AuxiliaryArity, ...)                 \
-    CASE(IfExists, Structure, Arity, AuxiliaryArity)                    \
+#define IFEXISTS(...)                 \
+    CASE(IfExists)                    \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalIfExists(rel, cur, shadow, ctxt);                    \
     ESAC(IfExists)
 
-        FOR_EACH(IFEXISTS)
+        IFEXISTS()
 #undef IFEXISTS
 
-#define PARALLEL_IFEXISTS(Structure, Arity, AuxiliaryArity, ...)        \
-    CASE(ParallelIfExists, Structure, Arity, AuxiliaryArity)            \
+#define PARALLEL_IFEXISTS(...)        \
+    CASE(ParallelIfExists)            \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalParallelIfExists(rel, cur, shadow, ctxt);            \
     ESAC(ParallelIfExists)
 
-        FOR_EACH(PARALLEL_IFEXISTS)
+        PARALLEL_IFEXISTS()
 #undef PARALLEL_IFEXISTS
 
-#define INDEX_IFEXISTS(Structure, Arity, AuxiliaryArity, ...) \
-    CASE(IndexIfExists, Structure, Arity, AuxiliaryArity)     \
+#define INDEX_IFEXISTS(...) \
+    CASE(IndexIfExists)     \
         return evalIndexIfExists<RelType>(cur, shadow, ctxt); \
     ESAC(IndexIfExists)
 
-        FOR_EACH(INDEX_IFEXISTS)
+        INDEX_IFEXISTS()
 #undef INDEX_IFEXISTS
 
-#define PARALLEL_INDEX_IFEXISTS(Structure, Arity, AuxiliaryArity, ...)  \
-    CASE(ParallelIndexIfExists, Structure, Arity, AuxiliaryArity)       \
+#define PARALLEL_INDEX_IFEXISTS(...)  \
+    CASE(ParallelIndexIfExists)       \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalParallelIndexIfExists(rel, cur, shadow, ctxt);       \
     ESAC(ParallelIndexIfExists)
 
-        FOR_EACH(PARALLEL_INDEX_IFEXISTS)
+        PARALLEL_INDEX_IFEXISTS()
 #undef PARALLEL_INDEX_IFEXISTS
 
         CASE(UnpackRecord)
@@ -1231,38 +1219,38 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             return execute(shadow.getNestedOperation(), ctxt);
         ESAC(UnpackRecord)
 
-#define PARALLEL_AGGREGATE(Structure, Arity, AuxiliaryArity, ...)       \
-    CASE(ParallelAggregate, Structure, Arity, AuxiliaryArity)           \
+#define PARALLEL_AGGREGATE(...)       \
+    CASE(ParallelAggregate)           \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalParallelAggregate(rel, cur, shadow, ctxt);           \
     ESAC(ParallelAggregate)
 
-        FOR_EACH(PARALLEL_AGGREGATE)
+        PARALLEL_AGGREGATE()
 #undef PARALLEL_AGGREGATE
 
-#define AGGREGATE(Structure, Arity, AuxiliaryArity, ...)                \
-    CASE(Aggregate, Structure, Arity, AuxiliaryArity)                   \
+#define AGGREGATE(...)                \
+    CASE(Aggregate)                   \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalAggregate(cur, shadow, rel.scan(), ctxt);            \
     ESAC(Aggregate)
 
-        FOR_EACH(AGGREGATE)
+        AGGREGATE()
 #undef AGGREGATE
 
-#define PARALLEL_INDEX_AGGREGATE(Structure, Arity, AuxiliaryArity, ...) \
-    CASE(ParallelIndexAggregate, Structure, Arity, AuxiliaryArity)      \
+#define PARALLEL_INDEX_AGGREGATE(...) \
+    CASE(ParallelIndexAggregate)      \
         return evalParallelIndexAggregate<RelType>(cur, shadow, ctxt);  \
     ESAC(ParallelIndexAggregate)
 
-        FOR_EACH(PARALLEL_INDEX_AGGREGATE)
+        PARALLEL_INDEX_AGGREGATE()
 #undef PARALLEL_INDEX_AGGREGATE
 
-#define INDEX_AGGREGATE(Structure, Arity, AuxiliaryArity, ...) \
-    CASE(IndexAggregate, Structure, Arity, AuxiliaryArity)     \
+#define INDEX_AGGREGATE(...) \
+    CASE(IndexAggregate)     \
         return evalIndexAggregate<RelType>(cur, shadow, ctxt); \
     ESAC(IndexAggregate)
 
-        FOR_EACH(INDEX_AGGREGATE)
+        INDEX_AGGREGATE()
 #undef INDEX_AGGREGATE
 
         CASE(Break)
@@ -1291,32 +1279,31 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             return result;
         ESAC(Filter)
 
-#define GUARDED_INSERT(Structure, Arity, AuxiliaryArity, ...)     \
-    CASE(GuardedInsert, Structure, Arity, AuxiliaryArity)         \
+#define GUARDED_INSERT(...)     \
+    CASE(GuardedInsert)         \
         auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalGuardedInsert(rel, shadow, ctxt);              \
     ESAC(GuardedInsert)
 
-        FOR_EACH(GUARDED_INSERT)
+        GUARDED_INSERT()
 #undef GUARDED_INSERT
 
-#define INSERT(Structure, Arity, AuxiliaryArity, ...)             \
-    CASE(Insert, Structure, Arity, AuxiliaryArity)                \
+#define INSERT(...)             \
+    CASE(Insert)                \
         auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalInsert(rel, shadow, ctxt);                     \
     ESAC(Insert)
 
-        FOR_EACH(INSERT)
+        INSERT()
 #undef INSERT
 
-#define ERASE(Structure, Arity, AuxiliaryArity, ...)                                                 \
-    CASE(Erase, Structure, Arity, AuxiliaryArity)                                                    \
-        void(static_cast<RelType*>(shadow.getRelation()));                                           \
-        auto& rel = *static_cast<BtreeDeleteRelation<Arity, AuxiliaryArity>*>(shadow.getRelation()); \
+#define ERASE(...)                                                 \
+    CASE(Erase)                                                    \
+        auto& rel = *static_cast<DynamicRelation*>(shadow.getRelation());                            \
         return evalErase(rel, shadow, ctxt);                                                         \
     ESAC(Erase)
 
-        FOR_EACH_BTREE_DELETE(ERASE)
+        ERASE()
 #undef ERASE
 
         CASE(SubroutineReturn)
@@ -1385,13 +1372,13 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
             return true;
         ESAC(Clear)
 
-#define ESTIMATEJOINSIZE(Structure, Arity, AuxiliaryArity, ...)         \
-    CASE(EstimateJoinSize, Structure, Arity, AuxiliaryArity)            \
+#define ESTIMATEJOINSIZE(...)         \
+    CASE(EstimateJoinSize)            \
         const auto& rel = *static_cast<RelType*>(shadow.getRelation()); \
         return evalEstimateJoinSize<RelType>(rel, cur, shadow, ctxt);   \
     ESAC(EstimateJoinSize)
 
-        FOR_EACH(ESTIMATEJOINSIZE)
+        ESTIMATEJOINSIZE()
 #undef ESTIMATEJOINSIZE
 
         CASE(Call)
@@ -1476,8 +1463,8 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
         ESAC(Query)
 
         CASE(MergeExtend)
-            auto& src = *static_cast<EqrelRelation*>(getRelationHandle(shadow.getSourceId()).get());
-            auto& trg = *static_cast<EqrelRelation*>(getRelationHandle(shadow.getTargetId()).get());
+            auto& src = *static_cast<DynamicRelation*>(getRelationHandle(shadow.getSourceId()).get());
+            auto& trg = *static_cast<DynamicRelation*>(getRelationHandle(shadow.getTargetId()).get());
             src.extendAndInsert(trg);
             return true;
         ESAC(MergeExtend)
@@ -1503,17 +1490,17 @@ RamDomain Engine::execute(const Node* node, Context& ctxt) {
 
 template <typename Rel>
 RamDomain Engine::evalExistenceCheck(const ExistenceCheck& shadow, Context& ctxt) {
-    constexpr std::size_t Arity = Rel::Arity;
+    const auto& superInfo = shadow.getSuperInst();
+    const std::size_t Arity = superInfo.first.size();
     std::size_t viewPos = shadow.getViewId();
 
     if (profileEnabled && !shadow.isTemp()) {
         reads[shadow.getRelationName()]++;
     }
 
-    const auto& superInfo = shadow.getSuperInst();
     // for total we use the exists test
     if (shadow.isTotalSearch()) {
-        souffle::Tuple<RamDomain, Arity> tuple;
+        souffle::DynamicTuple tuple(Arity);
         TUPLE_COPY_FROM(tuple, superInfo.first);
         /* TupleElement */
         for (const auto& tupleElement : superInfo.tupleFirst) {
@@ -1527,8 +1514,8 @@ RamDomain Engine::evalExistenceCheck(const ExistenceCheck& shadow, Context& ctxt
     }
 
     // for partial we search for lower and upper boundaries
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(Arity);
+    souffle::DynamicTuple high(Arity);
     TUPLE_COPY_FROM(low, superInfo.first);
     TUPLE_COPY_FROM(high, superInfo.second);
 
@@ -1549,12 +1536,12 @@ RamDomain Engine::evalExistenceCheck(const ExistenceCheck& shadow, Context& ctxt
 template <typename Rel>
 RamDomain Engine::evalProvenanceExistenceCheck(const ProvenanceExistenceCheck& shadow, Context& ctxt) {
     // construct the pattern tuple
-    constexpr std::size_t Arity = Rel::Arity;
     const auto& superInfo = shadow.getSuperInst();
+    const std::size_t Arity = superInfo.first.size();
 
     // for partial we search for lower and upper boundaries
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(Arity);
+    souffle::DynamicTuple high(Arity);
     TUPLE_COPY_FROM(low, superInfo.first);
     TUPLE_COPY_FROM(high, superInfo.second);
 
@@ -1638,7 +1625,6 @@ template <typename Rel>
 RamDomain Engine::evalEstimateJoinSize(
         const Rel& rel, const ram::EstimateJoinSize& cur, const EstimateJoinSize& shadow, Context& ctxt) {
     (void)ctxt;
-    constexpr std::size_t Arity = Rel::Arity;
     bool onlyConstants = true;
 
     for (auto col : cur.getKeyColumns()) {
@@ -1684,17 +1670,17 @@ RamDomain Engine::evalEstimateJoinSize(
     }
 
     // ensure range is non-empty
-    auto* index = rel.getIndex(indexPos);
+    const auto& index = rel.getIndex(indexPos);
     // initial values
     double total = 0;
     double duplicates = 0;
 
-    if (!index->scan().empty()) {
+    if (!index.scan().empty()) {
         // assign first tuple as prev as a dummy
         bool first = true;
-        Tuple<RamDomain, Arity> prev = *index->scan().begin();
+        souffle::DynamicTuple prev = *index.scan().begin();
 
-        for (const auto& tuple : index->scan()) {
+        for (const auto& tuple : index.scan()) {
             // only if every constant matches do we consider the tuple
             bool matchesConstants = std::all_of(keyConstants.begin(), keyConstants.end(),
                     [tuple](const auto& p) { return tuple[p.first] == p.second; });
@@ -1750,11 +1736,11 @@ RamDomain Engine::evalEstimateJoinSize(
 
 template <typename Rel>
 RamDomain Engine::evalIndexScan(const ram::IndexScan& cur, const IndexScan& shadow, Context& ctxt) {
-    constexpr std::size_t Arity = Rel::Arity;
+    const std::size_t Arity = shadow.getSuperInst().first.size();
     // create pattern tuple for range query
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(Arity);
+    souffle::DynamicTuple high(Arity);
     CAL_SEARCH_BOUND(superInfo, low, high);
 
     std::size_t viewId = shadow.getViewId();
@@ -1775,10 +1761,10 @@ RamDomain Engine::evalParallelIndexScan(
     auto viewContext = shadow.getViewContext();
 
     // create pattern tuple for range query
-    constexpr std::size_t Arity = Rel::Arity;
+    const std::size_t Arity = shadow.getSuperInst().first.size();
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(Arity);
+    souffle::DynamicTuple high(Arity);
     CAL_SEARCH_BOUND(superInfo, low, high);
 
     std::size_t indexPos = shadow.getViewId();
@@ -1857,10 +1843,9 @@ RamDomain Engine::evalParallelIfExists(
 template <typename Rel>
 RamDomain Engine::evalIndexIfExists(
         const ram::IndexIfExists& cur, const IndexIfExists& shadow, Context& ctxt) {
-    constexpr std::size_t Arity = Rel::Arity;
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(superInfo.first.size());
+    souffle::DynamicTuple high(superInfo.first.size());
     CAL_SEARCH_BOUND(superInfo, low, high);
 
     std::size_t viewId = shadow.getViewId();
@@ -1884,10 +1869,9 @@ RamDomain Engine::evalParallelIndexIfExists(const Rel& rel, const ram::ParallelI
     auto viewInfo = viewContext->getViewInfoForNested();
 
     // create pattern tuple for range query
-    constexpr std::size_t Arity = Rel::Arity;
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(superInfo.first.size());
+    souffle::DynamicTuple high(superInfo.first.size());
     CAL_SEARCH_BOUND(superInfo, low, high);
 
     std::size_t indexPos = shadow.getViewId();
@@ -2056,8 +2040,7 @@ RamDomain Engine::evalAggregate(
     });
 
     // write result to environment
-    souffle::Tuple<RamDomain, 1> tuple;
-    tuple[0] = res;
+    souffle::DynamicTuple tuple{res};
     ctxt[aggregate.getTupleId()] = tuple.data();
 
     if (!shouldRunNested) {
@@ -2092,11 +2075,11 @@ RamDomain Engine::evalParallelIndexAggregate(
         newCtxt.createView(*getRelationHandle(info[0]), info[1], info[2]);
     }
     // init temporary tuple for this level
-    constexpr std::size_t Arity = Rel::Arity;
+    const std::size_t Arity = shadow.getSuperInst().first.size();
     const auto& superInfo = shadow.getSuperInst();
     // get lower and upper boundaries for iteration
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    souffle::DynamicTuple low(Arity);
+    souffle::DynamicTuple high(Arity);
     CAL_SEARCH_BOUND(superInfo, low, high);
 
     std::size_t viewId = shadow.getViewId();
@@ -2109,10 +2092,10 @@ template <typename Rel>
 RamDomain Engine::evalIndexAggregate(
         const ram::IndexAggregate& cur, const IndexAggregate& shadow, Context& ctxt) {
     // init temporary tuple for this level
-    const std::size_t Arity = Rel::Arity;
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> low;
-    souffle::Tuple<RamDomain, Arity> high;
+    const std::size_t Arity = superInfo.first.size();
+    souffle::DynamicTuple low(Arity);
+    souffle::DynamicTuple high(Arity);
     CAL_SEARCH_BOUND(superInfo, low, high);
 
     std::size_t viewId = shadow.getViewId();
@@ -2123,9 +2106,9 @@ RamDomain Engine::evalIndexAggregate(
 
 template <typename Rel>
 RamDomain Engine::evalInsert(Rel& rel, const Insert& shadow, Context& ctxt) {
-    constexpr std::size_t Arity = Rel::Arity;
+    const std::size_t Arity = rel.getArity();
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> tuple;
+    souffle::DynamicTuple tuple(Arity);
     TUPLE_COPY_FROM(tuple, superInfo.first);
 
     /* TupleElement */
@@ -2144,9 +2127,9 @@ RamDomain Engine::evalInsert(Rel& rel, const Insert& shadow, Context& ctxt) {
 
 template <typename Rel>
 RamDomain Engine::evalErase(Rel& rel, const Erase& shadow, Context& ctxt) {
-    constexpr std::size_t Arity = Rel::Arity;
+    const std::size_t Arity = rel.getArity();
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> tuple;
+    souffle::DynamicTuple tuple(Arity);
     TUPLE_COPY_FROM(tuple, superInfo.first);
 
     /* TupleElement */
@@ -2169,9 +2152,9 @@ RamDomain Engine::evalGuardedInsert(Rel& rel, const GuardedInsert& shadow, Conte
         return true;
     }
 
-    constexpr std::size_t Arity = Rel::Arity;
+    const std::size_t Arity = rel.getArity();
     const auto& superInfo = shadow.getSuperInst();
-    souffle::Tuple<RamDomain, Arity> tuple;
+    souffle::DynamicTuple tuple(Arity);
     TUPLE_COPY_FROM(tuple, superInfo.first);
 
     /* TupleElement */

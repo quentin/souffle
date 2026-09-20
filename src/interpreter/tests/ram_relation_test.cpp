@@ -20,6 +20,7 @@
 #include "RelationTag.h"
 #include "interpreter/Engine.h"
 #include "ram/Expression.h"
+#include "ram/Erase.h"
 #include "ram/IO.h"
 #include "ram/Insert.h"
 #include "ram/Program.h"
@@ -100,6 +101,49 @@ const std::string testInterpreterStore(
     return sout.str();
 }
 
+const std::string testInterpreterProgram(std::vector<std::string> attributes,
+        std::vector<std::string> attributeTypes, std::size_t auxiliaryArity,
+        RelationRepresentation representation, VecOwn<ram::Statement> statements) {
+    Global glb;
+    glb.config().set("jobs", "1");
+
+    const std::size_t arity = attributes.size();
+    VecOwn<ram::Relation> relations;
+    relations.push_back(mk<ram::Relation>("test", arity, auxiliaryArity, attributes, attributeTypes,
+            representation));
+
+    Own<ram::Statement> main;
+    for (auto it = statements.rbegin(); it != statements.rend(); ++it) {
+        if (!main) {
+            main = std::move(*it);
+        } else {
+            main = mk<ram::Sequence>(std::move(*it), std::move(main));
+        }
+    }
+
+    Json types = Json::object{
+            {"relation", Json::object{{"arity", static_cast<long long>(arity)},
+                                 {"types", Json::array(attributeTypes.begin(), attributeTypes.end())}}}};
+    std::map<std::string, std::string> ioDirs = {{"operation", "output"}, {"IO", "stdout"},
+            {"attributeNames", "x\ty"}, {"name", "test"},
+            {"auxArity", std::to_string(auxiliaryArity)}, {"types", types.dump()}};
+    main = mk<ram::Sequence>(std::move(main), mk<ram::IO>("test", ioDirs));
+
+    std::map<std::string, Own<Statement>> subroutines;
+    Own<Program> program = mk<Program>(std::move(relations), std::move(main), std::move(subroutines));
+    ErrorReport errorReport;
+    DebugReport debugReport(glb);
+    TranslationUnit translationUnit(glb, std::move(program), errorReport, debugReport);
+    Own<Engine> interpreter = mk<Engine>(translationUnit, 1);
+
+    std::streambuf* oldCoutStreambuf = std::cout.rdbuf();
+    std::ostringstream output;
+    std::cout.rdbuf(output.rdbuf());
+    interpreter->executeMain();
+    std::cout.rdbuf(oldCoutStreambuf);
+    return output.str();
+}
+
 TEST(IO_store, FloatSimple) {
     std::vector<std::string> attribs = {"a", "b"};
     std::vector<std::string> attribsTypes = {"f", "f"};
@@ -117,6 +161,74 @@ test
 
     auto result = testInterpreterStore(attribs, attribsTypes, std::move(exprs));
     EXPECT_EQ(expected, result);
+}
+
+TEST(IO_store, DynamicArityBeyondStaticInterpreterRange) {
+    constexpr std::size_t arity = 32;
+    std::vector<std::string> attributes;
+    std::vector<std::string> types(arity, "i");
+    VecOwn<Expression> values;
+    std::stringstream expected;
+    expected << "---------------\ntest\n===============\n";
+    for (std::size_t i = 0; i < arity; ++i) {
+        attributes.push_back("a" + std::to_string(i));
+        values.push_back(mk<SignedConstant>(static_cast<RamDomain>(i)));
+        if (i != 0) expected << '\t';
+        expected << i;
+    }
+    expected << "\n===============\n";
+
+    EXPECT_EQ(expected.str(), testInterpreterStore(attributes, types, std::move(values)));
+}
+
+TEST(InterpreterDynamicBackends, BtreeDelete) {
+    VecOwn<Expression> inserted;
+    inserted.push_back(mk<SignedConstant>(1));
+    inserted.push_back(mk<SignedConstant>(2));
+    VecOwn<Expression> erased;
+    erased.push_back(mk<SignedConstant>(1));
+    erased.push_back(mk<SignedConstant>(2));
+
+    VecOwn<ram::Statement> statements;
+    statements.push_back(mk<ram::Query>(mk<ram::Insert>("test", std::move(inserted))));
+    statements.push_back(mk<ram::Query>(mk<ram::Erase>("test", std::move(erased))));
+
+    const auto output = testInterpreterProgram(
+            {"a", "b"}, {"i", "i"}, 0, RelationRepresentation::BTREE_DELETE, std::move(statements));
+    EXPECT_EQ("---------------\ntest\n===============\n===============\n", output);
+}
+
+TEST(InterpreterDynamicBackends, ProvenanceUpdate) {
+    VecOwn<ram::Statement> statements;
+    for (const auto [rule, level] : {std::pair<RamDomain, RamDomain>{7, 5}, {3, 5}, {1, 7}}) {
+        VecOwn<Expression> values;
+        values.push_back(mk<SignedConstant>(1));
+        values.push_back(mk<SignedConstant>(2));
+        values.push_back(mk<SignedConstant>(rule));
+        values.push_back(mk<SignedConstant>(level));
+        statements.push_back(mk<ram::Query>(mk<ram::Insert>("test", std::move(values))));
+    }
+
+    const auto output = testInterpreterProgram({"x", "y", "@rule_number", "@level_number"},
+            {"i", "i", "i", "i"}, 2, RelationRepresentation::BTREE, std::move(statements));
+    EXPECT_EQ("---------------\ntest\n===============\n1\t2\t3\t5\n===============\n", output);
+}
+
+TEST(InterpreterDynamicBackends, EquivalenceRelationClosure) {
+    VecOwn<ram::Statement> statements;
+    for (const auto [lhs, rhs] : {std::pair<RamDomain, RamDomain>{1, 2}, {2, 3}}) {
+        VecOwn<Expression> values;
+        values.push_back(mk<SignedConstant>(lhs));
+        values.push_back(mk<SignedConstant>(rhs));
+        statements.push_back(mk<ram::Query>(mk<ram::Insert>("test", std::move(values))));
+    }
+
+    const auto output = testInterpreterProgram(
+            {"a", "b"}, {"i", "i"}, 0, RelationRepresentation::EQREL, std::move(statements));
+    EXPECT_EQ(std::size_t{9}, static_cast<std::size_t>(std::count(output.begin(), output.end(), '\n') - 4));
+    EXPECT_NE(std::string::npos, output.find("1\t1\n"));
+    EXPECT_NE(std::string::npos, output.find("1\t3\n"));
+    EXPECT_NE(std::string::npos, output.find("3\t1\n"));
 }
 
 TEST(IO_store, Signed) {
