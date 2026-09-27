@@ -87,7 +87,7 @@ jobs:
 
     - name: create-coverage-report
       if: ${{ matrix.domain == '32bit' }}
-      run: lcov --capture --directory build --output-file coverage.info --ignore-errors mismatch
+      run: lcov --capture --directory build --output-file coverage.info --ignore-errors mismatch --exclude '/usr/include/*' --exclude '/usr/local/include/*' --rc geninfo_unexecuted_blocks=1
 
     - name: remove-system-files-from-coverage-report
       if: ${{ matrix.domain == '32bit' }}
